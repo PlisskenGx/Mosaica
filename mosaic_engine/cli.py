@@ -301,6 +301,11 @@ def main() -> None:
             "--cleanup cannot be negative"
         )
 
+    if args.ppi <= 0:
+        parser.error(
+            "--ppi must be positive"
+        )
+
     config = MosaicConfig(
 
         tile_shape=args.shape,

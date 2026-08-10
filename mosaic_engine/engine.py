@@ -3,7 +3,6 @@ from __future__ import annotations
 from io import BytesIO
 from pathlib import Path
 
-import cairosvg
 from PIL import Image
 
 from .color import nearest_palette_index
@@ -27,6 +26,15 @@ def _open_source_image(
     """
 
     if source_path.suffix.lower() == ".svg":
+        try:
+            import cairosvg
+        except (ImportError, OSError) as exc:
+            raise RuntimeError(
+                "SVG input requires CairoSVG and the native "
+                "Cairo library. Install both, or convert the "
+                "source artwork to a raster image such as PNG."
+            ) from exc
+
         png_bytes = cairosvg.svg2png(
             url=str(source_path),
             output_width=4096,
@@ -733,6 +741,54 @@ def generate_mosaic(
     palette: list[PaletteColor],
     config: MosaicConfig,
 ) -> MosaicResult:
+
+    if config.tile_width_in <= 0:
+        raise ValueError(
+            "Tile width must be positive."
+        )
+
+    if config.tile_height_in <= 0:
+        raise ValueError(
+            "Tile height must be positive."
+        )
+
+    if config.grout_width_in < 0:
+        raise ValueError(
+            "Grout width cannot be negative."
+        )
+
+    if (
+        config.target_width_in is not None
+        and config.target_width_in <= 0
+    ):
+        raise ValueError(
+            "Target width must be positive."
+        )
+
+    if (
+        config.target_height_in is not None
+        and config.target_height_in <= 0
+    ):
+        raise ValueError(
+            "Target height must be positive."
+        )
+
+    if config.artwork_scale <= 0:
+        raise ValueError(
+            "Artwork scale must be positive."
+        )
+
+    if (
+        config.tile_shape == "square"
+        and (
+            config.target_width_in is not None
+            or config.target_height_in is not None
+        )
+    ):
+        raise ValueError(
+            "Exact-panel clipping is currently "
+            "supported for hex tiles only."
+        )
 
     if not palette:
         raise ValueError(

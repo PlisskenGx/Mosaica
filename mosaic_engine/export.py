@@ -204,6 +204,11 @@ def export_preview_png(
     the geometry engine.
     """
 
+    if pixels_per_inch <= 0:
+        raise ValueError(
+            "Preview pixels per inch must be positive."
+        )
+
     path = Path(path)
 
     pad = 4
