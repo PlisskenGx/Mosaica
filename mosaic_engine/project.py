@@ -152,6 +152,18 @@ class MosaicProject:
 
         self._overrides[(row, column)] = palette_index
 
+    def is_editable(self, row: int, column: int) -> bool:
+        """Return whether editor policy permits a manual override."""
+
+        placement = self._editable_placement(row, column)
+        return (
+            placement.piece_type != "outside"
+            and (
+                placement.piece_type == "full"
+                or not self.protect_perimeter
+            )
+        )
+
     def clear_override(self, row: int, column: int) -> None:
         self._validate_coordinates(row, column)
         self._overrides.pop((row, column), None)

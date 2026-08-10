@@ -91,7 +91,18 @@ def test_editor_route_loads_saved_project(tmp_path):
     status, script = _request(app, "GET", "/editor.js")
     assert status == "200 OK"
     assert "beforeunload" in script
-    assert "tile.id === selectedId" in script
+    assert "selectedIds.has(tile.id)" in script
+    assert "event.shiftKey" in script
+    assert "selectedIds.clear()" in script
+    assert "selectedIds.add(tile.id)" in script
+    assert "selectedIds.delete(tile.id)" in script
+    assert 'event.key >= "1" && event.key <= "9"' in script
+    assert 'event.key.toLowerCase() === "x"' in script
+    assert 'event.key === "Escape"' in script
+    assert "isEditableControl(event.target)" in script
+    assert "input, textarea, select" in script
+    assert 'request("/api/overrides/batch"' in script
+    assert 'request("/api/overrides/batch-clear"' in script
 
     status, stylesheet = _request(app, "GET", "/editor.css")
     assert status == "200 OK"
@@ -193,6 +204,121 @@ def test_api_sets_and_clears_override(tmp_path):
     assert tile["override_index"] is None
     assert tile["effective_index"] == 0
     assert payload["dirty"] is True
+
+
+def test_batch_override_updates_all_tiles_and_counts(tmp_path):
+    app = MosaicEditorApp(_save_project(tmp_path))
+
+    status, payload = _request(
+        app,
+        "POST",
+        "/api/overrides/batch",
+        {
+            "tile_ids": ["placement-000000", "placement-000001"],
+            "palette_index": 1,
+        },
+    )
+
+    assert status == "200 OK"
+    assert payload["dirty"] is True
+    assert payload["counts"] == {"Black": 0, "White": 2}
+    assert all(tile["override_index"] == 1 for tile in payload["tiles"])
+    assert all(tile["effective_index"] == 1 for tile in payload["tiles"])
+
+
+def test_batch_clear_restores_generated_values(tmp_path):
+    app = MosaicEditorApp(_save_project(tmp_path))
+    tile_ids = ["placement-000000", "placement-000001"]
+    _request(
+        app,
+        "POST",
+        "/api/overrides/batch",
+        {"tile_ids": tile_ids, "palette_index": 1},
+    )
+
+    status, payload = _request(
+        app,
+        "POST",
+        "/api/overrides/batch-clear",
+        {"tile_ids": tile_ids},
+    )
+
+    assert status == "200 OK"
+    assert payload["counts"] == {"Black": 2, "White": 0}
+    assert all(tile["override_index"] is None for tile in payload["tiles"])
+    assert all(tile["effective_index"] == 0 for tile in payload["tiles"])
+
+
+def test_invalid_batch_is_atomic_and_does_not_mark_dirty(tmp_path):
+    config = MosaicConfig(
+        tile_shape="hex",
+        target_width_in=3,
+        target_height_in=2,
+    )
+    geometry = build_panel_geometry(config, 3, 2)
+    app = MosaicEditorApp(_save_project(tmp_path, geometry))
+    _, initial = _request(app, "GET", "/api/project")
+    editable = next(tile for tile in initial["tiles"] if tile["editable"])
+    protected = next(tile for tile in initial["tiles"] if not tile["editable"])
+
+    status, error = _request(
+        app,
+        "POST",
+        "/api/overrides/batch",
+        {
+            "tile_ids": [editable["id"], protected["id"]],
+            "palette_index": 1,
+        },
+    )
+
+    assert status == "400 Bad Request"
+    assert "protected" in error["error"]
+    assert app.project.override_value(
+        editable["row"],
+        editable["column"],
+    ) is None
+    assert app.dirty is False
+
+    app.project.set_override(
+        editable["row"],
+        editable["column"],
+        1,
+    )
+    status, error = _request(
+        app,
+        "POST",
+        "/api/overrides/batch-clear",
+        {"tile_ids": [editable["id"], protected["id"]]},
+    )
+
+    assert status == "400 Bad Request"
+    assert "protected" in error["error"]
+    assert app.project.override_value(
+        editable["row"],
+        editable["column"],
+    ) == 1
+    assert app.dirty is False
+
+
+def test_noop_batch_does_not_mark_clean_project_dirty(tmp_path):
+    path = _save_project(tmp_path)
+    project = MosaicProject.load(path)
+    project.set_override(0, 0, 1)
+    project.save(path)
+    app = MosaicEditorApp(path)
+
+    status, payload = _request(
+        app,
+        "POST",
+        "/api/overrides/batch",
+        {
+            "tile_ids": ["placement-000000"],
+            "palette_index": 1,
+        },
+    )
+
+    assert status == "200 OK"
+    assert payload["dirty"] is False
 
 
 def test_api_rejects_protected_perimeter_edits(tmp_path):

@@ -29,6 +29,19 @@ class MosaicEditorApp:
         self.project_path = Path(project_path).resolve(strict=False)
         self.project = MosaicProject.load(self.project_path)
         self.dirty = False
+        self._tile_coordinates = {
+            self._tile_id(index): (
+                placement.row,
+                placement.column,
+            )
+            for index, placement
+            in enumerate(self.project.geometry.placements)
+        }
+        self._tile_ids = {
+            coordinate: tile_id
+            for tile_id, coordinate
+            in self._tile_coordinates.items()
+        }
 
     def __call__(self, environ, start_response):
         method = environ.get("REQUEST_METHOD", "GET").upper()
@@ -65,6 +78,67 @@ class MosaicEditorApp:
                 had_overrides = bool(self.project.overrides)
                 self.project.clear_all_overrides()
                 self.dirty = self.dirty or had_overrides
+                return self._json(
+                    start_response,
+                    "200 OK",
+                    self.project_payload(),
+                )
+
+            if method == "POST" and path == "/api/overrides/batch":
+                body = self._request_json(environ)
+                palette_index = body.get("palette_index")
+
+                if not isinstance(palette_index, int):
+                    raise ValueError(
+                        "palette_index must be an integer."
+                    )
+
+                if not 0 <= palette_index < len(self.project.palette):
+                    raise ValueError(
+                        "Palette index is outside the project palette."
+                    )
+
+                coordinates = self._batch_coordinates(body)
+                changed = any(
+                    self.project.override_value(row, column)
+                    != palette_index
+                    for row, column in coordinates
+                )
+
+                for row, column in coordinates:
+                    self.project.set_override(
+                        row,
+                        column,
+                        palette_index,
+                    )
+
+                if changed:
+                    self.dirty = True
+
+                return self._json(
+                    start_response,
+                    "200 OK",
+                    self.project_payload(),
+                )
+
+            if (
+                method == "POST"
+                and path == "/api/overrides/batch-clear"
+            ):
+                body = self._request_json(environ)
+                coordinates = self._batch_coordinates(body)
+                changed = any(
+                    self.project.override_value(row, column)
+                    is not None
+                    for row, column in coordinates
+                )
+
+                for row, column in coordinates:
+                    self.project.clear_override(row, column)
+
+                if changed:
+                    self.dirty = True
+
                 return self._json(
                     start_response,
                     "200 OK",
@@ -158,19 +232,10 @@ class MosaicEditorApp:
         generated_index = self.project.generated_value(row, column)
         override_index = self.project.override_value(row, column)
         effective_index = self.project.effective_index(row, column)
-        editable = (
-            placement.piece_type != "outside"
-            and (
-                placement.piece_type == "full"
-                or not self.project.protect_perimeter
-            )
-        )
+        editable = self.project.is_editable(row, column)
 
         return {
-            "id": (
-                "placement-"
-                f"{row * self.project.columns + column:06d}"
-            ),
+            "id": self._tile_ids[(row, column)],
             "row": row,
             "column": column,
             "display_row": row + 1,
@@ -186,6 +251,43 @@ class MosaicEditorApp:
             "override_index": override_index,
             "effective_index": effective_index,
         }
+
+    def _batch_coordinates(self, body: dict) -> list[tuple[int, int]]:
+        tile_ids = body.get("tile_ids")
+
+        if not isinstance(tile_ids, list) or not tile_ids:
+            raise ValueError("tile_ids must be a non-empty list.")
+
+        if (
+            any(not isinstance(tile_id, str) for tile_id in tile_ids)
+            or len(tile_ids) != len(set(tile_ids))
+        ):
+            raise ValueError(
+                "tile_ids must contain unique stable tile ID strings."
+            )
+
+        coordinates: list[tuple[int, int]] = []
+
+        for tile_id in tile_ids:
+            coordinate = self._tile_coordinates.get(tile_id)
+
+            if coordinate is None:
+                raise ValueError(f"Unknown tile ID: {tile_id}")
+
+            row, column = coordinate
+
+            if not self.project.is_editable(row, column):
+                raise ValueError(
+                    f"Tile {tile_id} is protected from editing."
+                )
+
+            coordinates.append(coordinate)
+
+        return coordinates
+
+    @staticmethod
+    def _tile_id(index: int) -> str:
+        return f"placement-{index:06d}"
 
     @staticmethod
     def _tile_action(path: str):

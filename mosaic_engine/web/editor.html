@@ -27,7 +27,7 @@
 
     <aside>
       <section>
-        <h2>Selected tile</h2>
+        <h2>Selection</h2>
         <div id="empty-selection">Select a full tile to inspect or edit it.</div>
         <dl id="selection" hidden>
           <dt>Row / column</dt><dd id="tile-coordinate"></dd>
@@ -36,7 +36,11 @@
           <dt>Override</dt><dd id="tile-override"></dd>
           <dt>Effective</dt><dd id="tile-effective"></dd>
         </dl>
-        <button id="clear-selected" class="secondary" disabled>Clear Override</button>
+        <dl id="multi-selection" hidden>
+          <dt>Selected tiles</dt><dd id="selection-count"></dd>
+          <dt>Effective</dt><dd id="selection-effective"></dd>
+        </dl>
+        <button id="clear-selected" class="secondary" disabled>Clear Selected Overrides</button>
       </section>
 
       <section>
