@@ -9,6 +9,7 @@ from typing import Iterable
 from .evidence import BWEvidence, Coordinate, compute_project_bw_evidence
 from .processing import palette_extremes, tile_neighbors
 from .project import MosaicProject
+from .refinement import RefinementReport
 
 
 @dataclass(frozen=True)
@@ -63,6 +64,58 @@ class BenchmarkReport:
             in self.generated_same_neighbor_histogram.items()
         }
         return data
+
+
+@dataclass(frozen=True)
+class ProposalOverlapReport:
+    proposed_changes: int
+    proposed_matching_human_direction: int
+    proposed_disagreeing_with_human: int
+    human_real_changes: int
+    human_changes_captured: int
+    precision: float | None
+    recall: float | None
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+def evaluate_refinement_proposals(
+    report: RefinementReport,
+    project: MosaicProject,
+) -> ProposalOverlapReport:
+    """Compare completed proposals to labels without feeding labels back."""
+
+    generated = project.generated_grid
+    human = {
+        coordinate: value
+        for coordinate, value in project.overrides.items()
+        if generated[coordinate[0]][coordinate[1]] != value
+    }
+    proposed = {
+        ((change.row, change.column), change.proposed_index)
+        for proposal in report.proposals
+        for change in proposal.changes
+    }
+    matches = {
+        (coordinate, value)
+        for coordinate, value in proposed
+        if human.get(coordinate) == value
+    }
+    captured = {
+        coordinate for coordinate, _ in matches
+    }
+    proposed_count = len(proposed)
+    human_count = len(human)
+    return ProposalOverlapReport(
+        proposed_changes=proposed_count,
+        proposed_matching_human_direction=len(matches),
+        proposed_disagreeing_with_human=proposed_count - len(matches),
+        human_real_changes=human_count,
+        human_changes_captured=len(captured),
+        precision=(len(matches) / proposed_count if proposed_count else None),
+        recall=(len(captured) / human_count if human_count else None),
+    )
 
 
 def benchmark_reports_json(

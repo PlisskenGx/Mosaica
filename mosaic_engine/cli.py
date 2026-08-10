@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 
 from email import parser
 from pathlib import Path
@@ -8,8 +9,10 @@ from pathlib import Path
 from .benchmark import (
     analyze_benchmark_projects,
     benchmark_reports_json,
+    evaluate_refinement_proposals,
     format_benchmark_reports,
 )
+from .evidence import compute_project_bw_evidence
 from .engine import generate_mosaic
 
 from .export import (
@@ -24,6 +27,10 @@ from .model import (
     PaletteColor,
 )
 from .project import MosaicProject
+from .refinement import (
+    format_refinement_report,
+    generate_refinement_proposals,
+)
 
 
 def _parse_color(
@@ -377,6 +384,18 @@ def main() -> None:
     )
 
     parser.add_argument(
+        "--refine-proposals",
+        metavar="PROJECT_JSON",
+        help="report deterministic refinement proposals for a saved project",
+    )
+
+    parser.add_argument(
+        "--refine-json",
+        action="store_true",
+        help="emit refinement proposals as JSON",
+    )
+
+    parser.add_argument(
         "--art-inset",
         type=float,
         default=0.0,
@@ -415,6 +434,42 @@ def main() -> None:
     )
 
     args = parser.parse_args()
+
+    if args.refine_proposals:
+        if (
+            args.source
+            or args.color
+            or args.load_project
+            or args.edit_project
+            or args.benchmark
+        ):
+            parser.error(
+                "source, --color, --load-project, --edit-project, and "
+                "--benchmark cannot be used with --refine-proposals"
+            )
+        project = MosaicProject.load(args.refine_proposals)
+        evidence = compute_project_bw_evidence(project)
+        refinement = generate_refinement_proposals(project, evidence)
+        evaluation = evaluate_refinement_proposals(refinement, project)
+        if args.refine_json:
+            print(json.dumps({
+                "refinement": refinement.to_dict(),
+                "evaluation": evaluation.to_dict(),
+            }, indent=2, sort_keys=True))
+        else:
+            print(format_refinement_report(refinement))
+            print("")
+            print(
+                "Benchmark overlap: "
+                f"{evaluation.proposed_matching_human_direction}/"
+                f"{evaluation.proposed_changes} proposed changes match; "
+                f"{evaluation.human_changes_captured}/"
+                f"{evaluation.human_real_changes} human changes captured"
+            )
+        return
+
+    if args.refine_json:
+        parser.error("--refine-json requires --refine-proposals")
 
     if args.benchmark:
         if args.source or args.color or args.load_project or args.edit_project:

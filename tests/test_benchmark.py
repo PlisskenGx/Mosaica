@@ -7,12 +7,19 @@ from mosaic_engine.benchmark import (
     analyze_project,
     benchmark_reports_json,
     connected_correction_regions,
+    evaluate_refinement_proposals,
     format_benchmark_reports,
 )
 from mosaic_engine.evidence import BWEvidence, TileEvidence
 from mosaic_engine.geometry import build_geometry
 from mosaic_engine.model import MosaicConfig, MosaicResult, PaletteColor
 from mosaic_engine.project import MosaicProject
+from mosaic_engine.refinement import (
+    RefinementProposal,
+    RefinementReport,
+    ScoreBreakdown,
+    TileChange,
+)
 
 
 PALETTE = (
@@ -147,3 +154,33 @@ def test_human_readable_benchmark_output():
     assert "Real changed overrides: 3" in output
     assert "2 white -> black" in output
     assert "Correction region sizes: 2, 1" in output
+
+
+def test_proposal_overlap_evaluation_is_separate_from_generation():
+    project = _project()
+    score = ScoreBreakdown(0, 0, 0, 0, 0, 0, 0)
+    report = RefinementReport(candidates=(), proposals=(
+        RefinementProposal(
+            candidate_id="region-0001",
+            rank=1,
+            alternative="expand",
+            affected_tile_ids=("placement-000000", "placement-000002"),
+            changes=(
+                TileChange("placement-000000", 0, 0, 1, 0),
+                TileChange("placement-000002", 0, 2, 1, 0),
+            ),
+            baseline_score=0,
+            alternative_score=0,
+            baseline_breakdown=score,
+            alternative_breakdown=score,
+            reason="synthetic",
+        ),
+    ))
+
+    overlap = evaluate_refinement_proposals(report, project)
+
+    assert overlap.proposed_changes == 2
+    assert overlap.proposed_matching_human_direction == 1
+    assert overlap.proposed_disagreeing_with_human == 1
+    assert overlap.human_real_changes == 3
+    assert overlap.human_changes_captured == 1

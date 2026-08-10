@@ -26,10 +26,12 @@ from .processing import (
 from .benchmark import (
     BenchmarkReport,
     CorrectionRegion,
+    ProposalOverlapReport,
     analyze_benchmark_projects,
     analyze_project,
     benchmark_reports_json,
     connected_correction_regions,
+    evaluate_refinement_proposals,
     format_benchmark_reports,
 )
 from .evidence import (
@@ -38,6 +40,15 @@ from .evidence import (
     compute_bw_evidence,
     compute_project_bw_evidence,
     physical_neighbor_rings,
+)
+from .refinement import (
+    CandidateRegion,
+    RefinementProposal,
+    RefinementReport,
+    ScoreBreakdown,
+    TileChange,
+    format_refinement_report,
+    generate_refinement_proposals,
 )
 
 from .project import (
@@ -60,16 +71,25 @@ __all__ = [
     "cleanup_grid",
     "BenchmarkReport",
     "CorrectionRegion",
+    "ProposalOverlapReport",
     "analyze_benchmark_projects",
     "analyze_project",
     "benchmark_reports_json",
     "connected_correction_regions",
+    "evaluate_refinement_proposals",
     "format_benchmark_reports",
     "BWEvidence",
     "TileEvidence",
     "compute_bw_evidence",
     "compute_project_bw_evidence",
     "physical_neighbor_rings",
+    "CandidateRegion",
+    "RefinementProposal",
+    "RefinementReport",
+    "ScoreBreakdown",
+    "TileChange",
+    "format_refinement_report",
+    "generate_refinement_proposals",
     "luminance",
     "threshold_grid",
 
