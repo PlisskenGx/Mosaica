@@ -5,6 +5,8 @@ from PIL import Image
 
 from mosaic_engine.cli import main
 from mosaic_engine import editor
+from mosaic_engine.geometry import build_geometry
+from mosaic_engine.model import MosaicConfig, MosaicResult, PaletteColor
 from mosaic_engine.project import MosaicProject
 
 
@@ -81,3 +83,36 @@ def test_cli_launches_local_editor(monkeypatch):
             },
         )
     ]
+
+
+def test_cli_emits_machine_readable_benchmark_json(
+    tmp_path, monkeypatch, capsys
+):
+    config = MosaicConfig(columns=1, rows=1, quantization_mode="bw")
+    geometry = build_geometry(config, 1, 1)
+    project = MosaicProject.from_result(MosaicResult(
+        columns=1,
+        rows=1,
+        grid=[[0]],
+        palette=(
+            PaletteColor("Black", (0, 0, 0)),
+            PaletteColor("White", (255, 255, 255)),
+        ),
+        source_path=tmp_path / "missing.png",
+        physical_width_in=geometry.width_in,
+        physical_height_in=geometry.height_in,
+        config=config,
+        geometry=geometry,
+    ))
+    path = project.save(tmp_path / "benchmark.json")
+    monkeypatch.setattr(sys, "argv", [
+        "mosaic-engine",
+        "--benchmark", str(path),
+        "--benchmark-json",
+    ])
+
+    main()
+
+    output = json.loads(capsys.readouterr().out)
+    assert output[0]["project_path"] == str(path)
+    assert output[0]["real_changed_overrides"] == 0

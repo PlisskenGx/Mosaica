@@ -23,6 +23,22 @@ from .processing import (
     luminance,
     threshold_grid,
 )
+from .benchmark import (
+    BenchmarkReport,
+    CorrectionRegion,
+    analyze_benchmark_projects,
+    analyze_project,
+    benchmark_reports_json,
+    connected_correction_regions,
+    format_benchmark_reports,
+)
+from .evidence import (
+    BWEvidence,
+    TileEvidence,
+    compute_bw_evidence,
+    compute_project_bw_evidence,
+    physical_neighbor_rings,
+)
 
 from .project import (
     MosaicProject,
@@ -42,6 +58,18 @@ __all__ = [
     "PaletteColor",
 
     "cleanup_grid",
+    "BenchmarkReport",
+    "CorrectionRegion",
+    "analyze_benchmark_projects",
+    "analyze_project",
+    "benchmark_reports_json",
+    "connected_correction_regions",
+    "format_benchmark_reports",
+    "BWEvidence",
+    "TileEvidence",
+    "compute_bw_evidence",
+    "compute_project_bw_evidence",
+    "physical_neighbor_rings",
     "luminance",
     "threshold_grid",
 

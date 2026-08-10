@@ -5,6 +5,11 @@ import argparse
 from email import parser
 from pathlib import Path
 
+from .benchmark import (
+    analyze_benchmark_projects,
+    benchmark_reports_json,
+    format_benchmark_reports,
+)
 from .engine import generate_mosaic
 
 from .export import (
@@ -351,6 +356,27 @@ def main() -> None:
     )
 
     parser.add_argument(
+        "--benchmark",
+        action="append",
+        metavar="PROJECT_JSON",
+        help=(
+            "analyze a saved benchmark project; repeat for multiple projects"
+        ),
+    )
+
+    parser.add_argument(
+        "--benchmark-json",
+        action="store_true",
+        help="emit benchmark reports as JSON",
+    )
+
+    parser.add_argument(
+        "--benchmark-source-evidence",
+        action="store_true",
+        help="include source-derived evidence; requires source artwork",
+    )
+
+    parser.add_argument(
         "--art-inset",
         type=float,
         default=0.0,
@@ -389,6 +415,29 @@ def main() -> None:
     )
 
     args = parser.parse_args()
+
+    if args.benchmark:
+        if args.source or args.color or args.load_project or args.edit_project:
+            parser.error(
+                "source, --color, --load-project, and --edit-project "
+                "cannot be used with --benchmark"
+            )
+        reports = analyze_benchmark_projects(
+            args.benchmark,
+            compute_source_evidence=args.benchmark_source_evidence,
+        )
+        print(
+            benchmark_reports_json(reports)
+            if args.benchmark_json
+            else format_benchmark_reports(reports)
+        )
+        return
+
+    if args.benchmark_json or args.benchmark_source_evidence:
+        parser.error(
+            "--benchmark-json and --benchmark-source-evidence require "
+            "--benchmark"
+        )
 
     if args.edit_project:
         if args.source or args.color or args.load_project:
