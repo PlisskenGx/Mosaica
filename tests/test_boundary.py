@@ -123,3 +123,54 @@ def test_panel_contains_half_tiles():
     ]
 
     assert len(halves) > 0
+
+
+def _boundary_cut_area(geometry, edge):
+    total = 0.0
+
+    for placement in geometry.placements:
+        xs = [x for x, _ in placement.full_vertices_in]
+        ys = [y for _, y in placement.full_vertices_in]
+
+        crosses = {
+            "left": min(xs) < 0,
+            "right": max(xs) > geometry.width_in,
+            "top": min(ys) < 0,
+            "bottom": max(ys) > geometry.height_in,
+        }[edge]
+
+        if crosses:
+            total += (
+                polygon_area(placement.full_vertices_in)
+                - polygon_area(placement.vertices_in)
+            )
+
+    return total
+
+
+def test_exact_panel_has_balanced_horizontal_cuts():
+    geometry = build_panel_geometry(
+        MosaicConfig(tile_shape="hex"),
+        10.0,
+        6.0,
+    )
+
+    assert isclose(
+        _boundary_cut_area(geometry, "left"),
+        _boundary_cut_area(geometry, "right"),
+        abs_tol=1e-9,
+    )
+
+
+def test_exact_panel_has_balanced_vertical_cuts():
+    geometry = build_panel_geometry(
+        MosaicConfig(tile_shape="hex"),
+        10.0,
+        6.0,
+    )
+
+    assert isclose(
+        _boundary_cut_area(geometry, "top"),
+        _boundary_cut_area(geometry, "bottom"),
+        abs_tol=1e-9,
+    )

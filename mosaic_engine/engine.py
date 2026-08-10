@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
 
@@ -8,7 +9,13 @@ from PIL import Image
 from .color import nearest_palette_index
 from .geometry import GridGeometry, build_geometry, build_panel_geometry
 from .model import MosaicConfig, MosaicResult, PaletteColor
-from .processing import cleanup_grid, threshold_grid
+from .processing import (
+    cleanup_grid,
+    luminance,
+    palette_extremes,
+    threshold_grid,
+    tile_neighbors,
+)
 
 
 def _open_source_image(
@@ -361,270 +368,289 @@ def _resolve_grid(
     )
 
 
+@dataclass(frozen=True)
+class _ArtworkLayout:
+    bounds: object
+    left: float
+    top: float
+    width: float
+    height: float
+    source_width: int
+    source_height: int
+
+    def source_pixel(
+        self,
+        x: float,
+        y: float,
+    ) -> tuple[int, int] | None:
+        if (
+            x < self.bounds.left
+            or x > self.bounds.right
+            or y < self.bounds.top
+            or y > self.bounds.bottom
+            or x < self.left
+            or x > self.left + self.width
+            or y < self.top
+            or y > self.top + self.height
+        ):
+            return None
+
+        u = (x - self.left) / self.width
+        v = (y - self.top) / self.height
+
+        return (
+            min(
+                self.source_width - 1,
+                max(0, round(u * (self.source_width - 1))),
+            ),
+            min(
+                self.source_height - 1,
+                max(0, round(v * (self.source_height - 1))),
+            ),
+        )
+
+
+def _artwork_layout(
+    img: Image.Image,
+    geometry: GridGeometry,
+    config: MosaicConfig,
+) -> _ArtworkLayout:
+    sw, sh = img.size
+    bounds = geometry.artwork_bounds
+    available_w = bounds.width
+    available_h = bounds.height
+    source_aspect = sw / sh
+    target_aspect = available_w / available_h
+
+    if config.fit == "stretch":
+        rendered_w = available_w
+        rendered_h = available_h
+    elif config.fit == "contain":
+        if source_aspect >= target_aspect:
+            rendered_w = available_w
+            rendered_h = available_w / source_aspect
+        else:
+            rendered_h = available_h
+            rendered_w = available_h * source_aspect
+    elif config.fit == "cover":
+        if source_aspect >= target_aspect:
+            rendered_h = available_h
+            rendered_w = available_h * source_aspect
+        else:
+            rendered_w = available_w
+            rendered_h = available_w / source_aspect
+    else:
+        raise ValueError(
+            f"Unsupported fit mode: {config.fit}"
+        )
+
+    rendered_w *= config.artwork_scale
+    rendered_h *= config.artwork_scale
+
+    center_x = (
+        (bounds.left + bounds.right) / 2.0
+        + config.artwork_offset_x_in
+    )
+    center_y = (
+        (bounds.top + bounds.bottom) / 2.0
+        + config.artwork_offset_y_in
+    )
+
+    return _ArtworkLayout(
+        bounds=bounds,
+        left=center_x - rendered_w / 2.0,
+        top=center_y - rendered_h / 2.0,
+        width=rendered_w,
+        height=rendered_h,
+        source_width=sw,
+        source_height=sh,
+    )
+
+
 def _sample_source(
     img: Image.Image,
     geometry: GridGeometry,
-    fit: str,
-    background: tuple[int, int, int],
-) -> list[
-    list[
-        tuple[int, int, int]
-    ]
-]:
-
-    """
-        Sample artwork at the visible centroid of each
-        physical tile or clipped edge piece.
-    """
+    config: MosaicConfig,
+) -> list[list[tuple[int, int, int]]]:
+    """Sample full tiles at their centroids for palette mode."""
 
     img = img.convert("RGB")
-
-    sw, sh = img.size
-
-    gw = geometry.width_in
-    gh = geometry.height_in
-
-    if gw <= 0 or gh <= 0:
-        raise ValueError(
-            "Geometry has invalid "
-            "physical dimensions."
-        )
-
-    source_aspect = sw / sh
-    target_aspect = gw / gh
-
+    layout = _artwork_layout(img, geometry, config)
+    px = img.load()
     grid = [
-        [
-            background
-            for _ in range(
-                geometry.columns
-            )
-        ]
-        for _ in range(
-            geometry.rows
-        )
+        [config.background_rgb for _ in range(geometry.columns)]
+        for _ in range(geometry.rows)
     ]
 
-    px = img.load()
+    for placement in geometry.placements:
+        if placement.piece_type != "full":
+            continue
 
-    if fit == "contain":
+        source_pixel = layout.source_pixel(
+            placement.center_x_in,
+            placement.center_y_in,
+        )
 
+        if source_pixel is not None:
+            grid[placement.row][placement.column] = px[source_pixel]
+
+    return grid
+
+
+def _point_in_polygon(
+    x: float,
+    y: float,
+    polygon,
+) -> bool:
+    inside = False
+    previous_x, previous_y = polygon[-1]
+
+    for current_x, current_y in polygon:
         if (
-            source_aspect
-            >= target_aspect
+            (current_y > y) != (previous_y > y)
+            and x < (
+                (previous_x - current_x)
+                * (y - current_y)
+                / (previous_y - current_y)
+                + current_x
+            )
         ):
+            inside = not inside
 
-            rendered_w = gw
+        previous_x, previous_y = current_x, current_y
 
-            rendered_h = (
-                gw
-                / source_aspect
+    return inside
+
+
+def _coverage_grid(
+    img: Image.Image,
+    geometry: GridGeometry,
+    config: MosaicConfig,
+    samples_per_axis: int = 24,
+) -> list[list[float]]:
+    """Estimate foreground area within each full physical tile."""
+
+    img = img.convert("RGB")
+    layout = _artwork_layout(img, geometry, config)
+    px = img.load()
+    coverage = [
+        [0.0 for _ in range(geometry.columns)]
+        for _ in range(geometry.rows)
+    ]
+
+    for placement in geometry.placements:
+        if placement.piece_type != "full":
+            continue
+
+        polygon = placement.vertices_in
+        min_x = min(x for x, _ in polygon)
+        max_x = max(x for x, _ in polygon)
+        min_y = min(y for _, y in polygon)
+        max_y = max(y for _, y in polygon)
+        inside_count = 0
+        foreground_count = 0
+
+        for sample_y in range(samples_per_axis):
+            y = min_y + (
+                (sample_y + 0.5)
+                / samples_per_axis
+                * (max_y - min_y)
             )
 
-        else:
+            for sample_x in range(samples_per_axis):
+                x = min_x + (
+                    (sample_x + 0.5)
+                    / samples_per_axis
+                    * (max_x - min_x)
+                )
 
-            rendered_h = gh
+                if not _point_in_polygon(x, y, polygon):
+                    continue
 
-            rendered_w = (
-                gh
-                * source_aspect
+                inside_count += 1
+                source_pixel = layout.source_pixel(x, y)
+
+                if source_pixel is None:
+                    continue
+
+                is_foreground = (
+                    luminance(px[source_pixel])
+                    < config.bw_threshold
+                )
+
+                if config.invert_bw:
+                    is_foreground = not is_foreground
+
+                if is_foreground:
+                    foreground_count += 1
+
+        if inside_count:
+            coverage[placement.row][placement.column] = (
+                foreground_count / inside_count
             )
 
-        left = (
-            gw
-            - rendered_w
-        ) / 2.0
+    return coverage
 
-        top = (
-            gh
-            - rendered_h
-        ) / 2.0
 
-        for placement in (
-            geometry.placements
-        ):
+def _classify_coverage(
+    coverage: list[list[float]],
+    geometry: GridGeometry,
+    palette: list[PaletteColor],
+    config: MosaicConfig,
+) -> list[list[int]]:
+    dark_index, light_index = palette_extremes(palette)
+    foreground_index = light_index if config.invert_bw else dark_index
+    background_index = dark_index if config.invert_bw else light_index
+    threshold = config.coverage_threshold
+    borderline_width = 0.08
+    preliminary = [
+        [value >= threshold for value in row]
+        for row in coverage
+    ]
+    active = {
+        (placement.row, placement.column)
+        for placement in geometry.placements
+        if placement.piece_type == "full"
+    }
+    result = [
+        [background_index for _ in range(geometry.columns)]
+        for _ in range(geometry.rows)
+    ]
 
-            if placement.piece_type == "outside":
-                continue
+    for row, column in active:
+        value = coverage[row][column]
+        foreground = preliminary[row][column]
 
-            x, y = (
-                placement.visible_centroid_in
+        if abs(value - threshold) <= borderline_width:
+            neighbors = [
+                neighbor
+                for neighbor in tile_neighbors(
+                    row,
+                    column,
+                    geometry.rows,
+                    geometry.columns,
+                    config,
+                )
+                if neighbor in active
+            ]
+            support = sum(
+                preliminary[r][c]
+                for r, c in neighbors
             )
 
             if (
-                x < left
-                or x > left + rendered_w
-                or y < top
-                or y > top + rendered_h
+                foreground
+                and neighbors
+                and support == 0
             ):
-                continue
+                foreground = False
+            elif not foreground and support >= 2:
+                foreground = True
 
-            u = (
-                x - left
-            ) / rendered_w
+        if foreground:
+            result[row][column] = foreground_index
 
-            v = (
-                y - top
-            ) / rendered_h
-
-            sx = min(
-                sw - 1,
-                max(
-                    0,
-                    round(
-                        u
-                        * (sw - 1)
-                    ),
-                ),
-            )
-
-            sy = min(
-                sh - 1,
-                max(
-                    0,
-                    round(
-                        v
-                        * (sh - 1)
-                    ),
-                ),
-            )
-
-            grid[
-                placement.row
-            ][
-                placement.column
-            ] = px[sx, sy]
-
-        return grid
-
-    if fit == "stretch":
-
-        for placement in (
-            geometry.placements
-        ):
-
-            if placement.piece_type == "outside":
-                continue
-
-            x, y = (
-                placement.visible_centroid_in
-            )
-
-            u = (
-                x / gw
-            )
-
-            v = (
-                y / gh
-            )
-
-            sx = min(
-                sw - 1,
-                max(
-                    0,
-                    round(
-                        u
-                        * (sw - 1)
-                    ),
-                ),
-            )
-
-            sy = min(
-                sh - 1,
-                max(
-                    0,
-                    round(
-                        v
-                        * (sh - 1)
-                    ),
-                ),
-            )
-
-            grid[
-                placement.row
-            ][
-                placement.column
-            ] = px[sx, sy]
-
-        return grid
-
-    if fit == "cover":
-
-        scale = max(
-            gw / sw,
-            gh / sh,
-        )
-
-        rendered_w = (
-            sw * scale
-        )
-
-        rendered_h = (
-            sh * scale
-        )
-
-        left = (
-            gw
-            - rendered_w
-        ) / 2.0
-
-        top = (
-            gh
-            - rendered_h
-        ) / 2.0
-
-        for placement in (
-            geometry.placements
-        ):
-
-            if placement.piece_type == "outside":
-                continue
-
-            x, y = (
-                placement.visible_centroid_in
-            )
-
-            u = (
-                x - left
-            ) / rendered_w
-
-            v = (
-                y - top
-            ) / rendered_h
-
-            sx = min(
-                sw - 1,
-                max(
-                    0,
-                    round(
-                        u
-                        * (sw - 1)
-                    ),
-                ),
-            )
-
-            sy = min(
-                sh - 1,
-                max(
-                    0,
-                    round(
-                        v
-                        * (sh - 1)
-                    ),
-                ),
-            )
-
-            grid[
-                placement.row
-            ][
-                placement.column
-            ] = px[sx, sy]
-
-        return grid
-
-    raise ValueError(
-        f"Unsupported fit mode: {fit}"
-    )
+    return result
 
 
 def _quantize(
@@ -778,6 +804,12 @@ def generate_mosaic(
             "Artwork scale must be positive."
         )
 
+    if not 0 < config.coverage_threshold <= 1:
+        raise ValueError(
+            "Coverage threshold must be greater than 0 "
+            "and at most 1."
+        )
+
     if (
         config.tile_shape == "square"
         and (
@@ -843,23 +875,29 @@ def generate_mosaic(
                 rows,
             )
 
-        sampled = _sample_source(
-            img=img,
-
-            geometry=geometry,
-
-            fit=config.fit,
-
-            background=(
-                config.background_rgb
-            ),
-        )
-
-        grid = _quantize(
-            sampled,
-            palette,
-            config,
-        )
+        if config.quantization_mode == "bw":
+            coverage = _coverage_grid(
+                img=img,
+                geometry=geometry,
+                config=config,
+            )
+            grid = _classify_coverage(
+                coverage=coverage,
+                geometry=geometry,
+                palette=palette,
+                config=config,
+            )
+        else:
+            sampled = _sample_source(
+                img=img,
+                geometry=geometry,
+                config=config,
+            )
+            grid = _quantize(
+                sampled,
+                palette,
+                config,
+            )
 
         if (
             config.cleanup_passes
@@ -874,6 +912,8 @@ def generate_mosaic(
                 passes=(
                     config.cleanup_passes
                 ),
+
+                geometry=geometry,
             )
 
     return MosaicResult(

@@ -317,6 +317,7 @@ def cleanup_grid(
     grid: list[list[int]],
     config: MosaicConfig,
     passes: int = 1,
+    geometry=None,
 ) -> list[list[int]]:
     """
     Remove isolated tile noise using physical tile
@@ -364,6 +365,21 @@ def cleanup_grid(
         for row in grid
     ]
 
+    active = None
+    mutable = None
+
+    if geometry is not None:
+        active = {
+            (placement.row, placement.column)
+            for placement in geometry.placements
+            if placement.piece_type != "outside"
+        }
+        mutable = {
+            (placement.row, placement.column)
+            for placement in geometry.placements
+            if placement.piece_type == "full"
+        }
+
     for _ in range(passes):
         updated = [
             row[:]
@@ -372,6 +388,12 @@ def cleanup_grid(
 
         for row in range(rows):
             for col in range(cols):
+
+                if (
+                    mutable is not None
+                    and (row, col) not in mutable
+                ):
+                    continue
 
                 current_color = (
                     current[row][col]
@@ -384,6 +406,13 @@ def cleanup_grid(
                     cols,
                     config,
                 )
+
+                if active is not None:
+                    neighbors = [
+                        neighbor
+                        for neighbor in neighbors
+                        if neighbor in active
+                    ]
 
                 if not neighbors:
                     continue

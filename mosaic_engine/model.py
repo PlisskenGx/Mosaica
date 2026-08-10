@@ -54,6 +54,8 @@ class MosaicConfig:
 
     bw_threshold: int = 128
 
+    coverage_threshold: float = 0.45
+
     invert_bw: bool = False
 
     cleanup_passes: int = 0

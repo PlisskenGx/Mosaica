@@ -169,7 +169,7 @@ def _piece_type(
 
     if abs(
         fraction - 0.5
-    ) <= 0.02:
+    ) <= 0.04:
         return "half", fraction
 
     return "edge_cut", fraction
@@ -671,6 +671,38 @@ def panel_hex_geometry(
             + 1
         )
 
+        lattice_min_x = -half_width
+        lattice_max_x = (
+            (columns - 1) * pitch
+            + (
+                pitch / 2.0
+                if rows > 1
+                else 0.0
+            )
+            + half_width
+        )
+        lattice_min_y = -radius
+        lattice_max_y = (
+            (rows - 1) * row_step
+            + radius
+        )
+
+        shift_x = (
+            width_in
+            - (
+                lattice_max_x
+                - lattice_min_x
+            )
+        ) / 2.0 - lattice_min_x
+
+        shift_y = (
+            height_in
+            - (
+                lattice_max_y
+                - lattice_min_y
+            )
+        ) / 2.0 - lattice_min_y
+
         for row in range(rows):
 
             x_offset = (
@@ -681,6 +713,7 @@ def panel_hex_geometry(
 
             cy = (
                 row * row_step
+                + shift_y
             )
 
             for col in range(columns):
@@ -688,6 +721,7 @@ def panel_hex_geometry(
                 cx = (
                     col * pitch
                     + x_offset
+                    + shift_x
                 )
 
                 full_polygon = _polygon(
@@ -773,6 +807,38 @@ def panel_hex_geometry(
             + 1
         )
 
+        lattice_min_x = -radius
+        lattice_max_x = (
+            (columns - 1) * col_step
+            + radius
+        )
+        lattice_min_y = -half_height
+        lattice_max_y = (
+            (rows - 1) * pitch
+            + (
+                pitch / 2.0
+                if columns > 1
+                else 0.0
+            )
+            + half_height
+        )
+
+        shift_x = (
+            width_in
+            - (
+                lattice_max_x
+                - lattice_min_x
+            )
+        ) / 2.0 - lattice_min_x
+
+        shift_y = (
+            height_in
+            - (
+                lattice_max_y
+                - lattice_min_y
+            )
+        ) / 2.0 - lattice_min_y
+
         for row in range(rows):
             for col in range(columns):
 
@@ -784,11 +850,13 @@ def panel_hex_geometry(
 
                 cx = (
                     col * col_step
+                    + shift_x
                 )
 
                 cy = (
                     row * pitch
                     + y_offset
+                    + shift_y
                 )
 
                 full_polygon = _polygon(

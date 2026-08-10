@@ -225,6 +225,17 @@ def main() -> None:
     )
 
     parser.add_argument(
+        "--coverage-threshold",
+        type=float,
+        default=0.45,
+
+        help=(
+            "minimum foreground area fraction "
+            "for black/white tile classification"
+        ),
+    )
+
+    parser.add_argument(
         "--cleanup",
         type=int,
         default=0,
@@ -306,6 +317,12 @@ def main() -> None:
             "--ppi must be positive"
         )
 
+    if not 0 < args.coverage_threshold <= 1:
+        parser.error(
+            "--coverage-threshold must be greater "
+            "than 0 and at most 1"
+        )
+
     config = MosaicConfig(
 
         tile_shape=args.shape,
@@ -336,6 +353,10 @@ def main() -> None:
         quantization_mode=args.mode,
 
         bw_threshold=args.threshold,
+
+        coverage_threshold=(
+            args.coverage_threshold
+        ),
 
         invert_bw=args.invert,
 

@@ -7,6 +7,7 @@ from mosaic_engine.processing import (
     cleanup_grid,
     threshold_grid,
 )
+from types import SimpleNamespace
 
 
 PALETTE = [
@@ -93,3 +94,33 @@ def test_hex_cleanup_removes_isolated_tile():
     ][
         1
     ] == 0
+
+
+def test_cleanup_excludes_outside_placements():
+    config = MosaicConfig(tile_shape="square")
+    grid = [
+        [1, 1, 1],
+        [0, 0, 1],
+        [1, 1, 1],
+    ]
+    placements = [
+        SimpleNamespace(
+            row=row,
+            column=column,
+            piece_type=(
+                "full"
+                if (row, column) in {(1, 0), (1, 1)}
+                else "outside"
+            ),
+        )
+        for row in range(3)
+        for column in range(3)
+    ]
+
+    result = cleanup_grid(
+        grid,
+        config,
+        geometry=SimpleNamespace(placements=placements),
+    )
+
+    assert result[1][1] == 0

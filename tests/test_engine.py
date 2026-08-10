@@ -81,6 +81,8 @@ def test_svg_loading_reports_missing_cairo(
         (MosaicConfig(target_width_in=0), "Target width"),
         (MosaicConfig(target_height_in=-1), "Target height"),
         (MosaicConfig(artwork_scale=0), "Artwork scale"),
+        (MosaicConfig(coverage_threshold=0), "Coverage threshold"),
+        (MosaicConfig(coverage_threshold=1.1), "Coverage threshold"),
     ],
 )
 def test_invalid_config_is_rejected_before_source_loading(
