@@ -24,6 +24,11 @@ from .processing import (
     threshold_grid,
 )
 
+from .project import (
+    MosaicProject,
+    PROJECT_SCHEMA_VERSION,
+)
+
 
 __all__ = [
     "generate_mosaic",
@@ -39,7 +44,10 @@ __all__ = [
     "cleanup_grid",
     "luminance",
     "threshold_grid",
+
+    "MosaicProject",
+    "PROJECT_SCHEMA_VERSION",
 ]
 
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"

@@ -18,6 +18,7 @@ from .model import (
     MosaicConfig,
     PaletteColor,
 )
+from .project import MosaicProject
 
 
 def _parse_color(
@@ -85,6 +86,43 @@ def _parse_color(
     )
 
 
+def _parse_coordinate(spec: str) -> tuple[int, int]:
+    try:
+        row, column = (
+            int(value)
+            for value in spec.split(",")
+        )
+    except (ValueError, TypeError) as exc:
+        raise argparse.ArgumentTypeError(
+            "Tile coordinates must be ROW,COLUMN."
+        ) from exc
+
+    if row < 1 or column < 1:
+        raise argparse.ArgumentTypeError(
+            "CLI tile coordinates are one-based."
+        )
+
+    return row - 1, column - 1
+
+
+def _parse_override(spec: str) -> tuple[int, int, int]:
+    try:
+        coordinate, palette = spec.split(":", 1)
+        row, column = _parse_coordinate(coordinate)
+        palette_index = int(palette)
+    except (ValueError, TypeError) as exc:
+        raise argparse.ArgumentTypeError(
+            "Override must be ROW,COLUMN:PALETTE_INDEX."
+        ) from exc
+
+    if palette_index < 1:
+        raise argparse.ArgumentTypeError(
+            "CLI palette indices are one-based."
+        )
+
+    return row, column, palette_index - 1
+
+
 def main() -> None:
 
     parser = argparse.ArgumentParser(
@@ -96,6 +134,7 @@ def main() -> None:
 
     parser.add_argument(
         "source",
+        nargs="?",
         help="source image",
     )
 
@@ -103,8 +142,6 @@ def main() -> None:
         "--color",
         action="append",
         type=_parse_color,
-        required=True,
-
         help=(
             "palette color as "
             "NAME:#RRGGBB[:SKU]"
@@ -262,6 +299,40 @@ def main() -> None:
     )
 
     parser.add_argument(
+        "--save-project",
+        help="save editable project state as JSON",
+    )
+
+    parser.add_argument(
+        "--load-project",
+        help="load editable project state from JSON",
+    )
+
+    parser.add_argument(
+        "--set-override",
+        action="append",
+        type=_parse_override,
+        default=[],
+        metavar="ROW,COLUMN:PALETTE_INDEX",
+        help="set a one-based tile override",
+    )
+
+    parser.add_argument(
+        "--clear-override",
+        action="append",
+        type=_parse_coordinate,
+        default=[],
+        metavar="ROW,COLUMN",
+        help="clear a one-based tile override",
+    )
+
+    parser.add_argument(
+        "--clear-all-overrides",
+        action="store_true",
+        help="clear every manual override",
+    )
+
+    parser.add_argument(
         "--art-inset",
         type=float,
         default=0.0,
@@ -323,64 +394,102 @@ def main() -> None:
             "than 0 and at most 1"
         )
 
-    config = MosaicConfig(
+    if args.load_project:
+        if args.source or args.color:
+            parser.error(
+                "source and --color cannot be used with --load-project"
+            )
 
-        tile_shape=args.shape,
+        project = MosaicProject.load(args.load_project)
+        config = project.config
 
-        tile_width_in=args.tile,
+    else:
+        if not args.source:
+            parser.error(
+                "source is required unless --load-project is used"
+            )
 
-        tile_height_in=(
-            args.tile_height
-            if args.tile_height
-            is not None
-            else args.tile
-        ),
+        if not args.color:
+            parser.error(
+                "at least one --color is required for generation"
+            )
 
-        grout_width_in=args.grout,
+        config = MosaicConfig(
 
-        hex_orientation=(
-            args.hex_orientation
-        ),
+            tile_shape=args.shape,
 
-        target_width_in=args.width,
-        target_height_in=args.height,
+            tile_width_in=args.tile,
 
-        columns=args.cols,
-        rows=args.rows,
+            tile_height_in=(
+                args.tile_height
+                if args.tile_height
+                is not None
+                else args.tile
+            ),
 
-        fit=args.fit,
+            grout_width_in=args.grout,
 
-        quantization_mode=args.mode,
+            hex_orientation=(
+                args.hex_orientation
+            ),
 
-        bw_threshold=args.threshold,
+            target_width_in=args.width,
+            target_height_in=args.height,
 
-        coverage_threshold=(
-            args.coverage_threshold
-        ),
+            columns=args.cols,
+            rows=args.rows,
 
-        invert_bw=args.invert,
+            fit=args.fit,
 
-        cleanup_passes=(
-            args.cleanup
-        ),
-        artwork_inset_in=args.art_inset,
+            quantization_mode=args.mode,
 
-        artwork_scale=args.art_scale,
+            bw_threshold=args.threshold,
 
-        artwork_offset_x_in=(
-            args.art_offset_x
-        ),
+            coverage_threshold=(
+                args.coverage_threshold
+            ),
 
-        artwork_offset_y_in=(
-            args.art_offset_y
-        ),
-    )
+            invert_bw=args.invert,
 
-    result = generate_mosaic(
-        source=args.source,
-        palette=args.color,
-        config=config,
-    )
+            cleanup_passes=(
+                args.cleanup
+            ),
+            artwork_inset_in=args.art_inset,
+
+            artwork_scale=args.art_scale,
+
+            artwork_offset_x_in=(
+                args.art_offset_x
+            ),
+
+            artwork_offset_y_in=(
+                args.art_offset_y
+            ),
+        )
+
+        result = generate_mosaic(
+            source=args.source,
+            palette=args.color,
+            config=config,
+        )
+        project = MosaicProject.from_result(result)
+
+    if args.clear_all_overrides:
+        project.clear_all_overrides()
+
+    try:
+        for row, column in args.clear_override:
+            project.clear_override(row, column)
+
+        for row, column, palette_index in args.set_override:
+            project.set_override(row, column, palette_index)
+    except (IndexError, ValueError) as exc:
+        parser.error(str(exc))
+
+    if args.save_project:
+        project.save(args.save_project)
+
+    result = project
 
     out = Path(
         args.out

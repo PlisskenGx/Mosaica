@@ -10,10 +10,25 @@ from PIL import (
 )
 
 from .model import MosaicResult
+from .project import MosaicProject
+
+
+ExportableMosaic = MosaicResult | MosaicProject
+
+
+def _assignment_index(
+    result: ExportableMosaic,
+    row: int,
+    column: int,
+) -> int:
+    if isinstance(result, MosaicProject):
+        return result.effective_index(row, column)
+
+    return result.grid[row][column]
 
 
 def export_counts_csv(
-    result: MosaicResult,
+    result: ExportableMosaic,
     path: str | Path,
 ) -> Path:
 
@@ -60,7 +75,7 @@ def export_counts_csv(
 
 
 def export_grid_csv(
-    result: MosaicResult,
+    result: ExportableMosaic,
     path: str | Path,
 ) -> Path:
 
@@ -86,18 +101,19 @@ def export_grid_csv(
             )
         )
 
-        for y, row in enumerate(
-            result.grid,
-            start=1,
-        ):
+        for row in range(result.rows):
 
             writer.writerow(
-                [y]
+                [row + 1]
                 + [
                     result.palette[
-                        i
+                        _assignment_index(
+                            result,
+                            row,
+                            column,
+                        )
                     ].name
-                    for i in row
+                    for column in range(result.columns)
                 ]
             )
 
@@ -105,7 +121,7 @@ def export_grid_csv(
 
 
 def export_placements_csv(
-    result: MosaicResult,
+    result: ExportableMosaic,
     path: str | Path,
 ) -> Path:
 
@@ -145,11 +161,11 @@ def export_placements_csv(
                 continue
 
             color = result.palette[
-                result.grid[
-                    placement.row
-                ][
-                    placement.column
-                ]
+                _assignment_index(
+                    result,
+                    placement.row,
+                    placement.column,
+                )
             ]
 
             visible_x, visible_y = (
@@ -193,7 +209,7 @@ def export_placements_csv(
 
 
 def export_preview_png(
-    result: MosaicResult,
+    result: ExportableMosaic,
     path: str | Path,
     pixels_per_inch: int = 48,
     draw_grid: bool = True,
@@ -251,11 +267,11 @@ def export_preview_png(
     ):
 
         color_index = (
-            result.grid[
-                placement.row
-            ][
-                placement.column
-            ]
+            _assignment_index(
+                result,
+                placement.row,
+                placement.column,
+            )
         )
 
         vertices = [
