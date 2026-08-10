@@ -45,6 +45,7 @@
             <dt>Changes</dt><dd id="proposal-change-count"></dd>
             <dt>Score</dt><dd id="proposal-score"></dd>
             <dt>Delta</dt><dd id="proposal-delta"></dd>
+            <dt>Recommendation</dt><dd id="proposal-recommendation"></dd>
           </dl>
           <label for="proposal-alternative">Ranked alternative</label>
           <select id="proposal-alternative"></select>
@@ -62,6 +63,33 @@
         </div>
         <div id="proposal-session" class="proposal-session"></div>
         <button id="proposal-reset" class="secondary" hidden>Reset Review State</button>
+      </section>
+
+      <section id="contour-review">
+        <h2>Contour experiment</h2>
+        <p class="proposal-warning">Read-only continuous-boundary diagnostics.</p>
+        <div id="contour-loading">Loading contour analysis…</div>
+        <div id="contour-error" class="proposal-error" hidden></div>
+        <div id="contour-empty" hidden>No coherent contour candidates were found.</div>
+        <div id="contour-content" hidden>
+          <label for="contour-candidate">Contour candidate</label>
+          <select id="contour-candidate"></select>
+          <label for="contour-alternative">Path alternative</label>
+          <select id="contour-alternative"></select>
+          <dl class="proposal-metadata">
+            <dt>Reason</dt><dd id="contour-reason"></dd>
+            <dt>Recommendation</dt><dd id="contour-recommendation"></dd>
+            <dt>Changes</dt><dd id="contour-changes"></dd>
+            <dt>Score delta</dt><dd id="contour-delta"></dd>
+          </dl>
+          <label><input id="contour-visible" type="checkbox" checked> Show source/current/proposed contour overlay</label>
+          <div class="contour-legend">
+            <span class="source-key">Source</span>
+            <span class="current-key">Current</span>
+            <span class="proposed-key">Proposed</span>
+          </div>
+          <div id="contour-components" class="proposal-components"></div>
+        </div>
       </section>
 
       <section>

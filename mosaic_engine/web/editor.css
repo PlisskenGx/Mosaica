@@ -159,6 +159,8 @@ dd { margin: 0; }
 .proposal-metadata { grid-template-columns: 6rem 1fr; }
 .proposal-metadata dd { overflow-wrap: anywhere; }
 #proposal-alternative { width: 100%; margin: .3rem 0; padding: .45rem; }
+#contour-candidate,
+#contour-alternative { width: 100%; margin: .3rem 0 .65rem; padding: .45rem; }
 .proposal-components {
   max-height: 10rem;
   overflow: auto;
@@ -171,6 +173,20 @@ dd { margin: 0; }
   padding: .15rem 0;
 }
 .proposal-session { margin: .55rem 0; color: #5d5d5d; font-size: .85rem; }
+.contour-line {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+  stroke-width: 3px;
+}
+.contour-source { stroke: #00a8c6; stroke-dasharray: 3px 2px; }
+.contour-current { stroke: #e238a0; stroke-dasharray: 8px 3px; }
+.contour-proposed { stroke: #44c767; stroke-width: 4px; }
+.contour-legend { display: flex; gap: .8rem; margin: .5rem 0; font-size: .8rem; }
+.contour-legend span::before { content: "—"; margin-right: .25rem; font-weight: 900; }
+.source-key { color: #007f98; }
+.current-key { color: #b01e79; }
+.proposed-key { color: #238f3e; }
 
 @media (max-width: 800px) {
   header { align-items: flex-start; flex-direction: column; }

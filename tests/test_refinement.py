@@ -10,7 +10,10 @@ from mosaic_engine.evidence import BWEvidence, TileEvidence
 from mosaic_engine.geometry import build_geometry
 from mosaic_engine.model import MosaicConfig, MosaicResult, PaletteColor
 from mosaic_engine.project import MosaicProject
-from mosaic_engine.refinement import generate_refinement_proposals
+from mosaic_engine.refinement import (
+    format_refinement_report,
+    generate_refinement_proposals,
+)
 
 
 PALETTE = (
@@ -92,6 +95,34 @@ def test_diagonal_stroke_detection_and_regional_alternatives():
         for reason in candidate.reasons
     )
     assert {"expand", "contract", "shift"} <= alternatives
+    assert "retain" in alternatives
+    assert all(
+        any(
+            proposal.alternative == "retain"
+            and proposal.score_delta == 0
+            for proposal in report.proposals
+            if proposal.candidate_id == candidate.candidate_id
+        )
+        for candidate in report.candidates
+    )
+
+
+def test_no_generated_winner_is_reported_as_no_recommendation():
+    project, evidence = _project_and_evidence()
+    report = generate_refinement_proposals(project, evidence)
+
+    for candidate in report.candidates:
+        proposals = [
+            value for value in report.proposals
+            if value.candidate_id == candidate.candidate_id
+        ]
+        if not any(
+            value.alternative != "retain" and value.score_delta > 0
+            for value in proposals
+        ):
+            assert candidate.recommended_alternative is None
+            assert not any(value.is_recommended for value in proposals)
+    assert "No recommended refinement" in format_refinement_report(report)
 
 
 def test_proposals_are_deterministic_and_scores_are_decomposed():

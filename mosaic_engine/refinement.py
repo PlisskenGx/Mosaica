@@ -47,6 +47,7 @@ class CandidateRegion:
     tile_ids: tuple[str, ...]
     reasons: tuple[str, ...]
     alternatives: tuple[str, ...]
+    recommended_alternative: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -55,6 +56,7 @@ class CandidateRegion:
             "tile_ids": list(self.tile_ids),
             "reasons": list(self.reasons),
             "alternatives": list(self.alternatives),
+            "recommended_alternative": self.recommended_alternative,
         }
 
 
@@ -70,6 +72,7 @@ class RefinementProposal:
     baseline_breakdown: ScoreBreakdown
     alternative_breakdown: ScoreBreakdown
     reason: str
+    is_recommended: bool = False
 
     @property
     def score_delta(self) -> float:
@@ -88,6 +91,7 @@ class RefinementProposal:
             "baseline_breakdown": self.baseline_breakdown.to_dict(),
             "alternative_breakdown": self.alternative_breakdown.to_dict(),
             "reason": self.reason,
+            "is_recommended": self.is_recommended,
         }
 
 
@@ -444,13 +448,6 @@ def generate_refinement_proposals(
             reasons = tuple(sorted(set(reasons) | {
                 "paired opposing edges permit a one-phase shift"
             }))
-        candidates.append(CandidateRegion(
-            candidate_id=candidate_id,
-            coordinates=coordinates,
-            tile_ids=tuple(_tile_id(project, c) for c in coordinates),
-            reasons=reasons,
-            alternatives=("retain", *sorted(change_sets)),
-        ))
         evaluation = set(coordinates)
         for coordinate in coordinates:
             evaluation.update(_neighbors(project, coordinate, full))
@@ -475,7 +472,7 @@ def generate_refinement_proposals(
             background,
             baseline_components,
         )
-        alternatives = []
+        alternatives = [("retain", (), baseline)]
         for name, proposed in sorted(change_sets.items()):
             actual = {
                 coordinate: value
@@ -511,6 +508,22 @@ def generate_refinement_proposals(
             -(item[2].total - baseline.total), item[0],
             tuple((change.row, change.column) for change in item[1]),
         ))
+        recommended = next(
+            (
+                name
+                for name, _, score in alternatives
+                if name != "retain" and score.total > baseline.total
+            ),
+            None,
+        )
+        candidates.append(CandidateRegion(
+            candidate_id=candidate_id,
+            coordinates=coordinates,
+            tile_ids=tuple(_tile_id(project, c) for c in coordinates),
+            reasons=reasons,
+            alternatives=tuple(name for name, _, _ in alternatives),
+            recommended_alternative=recommended,
+        ))
         for rank, (name, changes, score) in enumerate(alternatives, 1):
             proposal_rows.append(RefinementProposal(
                 candidate_id=candidate_id,
@@ -523,6 +536,7 @@ def generate_refinement_proposals(
                 baseline_breakdown=baseline,
                 alternative_breakdown=score,
                 reason="; ".join(reasons),
+                is_recommended=name == recommended,
             ))
     return RefinementReport(
         candidates=tuple(candidates),
@@ -541,6 +555,14 @@ def format_refinement_report(report: RefinementReport) -> str:
             f"{candidate.candidate_id}: {len(candidate.coordinates)} tiles"
         )
         lines.append(f"  Why: {'; '.join(candidate.reasons)}")
+        lines.append(
+            "  Recommendation: "
+            + (
+                candidate.recommended_alternative
+                if candidate.recommended_alternative is not None
+                else "No recommended refinement"
+            )
+        )
         for proposal in (
             value for value in report.proposals
             if value.candidate_id == candidate.candidate_id

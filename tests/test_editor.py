@@ -8,6 +8,12 @@ from PIL import Image
 
 import mosaic_engine.editor as editor_module
 from mosaic_engine.editor import MosaicEditorApp, run_editor
+from mosaic_engine.contour_refinement import (
+    ContourAlternative,
+    ContourCandidate,
+    ContourRefinementReport,
+    ContourScore,
+)
 from mosaic_engine.evidence import cache_project_bw_evidence
 from mosaic_engine.geometry import (
     build_geometry,
@@ -125,6 +131,31 @@ def _proposal_report(*changes, candidate_id="region-0001"):
     )
 
 
+def _contour_report():
+    score = ContourScore(1, 1, 1, -0.2, 0, -0.1)
+    alternative = ContourAlternative(
+        name="source-trajectory",
+        rank=1,
+        path=((0, 0), (0, 1)),
+        proposed_contour=((0.5, 0.5), (1.5, 0.5)),
+        changes=(),
+        score=score,
+        score_delta=0.1,
+        is_recommended=True,
+    )
+    return ContourRefinementReport(candidates=(ContourCandidate(
+        candidate_id="contour-0001",
+        reason="synthetic continuous contour",
+        region=((0, 0), (0, 1)),
+        affected_tile_ids=("placement-000000", "placement-000001"),
+        source_contour=((0.4, 0.5), (1.4, 0.5)),
+        current_mosaic_contour=((0.5, 0.5), (1.5, 0.5)),
+        baseline_score=replace(score, source_trajectory_agreement=0.9),
+        alternatives=(alternative,),
+        recommended_alternative="source-trajectory",
+    ),))
+
+
 def test_editor_route_loads_saved_project(tmp_path):
     app = MosaicEditorApp(_save_project(tmp_path))
 
@@ -150,6 +181,10 @@ def test_editor_route_loads_saved_project(tmp_path):
     assert 'request("/api/overrides/batch"' in script
     assert 'request("/api/overrides/batch-clear"' in script
     assert 'request("/api/proposals"' in script
+    assert 'request("/api/contour-proposals"' in script
+    assert "contour-source" in script
+    assert "contour-current" in script
+    assert "contour-proposed" in script
     assert "proposal-addition" in script
     assert "proposal-removal" in script
     assert 'event.key === "["' in script
@@ -168,6 +203,9 @@ def test_editor_route_loads_saved_project(tmp_path):
     assert ".tile.proposal-addition" in stylesheet
     assert ".tile.proposal-removal" in stylesheet
     assert ".tile.manual-override" in stylesheet
+    assert ".contour-source" in stylesheet
+    assert ".contour-current" in stylesheet
+    assert ".contour-proposed" in stylesheet
 
 
 def test_editor_loads_and_exports_state_without_source(tmp_path):
@@ -691,3 +729,23 @@ def test_editor_loads_proposals_from_cache_without_source(tmp_path):
 
     assert status == "200 OK"
     assert "candidates" in payload
+
+
+def test_contour_proposal_api_exposes_all_three_contours(tmp_path):
+    app = MosaicEditorApp(
+        _save_project(tmp_path),
+        refinement_report=_proposal_report((0, 0, 0, 1)),
+        contour_report=_contour_report(),
+    )
+
+    status, listing = _request(app, "GET", "/api/contour-proposals")
+    detail_status, detail = _request(
+        app, "GET", "/api/contour-proposals/contour-0001"
+    )
+
+    assert status == detail_status == "200 OK"
+    assert listing["experiment"] == "continuous-contour-v1"
+    assert detail["source_contour"]
+    assert detail["current_mosaic_contour"]
+    assert detail["alternatives"][0]["proposed_contour"]
+    assert detail["recommendation"] == "source-trajectory"

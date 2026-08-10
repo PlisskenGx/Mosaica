@@ -7,6 +7,9 @@
   let proposalIndex = 0;
   let proposalAlternativeIndex = 0;
   let proposalView = "proposed";
+  let contourState = null;
+  let contourIndex = 0;
+  let contourAlternativeIndex = 0;
 
   const byId = (id) => document.getElementById(id);
   const tileById = (id) => state?.tiles.find((tile) => tile.id === id);
@@ -34,6 +37,7 @@
     renderCounts();
     renderSelection();
     renderProposalPanel();
+    renderContourPanel();
     byId("dirty").textContent = state.dirty ? "Unsaved changes" : "";
   }
 
@@ -84,6 +88,25 @@
       });
       svg.appendChild(polygon);
     }
+    renderContourOverlay(svg);
+  }
+
+  function renderContourOverlay(svg) {
+    if (!byId("contour-visible")?.checked) return;
+    const candidate = contourState?.candidates?.[contourIndex];
+    const alternative = candidate?.alternatives?.[contourAlternativeIndex];
+    if (!candidate || !alternative) return;
+    [
+      [candidate.source_contour, "contour-source"],
+      [candidate.current_mosaic_contour, "contour-current"],
+      [alternative.proposed_contour, "contour-proposed"],
+    ].forEach(([points, className]) => {
+      if (!points?.length) return;
+      const line = document.createElementNS(SVG_NS, "polyline");
+      line.setAttribute("points", points.map((point) => point.join(",")).join(" "));
+      line.classList.add("contour-line", className);
+      svg.appendChild(line);
+    });
   }
 
   function currentCandidate() {
@@ -123,12 +146,18 @@
     byId("proposal-delta").textContent = (
       `${proposal.score_delta >= 0 ? "+" : ""}${proposal.score_delta.toFixed(4)}`
     );
+    byId("proposal-recommendation").textContent = (
+      candidate.recommended_alternative || "No recommended refinement"
+    );
     const select = byId("proposal-alternative");
     select.replaceChildren();
     candidate.ranked_alternatives.forEach((alternative, index) => {
       const option = document.createElement("option");
       option.value = String(index);
-      option.textContent = `#${alternative.rank} ${alternative.alternative} (${alternative.score_delta >= 0 ? "+" : ""}${alternative.score_delta.toFixed(4)})`;
+      const diagnostic = alternative.is_recommended
+        ? "recommended"
+        : (alternative.alternative === "retain" ? "retention" : "diagnostic");
+      option.textContent = `#${alternative.rank} ${alternative.alternative} · ${diagnostic} (${alternative.score_delta >= 0 ? "+" : ""}${alternative.score_delta.toFixed(4)})`;
       option.selected = index === proposalAlternativeIndex;
       select.appendChild(option);
     });
@@ -151,6 +180,52 @@
     });
     ["current", "proposed", "difference"].forEach((mode) => {
       byId(`proposal-${mode}`).classList.toggle("active", proposalView === mode);
+    });
+    byId("proposal-accept").disabled = proposal.alternative === "retain";
+  }
+
+  function renderContourPanel() {
+    const candidates = contourState?.candidates || [];
+    const candidate = candidates[contourIndex];
+    const alternative = candidate?.alternatives?.[contourAlternativeIndex];
+    byId("contour-loading").hidden = contourState !== null;
+    byId("contour-empty").hidden = !contourState || candidates.length > 0;
+    byId("contour-content").hidden = !candidate || !alternative;
+    if (!candidate || !alternative) return;
+    const candidateSelect = byId("contour-candidate");
+    candidateSelect.replaceChildren();
+    candidates.forEach((value, index) => {
+      const option = document.createElement("option");
+      option.value = String(index);
+      option.selected = index === contourIndex;
+      option.textContent = value.candidate_id;
+      candidateSelect.appendChild(option);
+    });
+    const alternativeSelect = byId("contour-alternative");
+    alternativeSelect.replaceChildren();
+    candidate.alternatives.forEach((value, index) => {
+      const option = document.createElement("option");
+      option.value = String(index);
+      option.selected = index === contourAlternativeIndex;
+      option.textContent = `#${value.rank} ${value.name}${value.is_recommended ? " · recommended" : " · diagnostic"}`;
+      alternativeSelect.appendChild(option);
+    });
+    byId("contour-reason").textContent = candidate.reason;
+    byId("contour-recommendation").textContent = (
+      candidate.recommendation || "No recommended refinement"
+    );
+    byId("contour-changes").textContent = String(alternative.changes.length);
+    byId("contour-delta").textContent = (
+      `${alternative.score_delta >= 0 ? "+" : ""}${alternative.score_delta.toFixed(4)}`
+    );
+    const components = byId("contour-components");
+    components.replaceChildren();
+    Object.entries(alternative.score).forEach(([key, value]) => {
+      if (key === "total") return;
+      const row = document.createElement("div");
+      row.className = "proposal-component";
+      row.innerHTML = `<span>${key.replaceAll("_", " ")}</span><span>${value.toFixed(3)}</span>`;
+      components.appendChild(row);
     });
   }
 
@@ -431,6 +506,16 @@
     proposalAlternativeIndex = Number(event.target.value);
     render();
   });
+  byId("contour-candidate").addEventListener("change", (event) => {
+    contourIndex = Number(event.target.value);
+    contourAlternativeIndex = 0;
+    render();
+  });
+  byId("contour-alternative").addEventListener("change", (event) => {
+    contourAlternativeIndex = Number(event.target.value);
+    render();
+  });
+  byId("contour-visible").addEventListener("change", render);
   document.addEventListener("keydown", handleShortcut);
 
   window.addEventListener("beforeunload", (event) => {
@@ -443,16 +528,31 @@
     .then((payload) => {
       state = payload;
       render();
-      return request("/api/proposals");
+      return Promise.allSettled([
+        request("/api/proposals"),
+        request("/api/contour-proposals"),
+      ]);
     })
-    .then((payload) => {
-      proposalState = payload;
+    .then(([proposals, contours]) => {
+      if (proposals.status === "fulfilled") {
+        proposalState = proposals.value;
+      } else {
+        proposalState = { candidates: [], session: { accepted: 0, rejected: 0, skipped: 0, states: {} } };
+        byId("proposal-loading").hidden = true;
+        byId("proposal-error").hidden = false;
+        byId("proposal-error").textContent = proposals.reason.message;
+      }
+      if (contours.status === "fulfilled") {
+        contourState = contours.value;
+      } else {
+        contourState = { candidates: [] };
+        byId("contour-loading").hidden = true;
+        byId("contour-error").hidden = false;
+        byId("contour-error").textContent = contours.reason.message;
+      }
       render();
     })
     .catch((error) => {
-      byId("proposal-loading").hidden = true;
-      byId("proposal-error").hidden = false;
-      byId("proposal-error").textContent = error.message;
-      if (!state) byId("status").textContent = error.message;
+      byId("status").textContent = error.message;
     });
 })();

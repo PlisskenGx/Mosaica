@@ -5,6 +5,15 @@ Standalone physical tile mosaic generation engine.
 """
 
 from .engine import generate_mosaic
+from .contour_refinement import (
+    ContourAlternative,
+    ContourCandidate,
+    ContourChange,
+    ContourRefinementReport,
+    ContourScore,
+    format_contour_refinement_report,
+    generate_contour_refinement_proposals,
+)
 
 from .geometry import (
     GridGeometry,
@@ -32,6 +41,7 @@ from .benchmark import (
     benchmark_reports_json,
     connected_correction_regions,
     evaluate_refinement_proposals,
+    evaluate_contour_refinement_proposals,
     format_benchmark_reports,
 )
 from .evidence import (
@@ -65,6 +75,13 @@ from .project import (
 
 __all__ = [
     "generate_mosaic",
+    "ContourAlternative",
+    "ContourCandidate",
+    "ContourChange",
+    "ContourRefinementReport",
+    "ContourScore",
+    "format_contour_refinement_report",
+    "generate_contour_refinement_proposals",
 
     "build_geometry",
     "GridGeometry",
@@ -83,6 +100,7 @@ __all__ = [
     "benchmark_reports_json",
     "connected_correction_regions",
     "evaluate_refinement_proposals",
+    "evaluate_contour_refinement_proposals",
     "format_benchmark_reports",
     "BWEvidence",
     "BWEvidenceCache",

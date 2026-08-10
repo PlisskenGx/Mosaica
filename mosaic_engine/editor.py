@@ -8,6 +8,10 @@ import webbrowser
 from wsgiref.simple_server import make_server
 
 from .evidence import resolve_project_bw_evidence
+from .contour_refinement import (
+    ContourRefinementReport,
+    generate_contour_refinement_proposals,
+)
 from .project import MosaicProject
 from .processing import palette_extremes
 from .refinement import (
@@ -37,11 +41,14 @@ class MosaicEditorApp:
         project_path: str | Path,
         *,
         refinement_report: RefinementReport | None = None,
+        contour_report: ContourRefinementReport | None = None,
     ) -> None:
         self.project_path = Path(project_path).resolve(strict=False)
         self.project = MosaicProject.load(self.project_path)
         self.dirty = False
         self._refinement_report = refinement_report
+        self._contour_report = contour_report
+        self._evidence = None
         self._review_state: dict[str, str] = {}
         self._tile_coordinates = {
             self._tile_id(index): (
@@ -85,6 +92,27 @@ class MosaicEditorApp:
                     "200 OK",
                     self._review_summary(),
                 )
+
+            if method == "GET" and path == "/api/contour-proposals":
+                return self._json(
+                    start_response,
+                    "200 OK",
+                    self._ensure_contours().to_dict(),
+                )
+
+            if (
+                method == "GET"
+                and path.startswith("/api/contour-proposals/")
+            ):
+                candidate_id = path.rsplit("/", 1)[-1]
+                for candidate in self._ensure_contours().candidates:
+                    if candidate.candidate_id == candidate_id:
+                        return self._json(
+                            start_response,
+                            "200 OK",
+                            candidate.to_dict(),
+                        )
+                raise ValueError(f"Unknown contour candidate: {candidate_id}")
 
             proposal_action = self._proposal_action(path)
 
@@ -275,12 +303,24 @@ class MosaicEditorApp:
 
     def _ensure_proposals(self) -> RefinementReport:
         if self._refinement_report is None:
-            evidence = resolve_project_bw_evidence(self.project)
             self._refinement_report = generate_refinement_proposals(
                 self.project,
-                evidence,
+                self._source_evidence(),
             )
         return self._refinement_report
+
+    def _source_evidence(self):
+        if self._evidence is None:
+            self._evidence = resolve_project_bw_evidence(self.project)
+        return self._evidence
+
+    def _ensure_contours(self) -> ContourRefinementReport:
+        if self._contour_report is None:
+            self._contour_report = generate_contour_refinement_proposals(
+                self.project,
+                self._source_evidence(),
+            )
+        return self._contour_report
 
     def _candidate(self, candidate_id: str):
         for candidate in self._ensure_proposals().candidates:

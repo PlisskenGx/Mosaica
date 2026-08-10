@@ -8,7 +8,15 @@ from mosaic_engine.benchmark import (
     benchmark_reports_json,
     connected_correction_regions,
     evaluate_refinement_proposals,
+    evaluate_contour_refinement_proposals,
     format_benchmark_reports,
+)
+from mosaic_engine.contour_refinement import (
+    ContourAlternative,
+    ContourCandidate,
+    ContourChange,
+    ContourRefinementReport,
+    ContourScore,
 )
 from mosaic_engine.evidence import BWEvidence, TileEvidence
 from mosaic_engine.geometry import build_geometry
@@ -184,3 +192,36 @@ def test_proposal_overlap_evaluation_is_separate_from_generation():
     assert overlap.proposed_disagreeing_with_human == 1
     assert overlap.human_real_changes == 3
     assert overlap.human_changes_captured == 1
+
+
+def test_contour_overlap_evaluation_occurs_after_proposal_generation():
+    project = _project()
+    score = ContourScore(0, 0, 0, 0, 0, 0)
+    alternative = ContourAlternative(
+        name="source-trajectory",
+        rank=1,
+        path=((0, 0),),
+        proposed_contour=((0.5, 0.5),),
+        changes=(ContourChange(
+            "placement-000000", 0, 0, 1, 0
+        ),),
+        score=score,
+        score_delta=0,
+        is_recommended=False,
+    )
+    report = ContourRefinementReport(candidates=(ContourCandidate(
+        candidate_id="contour-0001",
+        reason="synthetic",
+        region=((0, 0),),
+        affected_tile_ids=("placement-000000",),
+        source_contour=((0.5, 0.5),),
+        current_mosaic_contour=((0.5, 0.5),),
+        baseline_score=score,
+        alternatives=(alternative,),
+        recommended_alternative=None,
+    ),))
+
+    overlap = evaluate_contour_refinement_proposals(report, project)
+
+    assert overlap.proposed_changes == 1
+    assert overlap.proposed_matching_human_direction == 1
