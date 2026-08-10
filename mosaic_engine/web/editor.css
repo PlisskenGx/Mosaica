@@ -1,0 +1,93 @@
+:root {
+  color-scheme: light;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  color: #202124;
+  background: #f4f1eb;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; }
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  background: #202124;
+  color: white;
+}
+
+h1, h2, p { margin-top: 0; }
+h1 { margin-bottom: .2rem; font-size: 1.35rem; }
+header p { margin-bottom: 0; color: #c9cdd2; }
+.header-actions { display: flex; align-items: center; gap: .65rem; }
+
+button {
+  border: 1px solid #202124;
+  border-radius: .4rem;
+  padding: .55rem .8rem;
+  color: white;
+  background: #3568d4;
+  cursor: pointer;
+}
+button.secondary { color: #202124; background: white; }
+button:disabled { cursor: not-allowed; opacity: .45; }
+
+main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20rem;
+  min-height: calc(100vh - 5rem);
+}
+
+.canvas-panel { padding: 1.5rem; overflow: auto; }
+#mosaic {
+  display: block;
+  width: 100%;
+  max-height: calc(100vh - 8rem);
+  background: white;
+  border: 1px solid #c8c4bb;
+}
+
+.tile { stroke: #777; stroke-width: .025; vector-effect: non-scaling-stroke; }
+.tile.editable { cursor: pointer; }
+.tile.protected { cursor: default; opacity: .78; }
+.tile.selected { stroke: #ff3d00; stroke-width: .09; }
+
+aside {
+  padding: 1.25rem;
+  background: white;
+  border-left: 1px solid #d8d4cb;
+}
+aside section { margin-bottom: 1.75rem; }
+aside h2 { font-size: 1rem; }
+dl { display: grid; grid-template-columns: 7rem 1fr; gap: .35rem; }
+dt { color: #686868; }
+dd { margin: 0; }
+
+.palette { display: grid; gap: .5rem; }
+.swatch {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  width: 100%;
+  color: #202124;
+  background: white;
+  text-align: left;
+}
+.swatch-color {
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 1px solid #777;
+  border-radius: .25rem;
+}
+
+.count-row { display: flex; justify-content: space-between; padding: .25rem 0; }
+#status { min-width: 5rem; color: #b8efc0; }
+.dirty-indicator { color: #ffd27d; font-weight: 700; }
+
+@media (max-width: 800px) {
+  header { align-items: flex-start; flex-direction: column; }
+  main { grid-template-columns: 1fr; }
+  aside { border-left: 0; border-top: 1px solid #d8d4cb; }
+}

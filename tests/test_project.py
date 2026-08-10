@@ -185,7 +185,7 @@ def test_project_json_contains_schema_and_no_source_binary(tmp_path):
         "name": PROJECT_SCHEMA_NAME,
         "version": PROJECT_SCHEMA_VERSION,
     }
-    assert data["engine_version"] == "0.5.0"
+    assert data["engine_version"] == "0.6.0"
     assert data["source"]["path"] == "artwork.png"
     assert data["source"]["filename"] == "artwork.png"
     assert data["source"]["relative_path"]

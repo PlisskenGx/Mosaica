@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mosaic Engine Editor</title>
+  <link rel="stylesheet" href="/editor.css">
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Mosaic Engine</h1>
+      <p id="project-name">Loading project…</p>
+    </div>
+    <div class="header-actions">
+      <button id="clear-all" class="secondary">Clear All Overrides</button>
+      <button id="save">Save Project</button>
+      <span id="dirty" class="dirty-indicator" role="status"></span>
+      <span id="status" role="status"></span>
+    </div>
+  </header>
+
+  <main>
+    <section class="canvas-panel" aria-label="Mosaic canvas">
+      <svg id="mosaic" xmlns="http://www.w3.org/2000/svg"></svg>
+    </section>
+
+    <aside>
+      <section>
+        <h2>Selected tile</h2>
+        <div id="empty-selection">Select a full tile to inspect or edit it.</div>
+        <dl id="selection" hidden>
+          <dt>Row / column</dt><dd id="tile-coordinate"></dd>
+          <dt>Piece type</dt><dd id="tile-piece"></dd>
+          <dt>Generated</dt><dd id="tile-generated"></dd>
+          <dt>Override</dt><dd id="tile-override"></dd>
+          <dt>Effective</dt><dd id="tile-effective"></dd>
+        </dl>
+        <button id="clear-selected" class="secondary" disabled>Clear Override</button>
+      </section>
+
+      <section>
+        <h2>Palette</h2>
+        <div id="palette" class="palette"></div>
+      </section>
+
+      <section>
+        <h2>Effective counts</h2>
+        <div id="counts"></div>
+      </section>
+    </aside>
+  </main>
+
+  <script src="/editor.js"></script>
+</body>
+</html>

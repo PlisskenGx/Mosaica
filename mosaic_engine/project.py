@@ -197,7 +197,7 @@ class MosaicProject:
                 "name": PROJECT_SCHEMA_NAME,
                 "version": PROJECT_SCHEMA_VERSION,
             },
-            "engine_version": "0.5.0",
+            "engine_version": "0.6.0",
             "source": self._source_metadata(project_path),
             "palette": [
                 {

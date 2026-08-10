@@ -4,6 +4,7 @@ import sys
 from PIL import Image
 
 from mosaic_engine.cli import main
+from mosaic_engine import editor
 from mosaic_engine.project import MosaicProject
 
 
@@ -49,3 +50,34 @@ def test_cli_can_save_load_and_edit_project(tmp_path, monkeypatch):
     assert loaded.override_value(0, 0) is None
     assert loaded.effective_value(0, 0) == 0
     assert json.loads(second_project.read_text())["schema"]["version"] == 1
+
+
+def test_cli_launches_local_editor(monkeypatch):
+    calls = []
+
+    def fake_run_editor(project_path, **options):
+        calls.append((project_path, options))
+
+    monkeypatch.setattr(editor, "run_editor", fake_run_editor)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "mosaic-engine",
+            "--edit-project", "saved-project.json",
+            "--editor-port", "9123",
+            "--no-browser",
+        ],
+    )
+
+    main()
+
+    assert calls == [
+        (
+            "saved-project.json",
+            {
+                "port": 9123,
+                "open_browser": False,
+            },
+        )
+    ]

@@ -333,6 +333,24 @@ def main() -> None:
     )
 
     parser.add_argument(
+        "--edit-project",
+        help="open a saved MosaicProject in the local editor",
+    )
+
+    parser.add_argument(
+        "--editor-port",
+        type=int,
+        default=8765,
+        help="localhost port for the project editor",
+    )
+
+    parser.add_argument(
+        "--no-browser",
+        action="store_true",
+        help="start the editor without opening a browser",
+    )
+
+    parser.add_argument(
         "--art-inset",
         type=float,
         default=0.0,
@@ -371,6 +389,25 @@ def main() -> None:
     )
 
     args = parser.parse_args()
+
+    if args.edit_project:
+        if args.source or args.color or args.load_project:
+            parser.error(
+                "source, --color, and --load-project cannot be "
+                "used with --edit-project"
+            )
+
+        if not 1 <= args.editor_port <= 65535:
+            parser.error("--editor-port must be between 1 and 65535")
+
+        from .editor import run_editor
+
+        run_editor(
+            args.edit_project,
+            port=args.editor_port,
+            open_browser=not args.no_browser,
+        )
+        return
 
     if not 0 <= args.threshold <= 255:
         parser.error(
