@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mosaic-engine"
-version = "0.6.1"
+version = "0.6.2"
 description = "Standalone physical tile mosaic generation engine"
 requires-python = ">=3.11"
 

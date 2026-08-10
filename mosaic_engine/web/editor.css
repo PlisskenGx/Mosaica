@@ -45,14 +45,40 @@ main {
   display: block;
   width: 100%;
   max-height: calc(100vh - 8rem);
-  background: white;
-  border: 1px solid #c8c4bb;
+  background: #d9dde2;
+  border: 1px solid #9ca3ad;
 }
 
-.tile { stroke: #777; stroke-width: .025; vector-effect: non-scaling-stroke; }
+.tile {
+  stroke: #6f7782;
+  stroke-width: 1px;
+  paint-order: stroke fill;
+  vector-effect: non-scaling-stroke;
+  transition: stroke 90ms ease, stroke-width 90ms ease, filter 90ms ease;
+}
 .tile.editable { cursor: pointer; }
-.tile.protected { cursor: default; opacity: .78; }
-.tile.selected { stroke: #ff3d00; stroke-width: .09; }
+.tile.editable:hover,
+.tile.editable:focus-visible {
+  stroke: #8ed8f0;
+  stroke-width: 2px;
+  filter: drop-shadow(0 0 1px #263746);
+}
+.tile.protected {
+  cursor: default;
+  stroke: #555e68;
+  stroke-dasharray: 4px 3px;
+}
+.tile.protected:hover,
+.tile.protected:focus-visible {
+  stroke: #d19a45;
+  stroke-width: 1.5px;
+}
+.tile.tile.selected {
+  stroke: #ff2bb5;
+  stroke-width: 4px;
+  stroke-dasharray: none;
+  filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 3px #2b1630);
+}
 
 aside {
   padding: 1.25rem;

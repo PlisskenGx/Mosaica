@@ -93,6 +93,13 @@ def test_editor_route_loads_saved_project(tmp_path):
     assert "beforeunload" in script
     assert "tile.id === selectedId" in script
 
+    status, stylesheet = _request(app, "GET", "/editor.css")
+    assert status == "200 OK"
+    assert ".tile.tile.selected" in stylesheet
+    assert ".tile.editable:hover" in stylesheet
+    assert ".tile.protected:hover" in stylesheet
+    assert "paint-order: stroke fill" in stylesheet
+
 
 def test_editor_loads_and_exports_state_without_source(tmp_path):
     path = _save_project(tmp_path)
