@@ -173,6 +173,7 @@ def test_json_round_trip_preserves_generated_state_and_overrides(tmp_path):
     assert loaded.config == project.config
     assert loaded.geometry == project.geometry
     assert loaded.source_path == Path("artwork.png").resolve()
+    assert loaded.bw_evidence_cache is None
 
 
 def test_project_json_contains_schema_and_no_source_binary(tmp_path):

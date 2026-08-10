@@ -26,6 +26,44 @@
     </section>
 
     <aside>
+      <section id="proposal-review" class="proposal-review">
+        <h2>Refinement proposals</h2>
+        <p class="proposal-warning">Preview only — proposals are not committed edits.</p>
+        <div id="proposal-loading">Loading deterministic proposals…</div>
+        <div id="proposal-error" class="proposal-error" hidden></div>
+        <div id="proposal-empty" hidden>No proposal candidates were found.</div>
+        <div id="proposal-content" hidden>
+          <div class="proposal-navigation">
+            <button id="proposal-previous" class="secondary" title="Previous candidate ([)">Previous</button>
+            <strong id="proposal-position"></strong>
+            <button id="proposal-next" class="secondary" title="Next candidate (])">Next</button>
+          </div>
+          <dl class="proposal-metadata">
+            <dt>Candidate</dt><dd id="proposal-id"></dd>
+            <dt>Reason</dt><dd id="proposal-reason"></dd>
+            <dt>Affected tiles</dt><dd id="proposal-tiles"></dd>
+            <dt>Changes</dt><dd id="proposal-change-count"></dd>
+            <dt>Score</dt><dd id="proposal-score"></dd>
+            <dt>Delta</dt><dd id="proposal-delta"></dd>
+          </dl>
+          <label for="proposal-alternative">Ranked alternative</label>
+          <select id="proposal-alternative"></select>
+          <div class="proposal-view-modes" role="group" aria-label="Proposal comparison">
+            <button id="proposal-current" class="secondary">Current</button>
+            <button id="proposal-proposed" class="secondary">Proposed</button>
+            <button id="proposal-difference" class="secondary">Difference</button>
+          </div>
+          <div id="proposal-components" class="proposal-components"></div>
+          <div class="proposal-actions">
+            <button id="proposal-accept">Accept Proposal</button>
+            <button id="proposal-reject" class="danger">Reject</button>
+            <button id="proposal-skip" class="secondary">Skip</button>
+          </div>
+        </div>
+        <div id="proposal-session" class="proposal-session"></div>
+        <button id="proposal-reset" class="secondary" hidden>Reset Review State</button>
+      </section>
+
       <section>
         <h2>Selection</h2>
         <div id="empty-selection">Select a full tile to inspect or edit it.</div>

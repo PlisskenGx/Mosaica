@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from dataclasses import asdict
 from heapq import heappop, heappush
+import hashlib
+import json
 from math import atan2, degrees, hypot
 from pathlib import Path
 
@@ -15,6 +17,8 @@ from .processing import luminance, tile_neighbors
 
 
 Coordinate = tuple[int, int]
+EVIDENCE_CACHE_VERSION = 1
+EVIDENCE_ALGORITHM_VERSION = "bw-evidence-v1"
 
 
 @dataclass(frozen=True)
@@ -36,6 +40,27 @@ class TileEvidence:
 
     def to_dict(self) -> dict:
         return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> TileEvidence:
+        return cls(
+            row=data["row"],
+            column=data["column"],
+            raw_coverage=data["raw_coverage"],
+            first_ring=tuple(tuple(value) for value in data["first_ring"]),
+            second_ring=tuple(tuple(value) for value in data["second_ring"]),
+            first_ring_foreground=data["first_ring_foreground"],
+            second_ring_foreground=data["second_ring_foreground"],
+            source_foreground_at_center=data["source_foreground_at_center"],
+            source_edge_distance_in=data.get("source_edge_distance_in"),
+            source_boundary_orientation_deg=data.get(
+                "source_boundary_orientation_deg"
+            ),
+            source_centerline_distance_in=data.get(
+                "source_centerline_distance_in"
+            ),
+            local_stroke_width_in=data.get("local_stroke_width_in"),
+        )
 
 
 @dataclass(frozen=True)
@@ -59,6 +84,192 @@ class BWEvidence:
             ],
         }
 
+    @classmethod
+    def from_dict(cls, data: dict) -> BWEvidence:
+        tiles = [TileEvidence.from_dict(value) for value in data["tiles"]]
+        return cls(
+            tiles={(tile.row, tile.column): tile for tile in tiles},
+            coverage_threshold=data["coverage_threshold"],
+            source_resolution=tuple(data["source_resolution"]),
+        )
+
+
+@dataclass(frozen=True)
+class BWEvidenceCache:
+    """Optional source-derived evidence persisted with a project."""
+
+    input_fingerprint: str
+    source_sha256: str | None
+    samples_per_axis: int
+    source_analysis_width: int
+    evidence: BWEvidence
+    format_version: int = EVIDENCE_CACHE_VERSION
+    algorithm_version: str = EVIDENCE_ALGORITHM_VERSION
+
+    def to_dict(self) -> dict:
+        return {
+            "format_version": self.format_version,
+            "algorithm_version": self.algorithm_version,
+            "input_fingerprint": self.input_fingerprint,
+            "source_sha256": self.source_sha256,
+            "samples_per_axis": self.samples_per_axis,
+            "source_analysis_width": self.source_analysis_width,
+            "evidence": self.evidence.to_dict(),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> BWEvidenceCache:
+        if data.get("format_version") != EVIDENCE_CACHE_VERSION:
+            raise ValueError(
+                "Unsupported BW evidence cache version: "
+                f"{data.get('format_version')}"
+            )
+        if data.get("algorithm_version") != EVIDENCE_ALGORITHM_VERSION:
+            raise ValueError(
+                "Unsupported BW evidence algorithm version: "
+                f"{data.get('algorithm_version')}"
+            )
+        return cls(
+            input_fingerprint=data["input_fingerprint"],
+            source_sha256=data.get("source_sha256"),
+            samples_per_axis=data["samples_per_axis"],
+            source_analysis_width=data["source_analysis_width"],
+            evidence=BWEvidence.from_dict(data["evidence"]),
+        )
+
+
+def _fingerprint_payload(
+    project,
+    samples_per_axis: int,
+    source_analysis_width: int,
+) -> dict:
+    config = project.config
+    geometry = project.geometry
+    return {
+        "algorithm_version": EVIDENCE_ALGORITHM_VERSION,
+        "samples_per_axis": samples_per_axis,
+        "source_analysis_width": source_analysis_width,
+        "config": {
+            "tile_shape": config.tile_shape,
+            "tile_width_in": config.tile_width_in,
+            "tile_height_in": config.tile_height_in,
+            "grout_width_in": config.grout_width_in,
+            "hex_orientation": config.hex_orientation,
+            "fit": config.fit,
+            "artwork_inset_in": config.artwork_inset_in,
+            "artwork_scale": config.artwork_scale,
+            "artwork_offset_x_in": config.artwork_offset_x_in,
+            "artwork_offset_y_in": config.artwork_offset_y_in,
+            "quantization_mode": config.quantization_mode,
+            "bw_threshold": config.bw_threshold,
+            "coverage_threshold": config.coverage_threshold,
+            "invert_bw": config.invert_bw,
+            "background_rgb": list(config.background_rgb),
+        },
+        "geometry": {
+            "shape": geometry.shape,
+            "columns": geometry.columns,
+            "rows": geometry.rows,
+            "panel_bounds": asdict(geometry.panel_bounds),
+            "artwork_bounds": asdict(geometry.artwork_bounds),
+            "placements": [
+                {
+                    "row": placement.row,
+                    "column": placement.column,
+                    "center": [
+                        placement.center_x_in,
+                        placement.center_y_in,
+                    ],
+                    "full_vertices": [
+                        list(value) for value in placement.full_vertices_in
+                    ],
+                    "vertices": [
+                        list(value) for value in placement.vertices_in
+                    ],
+                    "piece_type": placement.piece_type,
+                    "piece_fraction": placement.piece_fraction,
+                }
+                for placement in geometry.placements
+            ],
+        },
+    }
+
+
+def evidence_input_fingerprint(
+    project,
+    *,
+    samples_per_axis: int = 24,
+    source_analysis_width: int = 512,
+) -> str:
+    payload = json.dumps(
+        _fingerprint_payload(project, samples_per_axis, source_analysis_width),
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _source_sha256(path: Path) -> str | None:
+    if not path.is_file():
+        return None
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def build_evidence_cache(
+    project,
+    evidence: BWEvidence,
+    *,
+    source_path=None,
+    samples_per_axis: int = 24,
+    source_analysis_width: int = 512,
+) -> BWEvidenceCache:
+    path = Path(source_path) if source_path is not None else project.source_path
+    return BWEvidenceCache(
+        input_fingerprint=evidence_input_fingerprint(
+            project,
+            samples_per_axis=samples_per_axis,
+            source_analysis_width=source_analysis_width,
+        ),
+        source_sha256=_source_sha256(path),
+        samples_per_axis=samples_per_axis,
+        source_analysis_width=source_analysis_width,
+        evidence=evidence,
+    )
+
+
+def evidence_cache_validity(
+    project,
+    cache: BWEvidenceCache,
+) -> tuple[bool, str | None]:
+    expected = evidence_input_fingerprint(
+        project,
+        samples_per_axis=cache.samples_per_axis,
+        source_analysis_width=cache.source_analysis_width,
+    )
+    if cache.input_fingerprint != expected:
+        return False, "project geometry or evidence-affecting configuration changed"
+    full = {
+        (placement.row, placement.column)
+        for placement in project.geometry.placements
+        if placement.piece_type == "full"
+    }
+    if set(cache.evidence.tiles) != full:
+        return False, "cached tile evidence does not match full placements"
+    if cache.evidence.coverage_threshold != project.config.coverage_threshold:
+        return False, "cached coverage threshold does not match the project"
+    current_source_hash = _source_sha256(project.source_path)
+    if (
+        current_source_hash is not None
+        and cache.source_sha256 is not None
+        and current_source_hash != cache.source_sha256
+    ):
+        return False, "source artwork content changed"
+    return True, None
+
 
 def compute_project_bw_evidence(
     project,
@@ -81,6 +292,56 @@ def compute_project_bw_evidence(
         )
     finally:
         image.close()
+
+
+def cache_project_bw_evidence(
+    project,
+    *,
+    source_path=None,
+    samples_per_axis: int = 24,
+    source_analysis_width: int = 512,
+) -> BWEvidence:
+    """Compute and attach source-derived evidence without changing tiles."""
+
+    evidence = compute_project_bw_evidence(
+        project,
+        source_path=source_path,
+        samples_per_axis=samples_per_axis,
+        source_analysis_width=source_analysis_width,
+    )
+    project.set_bw_evidence_cache(build_evidence_cache(
+        project,
+        evidence,
+        source_path=source_path,
+        samples_per_axis=samples_per_axis,
+        source_analysis_width=source_analysis_width,
+    ))
+    return evidence
+
+
+def resolve_project_bw_evidence(project) -> BWEvidence:
+    """Prefer valid cached evidence, otherwise recompute from source."""
+
+    cache = project.bw_evidence_cache
+    stale_reason = None
+    if cache is not None:
+        valid, stale_reason = evidence_cache_validity(project, cache)
+        if valid:
+            return cache.evidence
+    try:
+        return compute_project_bw_evidence(project)
+    except (FileNotFoundError, OSError, RuntimeError) as exc:
+        if stale_reason is not None:
+            raise RuntimeError(
+                "Persisted BW evidence is stale or incompatible "
+                f"({stale_reason}), and recomputation from the source failed. "
+                "Restore the source artwork and run --cache-evidence again."
+            ) from exc
+        raise RuntimeError(
+            "No valid persisted BW evidence is available and evidence could "
+            "not be computed from the source. Restore the source artwork and "
+            "run --cache-evidence."
+        ) from exc
 
 
 def physical_neighbor_rings(

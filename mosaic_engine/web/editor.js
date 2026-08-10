@@ -3,6 +3,10 @@
   const selectedIds = new Set();
   let state = null;
   let activeId = null;
+  let proposalState = null;
+  let proposalIndex = 0;
+  let proposalAlternativeIndex = 0;
+  let proposalView = "proposed";
 
   const byId = (id) => document.getElementById(id);
   const tileById = (id) => state?.tiles.find((tile) => tile.id === id);
@@ -15,7 +19,11 @@
       ...options,
     });
     const payload = await response.json();
-    if (!response.ok) throw new Error(payload.error || "Request failed");
+    if (!response.ok) {
+      const error = new Error(payload.error || "Request failed");
+      error.payload = payload;
+      throw error;
+    }
     return payload;
   }
 
@@ -25,6 +33,7 @@
     renderPalette();
     renderCounts();
     renderSelection();
+    renderProposalPanel();
     byId("dirty").textContent = state.dirty ? "Unsaved changes" : "";
   }
 
@@ -33,22 +42,186 @@
     svg.replaceChildren();
     svg.setAttribute("viewBox", `0 0 ${state.panel.width_in} ${state.panel.height_in}`);
     svg.setAttribute("aria-label", "Editable tile mosaic");
+    svg.classList.toggle("proposal-difference", proposalView === "difference");
+    const candidate = currentCandidate();
+    const proposal = currentProposal();
+    const changes = new Map(
+      (proposal?.changes || []).map((change) => [change.tile_id, change])
+    );
+    const regionIds = new Set(candidate?.tile_ids || []);
 
     for (const tile of state.tiles) {
       const polygon = document.createElementNS(SVG_NS, "polygon");
       polygon.id = tile.id;
       polygon.dataset.tileId = tile.id;
       polygon.setAttribute("points", tile.vertices_in.map((point) => point.join(",")).join(" "));
-      polygon.setAttribute("fill", state.palette[tile.effective_index].hex);
+      const change = changes.get(tile.id);
+      const displayIndex = (
+        proposalView === "proposed" && change
+          ? change.proposed_index
+          : tile.effective_index
+      );
+      polygon.setAttribute("fill", state.palette[displayIndex].hex);
       polygon.classList.add("tile", tile.editable ? "editable" : "protected");
+      if (tile.override_index !== null) polygon.classList.add("manual-override");
+      if (regionIds.has(tile.id)) polygon.classList.add("proposal-region");
+      if (change && proposalView !== "current") {
+        polygon.classList.add(
+          change.change_kind === "foreground_addition"
+            ? "proposal-addition"
+            : "proposal-removal"
+        );
+      }
       if (selectedIds.has(tile.id)) polygon.classList.add("selected");
       if (tile.id === activeId) polygon.classList.add("active");
       polygon.setAttribute("tabindex", "0");
       polygon.addEventListener("click", (event) => selectTile(tile, event.shiftKey));
       polygon.addEventListener("keydown", (event) => {
-        if (event.key === "Enter" || event.key === " ") selectTile(tile, event.shiftKey);
+        if (event.key === "Enter" || event.key === " ") {
+          event.stopPropagation();
+          selectTile(tile, event.shiftKey);
+        }
       });
       svg.appendChild(polygon);
+    }
+  }
+
+  function currentCandidate() {
+    return proposalState?.candidates?.[proposalIndex] || null;
+  }
+
+  function currentProposal() {
+    return currentCandidate()?.ranked_alternatives?.[proposalAlternativeIndex] || null;
+  }
+
+  function renderProposalPanel() {
+    const candidates = proposalState?.candidates || [];
+    const candidate = currentCandidate();
+    const proposal = currentProposal();
+    byId("proposal-loading").hidden = proposalState !== null;
+    byId("proposal-empty").hidden = !proposalState || candidates.length > 0;
+    byId("proposal-content").hidden = !candidate || !proposal;
+    if (!proposalState) return;
+    const session = proposalState.session;
+    byId("proposal-session").textContent = (
+      `Session: ${session.accepted} accepted · ${session.rejected} rejected · `
+      + `${session.skipped} skipped`
+    );
+    byId("proposal-reset").hidden = !Object.keys(session.states).length;
+    if (!candidate || !proposal) return;
+
+    byId("proposal-position").textContent = `${proposalIndex + 1} / ${candidates.length}`;
+    byId("proposal-id").textContent = (
+      `${candidate.candidate_id}${candidate.review_status ? ` · ${candidate.review_status}` : ""}`
+    );
+    byId("proposal-reason").textContent = candidate.reasons.join("; ");
+    byId("proposal-tiles").textContent = proposal.affected_tile_ids.join(", ");
+    byId("proposal-change-count").textContent = String(proposal.changes.length);
+    byId("proposal-score").textContent = (
+      `${proposal.baseline_score.toFixed(4)} → ${proposal.alternative_score.toFixed(4)}`
+    );
+    byId("proposal-delta").textContent = (
+      `${proposal.score_delta >= 0 ? "+" : ""}${proposal.score_delta.toFixed(4)}`
+    );
+    const select = byId("proposal-alternative");
+    select.replaceChildren();
+    candidate.ranked_alternatives.forEach((alternative, index) => {
+      const option = document.createElement("option");
+      option.value = String(index);
+      option.textContent = `#${alternative.rank} ${alternative.alternative} (${alternative.score_delta >= 0 ? "+" : ""}${alternative.score_delta.toFixed(4)})`;
+      option.selected = index === proposalAlternativeIndex;
+      select.appendChild(option);
+    });
+    const components = byId("proposal-components");
+    components.replaceChildren();
+    const labels = {
+      source_agreement: "Source agreement",
+      directional_continuity: "Directional continuity",
+      stroke_width_consistency: "Stroke width",
+      boundary_regularity: "Boundary regularity",
+      negative_space_preservation: "Negative space",
+      minimal_change: "Minimal changes",
+      topology_preservation: "Topology",
+    };
+    Object.entries(labels).forEach(([key, label]) => {
+      const row = document.createElement("div");
+      row.className = "proposal-component";
+      row.innerHTML = `<span>${label}</span><span>${proposal.baseline_breakdown[key].toFixed(3)} → ${proposal.alternative_breakdown[key].toFixed(3)}</span>`;
+      components.appendChild(row);
+    });
+    ["current", "proposed", "difference"].forEach((mode) => {
+      byId(`proposal-${mode}`).classList.toggle("active", proposalView === mode);
+    });
+  }
+
+  function setProposalView(mode) {
+    proposalView = mode;
+    render();
+  }
+
+  function availableCandidateIndices() {
+    return (proposalState?.candidates || [])
+      .map((candidate, index) => ({ candidate, index }))
+      .filter(({ candidate }) => !["rejected", "accepted"].includes(candidate.review_status))
+      .map(({ index }) => index);
+  }
+
+  function moveProposal(direction) {
+    const available = availableCandidateIndices();
+    if (!available.length) return;
+    let position = available.indexOf(proposalIndex);
+    if (position < 0) position = direction > 0 ? -1 : 0;
+    proposalIndex = available[(position + direction + available.length) % available.length];
+    proposalAlternativeIndex = 0;
+    render();
+  }
+
+  async function reviewAction(action) {
+    const candidate = currentCandidate();
+    if (!candidate) return;
+    proposalState = await request(
+      `/api/proposals/${candidate.candidate_id}/${action}`,
+      { method: "POST", body: "{}" },
+    );
+    moveProposal(1);
+  }
+
+  async function resetReview() {
+    proposalState = await request("/api/proposals/reset", {
+      method: "POST", body: "{}",
+    });
+    proposalIndex = 0;
+    proposalAlternativeIndex = 0;
+    render();
+  }
+
+  async function acceptProposal(confirmConflicts = false) {
+    const candidate = currentCandidate();
+    const proposal = currentProposal();
+    if (!candidate || !proposal) return;
+    try {
+      const response = await request(
+        `/api/proposals/${candidate.candidate_id}/${proposal.alternative}/accept`,
+        {
+          method: "POST",
+          body: JSON.stringify({ confirm_conflicts: confirmConflicts }),
+        },
+      );
+      state = response.project;
+      proposalState = await request("/api/proposals");
+      moveProposal(1);
+    } catch (error) {
+      if (
+        error.payload?.conflicts?.length
+        && !confirmConflicts
+        && window.confirm(
+          `This proposal conflicts with ${error.payload.conflicts.length} existing manual override(s). Replace them?`
+        )
+      ) {
+        await acceptProposal(true);
+        return;
+      }
+      byId("status").textContent = error.message;
     }
   }
 
@@ -185,6 +358,34 @@
 
     if (event.ctrlKey || event.metaKey || event.altKey) return;
 
+    if (event.target?.closest?.("button")) return;
+
+    if (event.key === "[") {
+      event.preventDefault();
+      moveProposal(-1);
+      return;
+    }
+    if (event.key === "]") {
+      event.preventDefault();
+      moveProposal(1);
+      return;
+    }
+    if (event.key === "Enter" && currentProposal()) {
+      event.preventDefault();
+      acceptProposal();
+      return;
+    }
+    if (event.key.toLowerCase() === "r" && currentCandidate()) {
+      event.preventDefault();
+      reviewAction("reject");
+      return;
+    }
+    if (event.key.toLowerCase() === "s" && currentCandidate()) {
+      event.preventDefault();
+      reviewAction("skip");
+      return;
+    }
+
     if (event.key >= "1" && event.key <= "9") {
       const paletteIndex = Number(event.key) - 1;
       if (paletteIndex < state.palette.length && selectedIds.size) {
@@ -217,6 +418,19 @@
   byId("clear-selected").addEventListener("click", clearSelected);
   byId("clear-all").addEventListener("click", clearAll);
   byId("save").addEventListener("click", save);
+  byId("proposal-previous").addEventListener("click", () => moveProposal(-1));
+  byId("proposal-next").addEventListener("click", () => moveProposal(1));
+  byId("proposal-current").addEventListener("click", () => setProposalView("current"));
+  byId("proposal-proposed").addEventListener("click", () => setProposalView("proposed"));
+  byId("proposal-difference").addEventListener("click", () => setProposalView("difference"));
+  byId("proposal-accept").addEventListener("click", () => acceptProposal());
+  byId("proposal-reject").addEventListener("click", () => reviewAction("reject"));
+  byId("proposal-skip").addEventListener("click", () => reviewAction("skip"));
+  byId("proposal-reset").addEventListener("click", resetReview);
+  byId("proposal-alternative").addEventListener("change", (event) => {
+    proposalAlternativeIndex = Number(event.target.value);
+    render();
+  });
   document.addEventListener("keydown", handleShortcut);
 
   window.addEventListener("beforeunload", (event) => {
@@ -226,6 +440,19 @@
   });
 
   request("/api/project")
-    .then((payload) => { state = payload; render(); })
-    .catch((error) => { byId("status").textContent = error.message; });
+    .then((payload) => {
+      state = payload;
+      render();
+      return request("/api/proposals");
+    })
+    .then((payload) => {
+      proposalState = payload;
+      render();
+    })
+    .catch((error) => {
+      byId("proposal-loading").hidden = true;
+      byId("proposal-error").hidden = false;
+      byId("proposal-error").textContent = error.message;
+      if (!state) byId("status").textContent = error.message;
+    });
 })();

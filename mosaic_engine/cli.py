@@ -12,7 +12,10 @@ from .benchmark import (
     evaluate_refinement_proposals,
     format_benchmark_reports,
 )
-from .evidence import compute_project_bw_evidence
+from .evidence import (
+    cache_project_bw_evidence,
+    resolve_project_bw_evidence,
+)
 from .engine import generate_mosaic
 
 from .export import (
@@ -396,6 +399,12 @@ def main() -> None:
     )
 
     parser.add_argument(
+        "--cache-evidence",
+        metavar="PROJECT_JSON",
+        help="compute and persist deterministic BW evidence for a project",
+    )
+
+    parser.add_argument(
         "--art-inset",
         type=float,
         default=0.0,
@@ -435,6 +444,40 @@ def main() -> None:
 
     args = parser.parse_args()
 
+    if args.cache_evidence:
+        if (
+            args.source
+            or args.color
+            or args.load_project
+            or args.edit_project
+            or args.benchmark
+            or args.refine_proposals
+            or args.refine_json
+            or args.benchmark_json
+            or args.benchmark_source_evidence
+            or args.set_override
+            or args.clear_override
+            or args.clear_all_overrides
+            or args.save_project
+        ):
+            parser.error(
+                "generation, editing, benchmark, and refinement options "
+                "cannot be used with --cache-evidence"
+            )
+        project_path = Path(args.cache_evidence)
+        project = MosaicProject.load(project_path)
+        generated_before = project.generated_grid
+        overrides_before = project.overrides
+        cache_project_bw_evidence(project)
+        if (
+            project.generated_grid != generated_before
+            or project.overrides != overrides_before
+        ):
+            raise RuntimeError("Evidence caching unexpectedly changed tile state.")
+        project.save(project_path)
+        print(f"Cached BW evidence: {project_path}")
+        return
+
     if args.refine_proposals:
         if (
             args.source
@@ -448,7 +491,7 @@ def main() -> None:
                 "--benchmark cannot be used with --refine-proposals"
             )
         project = MosaicProject.load(args.refine_proposals)
-        evidence = compute_project_bw_evidence(project)
+        evidence = resolve_project_bw_evidence(project)
         refinement = generate_refinement_proposals(project, evidence)
         evaluation = evaluate_refinement_proposals(refinement, project)
         if args.refine_json:

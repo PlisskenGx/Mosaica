@@ -7,7 +7,14 @@ from urllib.parse import unquote
 import webbrowser
 from wsgiref.simple_server import make_server
 
+from .evidence import resolve_project_bw_evidence
 from .project import MosaicProject
+from .processing import palette_extremes
+from .refinement import (
+    RefinementProposal,
+    RefinementReport,
+    generate_refinement_proposals,
+)
 
 
 JSON_HEADERS = [
@@ -25,10 +32,17 @@ ASSETS = {
 class MosaicEditorApp:
     """Small WSGI application for editing one saved project."""
 
-    def __init__(self, project_path: str | Path) -> None:
+    def __init__(
+        self,
+        project_path: str | Path,
+        *,
+        refinement_report: RefinementReport | None = None,
+    ) -> None:
         self.project_path = Path(project_path).resolve(strict=False)
         self.project = MosaicProject.load(self.project_path)
         self.dirty = False
+        self._refinement_report = refinement_report
+        self._review_state: dict[str, str] = {}
         self._tile_coordinates = {
             self._tile_id(index): (
                 placement.row,
@@ -57,6 +71,62 @@ class MosaicEditorApp:
                     "200 OK",
                     self.project_payload(),
                 )
+
+            if method == "GET" and path == "/api/proposals":
+                return self._json(
+                    start_response,
+                    "200 OK",
+                    self._proposal_list_payload(),
+                )
+
+            if method == "GET" and path == "/api/proposals/session":
+                return self._json(
+                    start_response,
+                    "200 OK",
+                    self._review_summary(),
+                )
+
+            proposal_action = self._proposal_action(path)
+
+            if method == "GET" and proposal_action is not None:
+                candidate_id, alternative, action = proposal_action
+                if alternative is not None or action is not None:
+                    return self._not_found(start_response)
+                return self._json(
+                    start_response,
+                    "200 OK",
+                    self._candidate_payload(candidate_id),
+                )
+
+            if method == "POST" and path == "/api/proposals/reset":
+                self._review_state.clear()
+                return self._json(
+                    start_response,
+                    "200 OK",
+                    self._proposal_list_payload(),
+                )
+
+            if method == "POST" and proposal_action is not None:
+                candidate_id, alternative, action = proposal_action
+                if action == "accept" and alternative is not None:
+                    body = self._request_json(environ)
+                    return self._accept_proposal(
+                        start_response,
+                        candidate_id,
+                        alternative,
+                        body.get("confirm_conflicts") is True,
+                    )
+                if alternative is None and action in {"reject", "skip"}:
+                    self._candidate(candidate_id)
+                    self._review_state[candidate_id] = (
+                        "rejected" if action == "reject" else "skipped"
+                    )
+                    return self._json(
+                        start_response,
+                        "200 OK",
+                        self._proposal_list_payload(),
+                    )
+                return self._not_found(start_response)
 
             if method == "POST" and path == "/api/save":
                 self.project.save(self.project_path)
@@ -187,12 +257,165 @@ class MosaicEditorApp:
 
             return self._not_found(start_response)
 
-        except (IndexError, KeyError, ValueError) as exc:
+        except ProposalConflictError as exc:
+            return self._json(
+                start_response,
+                "409 Conflict",
+                {
+                    "error": str(exc),
+                    "conflicts": exc.conflicts,
+                },
+            )
+        except (IndexError, KeyError, ValueError, RuntimeError, OSError) as exc:
             return self._json(
                 start_response,
                 "400 Bad Request",
                 {"error": str(exc)},
             )
+
+    def _ensure_proposals(self) -> RefinementReport:
+        if self._refinement_report is None:
+            evidence = resolve_project_bw_evidence(self.project)
+            self._refinement_report = generate_refinement_proposals(
+                self.project,
+                evidence,
+            )
+        return self._refinement_report
+
+    def _candidate(self, candidate_id: str):
+        for candidate in self._ensure_proposals().candidates:
+            if candidate.candidate_id == candidate_id:
+                return candidate
+        raise ValueError(f"Unknown candidate ID: {candidate_id}")
+
+    def _candidate_proposals(
+        self,
+        candidate_id: str,
+    ) -> tuple[RefinementProposal, ...]:
+        self._candidate(candidate_id)
+        return tuple(
+            proposal
+            for proposal in self._ensure_proposals().proposals
+            if proposal.candidate_id == candidate_id
+        )
+
+    def _candidate_payload(self, candidate_id: str) -> dict:
+        candidate = self._candidate(candidate_id)
+        return {
+            **candidate.to_dict(),
+            "review_status": self._review_state.get(candidate_id),
+            "ranked_alternatives": [
+                self._proposal_payload(proposal)
+                for proposal in self._candidate_proposals(candidate_id)
+            ],
+        }
+
+    def _proposal_payload(self, proposal: RefinementProposal) -> dict:
+        payload = proposal.to_dict()
+        dark, light = palette_extremes(list(self.project.palette))
+        foreground = light if self.project.config.invert_bw else dark
+        for change in payload["changes"]:
+            change["change_kind"] = (
+                "foreground_addition"
+                if change["proposed_index"] == foreground
+                else "foreground_removal"
+            )
+        return payload
+
+    def _proposal_list_payload(self) -> dict:
+        report = self._ensure_proposals()
+        return {
+            "candidates": [
+                self._candidate_payload(candidate.candidate_id)
+                for candidate in report.candidates
+            ],
+            "session": self._review_summary(),
+        }
+
+    def _review_summary(self) -> dict:
+        return {
+            "accepted": sum(
+                value == "accepted" for value in self._review_state.values()
+            ),
+            "rejected": sum(
+                value == "rejected" for value in self._review_state.values()
+            ),
+            "skipped": sum(
+                value == "skipped" for value in self._review_state.values()
+            ),
+            "states": dict(sorted(self._review_state.items())),
+        }
+
+    def _proposal(
+        self,
+        candidate_id: str,
+        alternative: str,
+    ) -> RefinementProposal:
+        for proposal in self._candidate_proposals(candidate_id):
+            if proposal.alternative == alternative:
+                return proposal
+        raise ValueError(
+            f"Unknown alternative {alternative!r} for {candidate_id}."
+        )
+
+    def _accept_proposal(
+        self,
+        start_response,
+        candidate_id: str,
+        alternative: str,
+        confirm_conflicts: bool,
+    ):
+        proposal = self._proposal(candidate_id, alternative)
+        validated = []
+        conflicts = []
+        for change in proposal.changes:
+            coordinate = self._tile_coordinates.get(change.tile_id)
+            if coordinate != (change.row, change.column):
+                raise ValueError(
+                    f"Proposal contains an invalid tile ID: {change.tile_id}"
+                )
+            row, column = coordinate
+            if not self.project.is_editable(row, column):
+                raise ValueError(
+                    f"Tile {change.tile_id} is protected from editing."
+                )
+            if not 0 <= change.proposed_index < len(self.project.palette):
+                raise ValueError(
+                    f"Proposal palette index for {change.tile_id} is invalid."
+                )
+            existing = self.project.override_value(row, column)
+            if existing is not None and existing != change.proposed_index:
+                conflicts.append({
+                    "tile_id": change.tile_id,
+                    "row": row,
+                    "column": column,
+                    "existing_override": existing,
+                    "proposed_index": change.proposed_index,
+                })
+            validated.append((row, column, change.proposed_index))
+        if conflicts and not confirm_conflicts:
+            raise ProposalConflictError(conflicts)
+
+        changed = any(
+            self.project.override_value(row, column) != palette_index
+            for row, column, palette_index in validated
+        )
+        for row, column, palette_index in validated:
+            self.project.set_override(row, column, palette_index)
+        if changed:
+            self.dirty = True
+        self._review_state[candidate_id] = "accepted"
+        return self._json(
+            start_response,
+            "200 OK",
+            {
+                "accepted": True,
+                "candidate_id": candidate_id,
+                "alternative": alternative,
+                "project": self.project_payload(),
+                "session": self._review_summary(),
+            },
+        )
 
     def project_payload(self) -> dict:
         return {
@@ -302,6 +525,19 @@ class MosaicEditorApp:
             return None
 
     @staticmethod
+    def _proposal_action(path: str):
+        parts = path.strip("/").split("/")
+        if len(parts) < 3 or parts[:2] != ["api", "proposals"]:
+            return None
+        if len(parts) == 3:
+            return parts[2], None, None
+        if len(parts) == 4 and parts[3] in {"reject", "skip"}:
+            return parts[2], None, parts[3]
+        if len(parts) == 5 and parts[4] == "accept":
+            return parts[2], parts[3], "accept"
+        return None
+
+    @staticmethod
     def _request_json(environ) -> dict:
         try:
             length = int(environ.get("CONTENT_LENGTH") or 0)
@@ -353,6 +589,15 @@ class MosaicEditorApp:
             "404 Not Found",
             {"error": "Not found."},
         )
+
+
+class ProposalConflictError(ValueError):
+    def __init__(self, conflicts: list[dict]) -> None:
+        super().__init__(
+            "Proposal conflicts with existing manual overrides; "
+            "explicit confirmation is required."
+        )
+        self.conflicts = conflicts
 
 
 def run_editor(

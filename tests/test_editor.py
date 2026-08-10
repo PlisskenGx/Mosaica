@@ -4,9 +4,11 @@ import json
 from pathlib import Path
 
 import pytest
+from PIL import Image
 
 import mosaic_engine.editor as editor_module
 from mosaic_engine.editor import MosaicEditorApp, run_editor
+from mosaic_engine.evidence import cache_project_bw_evidence
 from mosaic_engine.geometry import (
     build_geometry,
     build_panel_geometry,
@@ -17,6 +19,13 @@ from mosaic_engine.model import (
     PaletteColor,
 )
 from mosaic_engine.project import MosaicProject
+from mosaic_engine.refinement import (
+    CandidateRegion,
+    RefinementProposal,
+    RefinementReport,
+    ScoreBreakdown,
+    TileChange,
+)
 
 
 PALETTE = (
@@ -79,6 +88,43 @@ def _request(app, method, path, body=None):
     return captured["status"], value
 
 
+def _proposal_report(*changes, candidate_id="region-0001"):
+    score = ScoreBreakdown(1, 1, 1, -1, 1, 0, 0)
+    tile_changes = tuple(
+        TileChange(
+            tile_id=f"placement-{row * 2 + column:06d}",
+            row=row,
+            column=column,
+            generated_index=generated,
+            proposed_index=proposed,
+        )
+        for row, column, generated, proposed in changes
+    )
+    proposal = RefinementProposal(
+        candidate_id=candidate_id,
+        rank=1,
+        alternative="expand",
+        affected_tile_ids=tuple(change.tile_id for change in tile_changes),
+        changes=tile_changes,
+        baseline_score=3.0,
+        alternative_score=3.5,
+        baseline_breakdown=score,
+        alternative_breakdown=replace(score, source_agreement=1.5),
+        reason="synthetic diagonal boundary",
+    )
+    candidate = CandidateRegion(
+        candidate_id=candidate_id,
+        coordinates=tuple((change.row, change.column) for change in tile_changes),
+        tile_ids=proposal.affected_tile_ids,
+        reasons=("synthetic diagonal boundary",),
+        alternatives=("retain", "expand"),
+    )
+    return RefinementReport(
+        candidates=(candidate,),
+        proposals=(proposal,),
+    )
+
+
 def test_editor_route_loads_saved_project(tmp_path):
     app = MosaicEditorApp(_save_project(tmp_path))
 
@@ -103,6 +149,15 @@ def test_editor_route_loads_saved_project(tmp_path):
     assert "input, textarea, select" in script
     assert 'request("/api/overrides/batch"' in script
     assert 'request("/api/overrides/batch-clear"' in script
+    assert 'request("/api/proposals"' in script
+    assert "proposal-addition" in script
+    assert "proposal-removal" in script
+    assert 'event.key === "["' in script
+    assert 'event.key === "]"' in script
+    assert 'event.key === "Enter" && currentProposal()' in script
+    assert 'event.key.toLowerCase() === "r"' in script
+    assert 'event.key.toLowerCase() === "s"' in script
+    assert "isEditableControl(event.target)" in script
 
     status, stylesheet = _request(app, "GET", "/editor.css")
     assert status == "200 OK"
@@ -110,6 +165,9 @@ def test_editor_route_loads_saved_project(tmp_path):
     assert ".tile.editable:hover" in stylesheet
     assert ".tile.protected:hover" in stylesheet
     assert "paint-order: stroke fill" in stylesheet
+    assert ".tile.proposal-addition" in stylesheet
+    assert ".tile.proposal-removal" in stylesheet
+    assert ".tile.manual-override" in stylesheet
 
 
 def test_editor_loads_and_exports_state_without_source(tmp_path):
@@ -422,3 +480,214 @@ def test_editor_reports_occupied_port(tmp_path, monkeypatch):
             port=port,
             open_browser=False,
         )
+
+
+def test_proposal_list_and_detail_api_are_deterministic(tmp_path):
+    report = _proposal_report((0, 0, 0, 1))
+    app = MosaicEditorApp(
+        _save_project(tmp_path), refinement_report=report
+    )
+
+    first_status, first = _request(app, "GET", "/api/proposals")
+    second_status, second = _request(app, "GET", "/api/proposals")
+    detail_status, detail = _request(
+        app, "GET", "/api/proposals/region-0001"
+    )
+
+    assert first_status == second_status == detail_status == "200 OK"
+    assert first == second
+    assert first["candidates"][0]["candidate_id"] == "region-0001"
+    assert detail["ranked_alternatives"][0]["rank"] == 1
+    assert detail["ranked_alternatives"][0]["changes"][0] == {
+        "tile_id": "placement-000000",
+        "row": 0,
+        "column": 0,
+        "generated_index": 0,
+        "proposed_index": 1,
+        "change_kind": "foreground_removal",
+    }
+
+
+def test_proposal_preview_endpoints_do_not_mutate_project(tmp_path):
+    app = MosaicEditorApp(
+        _save_project(tmp_path),
+        refinement_report=_proposal_report((0, 0, 0, 1)),
+    )
+    generated = app.project.generated_grid
+    overrides = app.project.overrides
+
+    _request(app, "GET", "/api/proposals")
+    _request(app, "GET", "/api/proposals/region-0001")
+
+    assert app.project.generated_grid == generated
+    assert app.project.overrides == overrides
+    assert app.dirty is False
+
+
+def test_accept_proposal_applies_sparse_overrides_once(tmp_path):
+    app = MosaicEditorApp(
+        _save_project(tmp_path),
+        refinement_report=_proposal_report(
+            (0, 0, 0, 1),
+            (0, 1, 0, 1),
+        ),
+    )
+
+    status, payload = _request(
+        app,
+        "POST",
+        "/api/proposals/region-0001/expand/accept",
+        {},
+    )
+
+    assert status == "200 OK"
+    assert app.project.generated_grid == ((0, 0),)
+    assert app.project.overrides == {(0, 0): 1, (0, 1): 1}
+    assert payload["project"]["dirty"] is True
+    assert payload["session"]["accepted"] == 1
+
+
+def test_accept_preserves_manual_overrides_outside_proposal(tmp_path):
+    app = MosaicEditorApp(
+        _save_project(tmp_path),
+        refinement_report=_proposal_report((0, 0, 0, 1)),
+    )
+    app.project.set_override(0, 1, 1)
+
+    status, _ = _request(
+        app,
+        "POST",
+        "/api/proposals/region-0001/expand/accept",
+        {},
+    )
+
+    assert status == "200 OK"
+    assert app.project.overrides == {(0, 0): 1, (0, 1): 1}
+
+
+def test_proposal_accept_conflict_is_atomic_and_requires_confirmation(
+    tmp_path,
+):
+    app = MosaicEditorApp(
+        _save_project(tmp_path),
+        refinement_report=_proposal_report(
+            (0, 0, 0, 1),
+            (0, 1, 0, 1),
+        ),
+    )
+    app.project.set_override(0, 0, 0)
+
+    status, payload = _request(
+        app,
+        "POST",
+        "/api/proposals/region-0001/expand/accept",
+        {},
+    )
+
+    assert status == "409 Conflict"
+    assert payload["conflicts"][0]["tile_id"] == "placement-000000"
+    assert app.project.overrides == {(0, 0): 0}
+    assert app.dirty is False
+
+    status, payload = _request(
+        app,
+        "POST",
+        "/api/proposals/region-0001/expand/accept",
+        {"confirm_conflicts": True},
+    )
+
+    assert status == "200 OK"
+    assert app.project.overrides == {(0, 0): 1, (0, 1): 1}
+    assert app.dirty is True
+    assert payload["session"]["accepted"] == 1
+
+
+def test_invalid_protected_proposal_accept_is_atomic(tmp_path):
+    geometry = build_geometry(MosaicConfig(columns=2, rows=1), 2, 1)
+    placements = list(geometry.placements)
+    placements[1] = replace(
+        placements[1], piece_type="edge_cut", piece_fraction=0.5
+    )
+    geometry = replace(geometry, placements=tuple(placements))
+    app = MosaicEditorApp(
+        _save_project(tmp_path, geometry),
+        refinement_report=_proposal_report(
+            (0, 0, 0, 1),
+            (0, 1, 0, 1),
+        ),
+    )
+
+    status, payload = _request(
+        app,
+        "POST",
+        "/api/proposals/region-0001/expand/accept",
+        {},
+    )
+
+    assert status == "400 Bad Request"
+    assert "protected" in payload["error"]
+    assert app.project.overrides == {}
+    assert app.dirty is False
+
+
+def test_reject_skip_and_reset_are_session_only(tmp_path):
+    path = _save_project(tmp_path)
+    before = path.read_bytes()
+    app = MosaicEditorApp(
+        path, refinement_report=_proposal_report((0, 0, 0, 1))
+    )
+
+    _, rejected = _request(
+        app, "POST", "/api/proposals/region-0001/reject", {}
+    )
+    assert rejected["session"]["rejected"] == 1
+    _, skipped = _request(
+        app, "POST", "/api/proposals/region-0001/skip", {}
+    )
+    assert skipped["session"]["rejected"] == 0
+    assert skipped["session"]["skipped"] == 1
+    status, summary = _request(app, "GET", "/api/proposals/session")
+    assert status == "200 OK"
+    assert summary == skipped["session"]
+    _, reset = _request(app, "POST", "/api/proposals/reset", {})
+    assert reset["session"] == {
+        "accepted": 0,
+        "rejected": 0,
+        "skipped": 0,
+        "states": {},
+    }
+    assert path.read_bytes() == before
+    assert app.project.overrides == {}
+    assert app.dirty is False
+
+
+def test_editor_loads_proposals_from_cache_without_source(tmp_path):
+    source = tmp_path / "source.png"
+    Image.new("RGB", (120, 120), "black").save(source)
+    config = MosaicConfig(
+        tile_shape="hex",
+        columns=3,
+        rows=3,
+        quantization_mode="bw",
+    )
+    geometry = build_geometry(config, 3, 3)
+    project = MosaicProject.from_result(MosaicResult(
+        columns=3,
+        rows=3,
+        grid=[[0, 0, 0], [0, 1, 0], [0, 0, 0]],
+        palette=PALETTE,
+        source_path=source,
+        physical_width_in=geometry.width_in,
+        physical_height_in=geometry.height_in,
+        config=config,
+        geometry=geometry,
+    ))
+    cache_project_bw_evidence(project, source_analysis_width=120)
+    path = project.save(tmp_path / "cached.json")
+    source.unlink()
+    app = MosaicEditorApp(path)
+
+    status, payload = _request(app, "GET", "/api/proposals")
+
+    assert status == "200 OK"
+    assert "candidates" in payload

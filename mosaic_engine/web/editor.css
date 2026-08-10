@@ -32,11 +32,12 @@ button {
   cursor: pointer;
 }
 button.secondary { color: #202124; background: white; }
+button.danger { background: #a93636; }
 button:disabled { cursor: not-allowed; opacity: .45; }
 
 main {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 20rem;
+  grid-template-columns: minmax(0, 1fr) 24rem;
   min-height: calc(100vh - 5rem);
 }
 
@@ -79,6 +80,28 @@ main {
   stroke-dasharray: none;
   filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 3px #2b1630);
 }
+.tile.manual-override:not(.selected) {
+  stroke: #257c9e;
+  stroke-width: 1.75px;
+}
+.tile.proposal-region:not(.proposal-addition):not(.proposal-removal) {
+  stroke: #8a63b8;
+  stroke-dasharray: 2px 2px;
+}
+.tile.proposal-addition:not(.selected) {
+  stroke: #16a05d;
+  stroke-width: 3px;
+  stroke-dasharray: none;
+  filter: drop-shadow(0 0 2px #eafff3);
+}
+.tile.proposal-removal:not(.selected) {
+  stroke: #e46f22;
+  stroke-width: 3px;
+  stroke-dasharray: 5px 2px;
+  filter: drop-shadow(0 0 2px #fff1e8);
+}
+#mosaic.proposal-difference .tile.proposal-addition { fill: #38cf7a; }
+#mosaic.proposal-difference .tile.proposal-removal { fill: #ff9b54; }
 
 aside {
   padding: 1.25rem;
@@ -111,6 +134,43 @@ dd { margin: 0; }
 .count-row { display: flex; justify-content: space-between; padding: .25rem 0; }
 #status { min-width: 5rem; color: #b8efc0; }
 .dirty-indicator { color: #ffd27d; font-weight: 700; }
+.proposal-review {
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #ddd7cd;
+}
+.proposal-warning {
+  padding: .55rem;
+  color: #6b4300;
+  background: #fff2c9;
+  border-radius: .35rem;
+  font-weight: 650;
+}
+.proposal-error { color: #a42525; }
+.proposal-navigation,
+.proposal-actions,
+.proposal-view-modes {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .4rem;
+  margin: .65rem 0;
+}
+.proposal-view-modes button.active { background: #433566; color: white; }
+.proposal-metadata { grid-template-columns: 6rem 1fr; }
+.proposal-metadata dd { overflow-wrap: anywhere; }
+#proposal-alternative { width: 100%; margin: .3rem 0; padding: .45rem; }
+.proposal-components {
+  max-height: 10rem;
+  overflow: auto;
+  font-size: .78rem;
+}
+.proposal-component {
+  display: flex;
+  justify-content: space-between;
+  gap: .5rem;
+  padding: .15rem 0;
+}
+.proposal-session { margin: .55rem 0; color: #5d5d5d; font-size: .85rem; }
 
 @media (max-width: 800px) {
   header { align-items: flex-start; flex-direction: column; }

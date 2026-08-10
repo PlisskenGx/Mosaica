@@ -116,3 +116,59 @@ def test_cli_emits_machine_readable_benchmark_json(
     output = json.loads(capsys.readouterr().out)
     assert output[0]["project_path"] == str(path)
     assert output[0]["real_changed_overrides"] == 0
+
+
+def test_cli_caches_evidence_without_changing_tiles_and_refines_offline(
+    tmp_path, monkeypatch, capsys
+):
+    source = tmp_path / "source.png"
+    Image.new("RGB", (100, 100), "black").save(source)
+    config = MosaicConfig(
+        tile_shape="hex",
+        columns=3,
+        rows=3,
+        quantization_mode="bw",
+    )
+    geometry = build_geometry(config, 3, 3)
+    project = MosaicProject.from_result(MosaicResult(
+        columns=3,
+        rows=3,
+        grid=[[0, 0, 0], [0, 1, 0], [0, 0, 0]],
+        palette=(
+            PaletteColor("Black", (0, 0, 0)),
+            PaletteColor("White", (255, 255, 255)),
+        ),
+        source_path=source,
+        physical_width_in=geometry.width_in,
+        physical_height_in=geometry.height_in,
+        config=config,
+        geometry=geometry,
+    ))
+    project.set_override(1, 1, 0)
+    path = project.save(tmp_path / "project.json")
+    generated = project.generated_grid
+    effective = project.effective_grid
+    overrides = project.overrides
+    monkeypatch.setattr(sys, "argv", [
+        "mosaic-engine", "--cache-evidence", str(path),
+    ])
+
+    main()
+
+    cached = MosaicProject.load(path)
+    assert cached.bw_evidence_cache is not None
+    assert cached.generated_grid == generated
+    assert cached.effective_grid == effective
+    assert cached.overrides == overrides
+    source.unlink()
+    capsys.readouterr()
+    monkeypatch.setattr(sys, "argv", [
+        "mosaic-engine",
+        "--refine-proposals", str(path),
+        "--refine-json",
+    ])
+
+    main()
+
+    output = json.loads(capsys.readouterr().out)
+    assert "refinement" in output

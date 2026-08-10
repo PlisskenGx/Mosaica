@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Iterable
 
 from .boundary import Rect
+from .evidence import BWEvidenceCache
 from .geometry import GridGeometry, TilePlacement
 from .model import MosaicConfig, MosaicResult, PaletteColor
 
@@ -23,6 +24,7 @@ class MosaicProject:
         generated_result: MosaicResult,
         overrides: dict[tuple[int, int], int] | None = None,
         protect_perimeter: bool = True,
+        bw_evidence_cache: BWEvidenceCache | None = None,
     ) -> None:
         self._generated_result = generated_result
         self._generated_grid = tuple(
@@ -31,6 +33,7 @@ class MosaicProject:
         )
         self._overrides: dict[tuple[int, int], int] = {}
         self.protect_perimeter = protect_perimeter
+        self._bw_evidence_cache = bw_evidence_cache
 
         for (row, column), palette_index in (
             overrides or {}
@@ -51,6 +54,13 @@ class MosaicProject:
     @property
     def overrides(self) -> dict[tuple[int, int], int]:
         return dict(self._overrides)
+
+    @property
+    def bw_evidence_cache(self) -> BWEvidenceCache | None:
+        return self._bw_evidence_cache
+
+    def set_bw_evidence_cache(self, cache: BWEvidenceCache | None) -> None:
+        self._bw_evidence_cache = cache
 
     @property
     def effective_grid(self) -> list[list[int]]:
@@ -204,7 +214,7 @@ class MosaicProject:
         self,
         project_path: str | Path | None = None,
     ) -> dict:
-        return {
+        data = {
             "schema": {
                 "name": PROJECT_SCHEMA_NAME,
                 "version": PROJECT_SCHEMA_VERSION,
@@ -238,6 +248,9 @@ class MosaicProject:
             },
             "geometry": _geometry_to_dict(self.geometry),
         }
+        if self._bw_evidence_cache is not None:
+            data["bw_evidence_cache"] = self._bw_evidence_cache.to_dict()
+        return data
 
     @classmethod
     def load(cls, path: str | Path) -> MosaicProject:
@@ -300,6 +313,12 @@ class MosaicProject:
             (item["row"], item["column"]): item["palette_index"]
             for item in data.get("overrides", [])
         }
+        cache_data = data.get("bw_evidence_cache")
+        evidence_cache = (
+            BWEvidenceCache.from_dict(cache_data)
+            if cache_data is not None
+            else None
+        )
 
         return cls(
             result,
@@ -308,6 +327,7 @@ class MosaicProject:
                 "edit_policy",
                 {},
             ).get("protect_perimeter", True),
+            bw_evidence_cache=evidence_cache,
         )
 
     def _source_metadata(

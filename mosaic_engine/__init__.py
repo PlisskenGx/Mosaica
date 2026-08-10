@@ -36,10 +36,16 @@ from .benchmark import (
 )
 from .evidence import (
     BWEvidence,
+    BWEvidenceCache,
     TileEvidence,
+    build_evidence_cache,
+    cache_project_bw_evidence,
     compute_bw_evidence,
     compute_project_bw_evidence,
+    evidence_cache_validity,
+    evidence_input_fingerprint,
     physical_neighbor_rings,
+    resolve_project_bw_evidence,
 )
 from .refinement import (
     CandidateRegion,
@@ -79,10 +85,16 @@ __all__ = [
     "evaluate_refinement_proposals",
     "format_benchmark_reports",
     "BWEvidence",
+    "BWEvidenceCache",
     "TileEvidence",
+    "build_evidence_cache",
+    "cache_project_bw_evidence",
     "compute_bw_evidence",
     "compute_project_bw_evidence",
+    "evidence_cache_validity",
+    "evidence_input_fingerprint",
     "physical_neighbor_rings",
+    "resolve_project_bw_evidence",
     "CandidateRegion",
     "RefinementProposal",
     "RefinementReport",
