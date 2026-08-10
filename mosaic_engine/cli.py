@@ -24,6 +24,7 @@ from .export import (
     export_placements_csv,
     export_preview_png,
 )
+from .fabrication import export_fabrication_package
 
 from .model import (
     MosaicConfig,
@@ -405,6 +406,19 @@ def main() -> None:
     )
 
     parser.add_argument(
+        "--fabrication",
+        metavar="PROJECT_JSON",
+        help="export fabrication-ready schedules and assembly map",
+    )
+
+    parser.add_argument(
+        "--waste",
+        type=float,
+        default=0.10,
+        help="fabrication purchase waste factor; default 0.10",
+    )
+
+    parser.add_argument(
         "--art-inset",
         type=float,
         default=0.0,
@@ -443,6 +457,46 @@ def main() -> None:
     )
 
     args = parser.parse_args()
+
+    if args.fabrication:
+        if (
+            args.source
+            or args.color
+            or args.load_project
+            or args.edit_project
+            or args.benchmark
+            or args.refine_proposals
+            or args.cache_evidence
+            or args.set_override
+            or args.clear_override
+            or args.clear_all_overrides
+            or args.save_project
+        ):
+            parser.error(
+                "generation, editing, benchmark, refinement, and evidence "
+                "options cannot be used with --fabrication"
+            )
+        if args.waste < 0:
+            parser.error("--waste cannot be negative")
+        project = MosaicProject.load(args.fabrication)
+        generated_before = project.generated_grid
+        overrides_before = project.overrides
+        paths = export_fabrication_package(
+            project,
+            args.out,
+            waste_factor=args.waste,
+        )
+        if (
+            project.generated_grid != generated_before
+            or project.overrides != overrides_before
+        ):
+            raise RuntimeError(
+                "Fabrication export unexpectedly changed project tile state."
+            )
+        print(f"Fabrication output: {Path(args.out).resolve()}")
+        for name, path in paths.items():
+            print(f"  {name}: {path}")
+        return
 
     if args.cache_evidence:
         if (

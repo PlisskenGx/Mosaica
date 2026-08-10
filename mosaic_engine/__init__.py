@@ -20,6 +20,20 @@ from .geometry import (
     TilePlacement,
     build_geometry,
 )
+from .fabrication import (
+    BuildGuidePiece,
+    CutPieceRecord,
+    FabricationData,
+    MaterialRecord,
+    build_fabrication_data,
+    export_assembly_map_svg,
+    export_cut_piece_schedule_csv,
+    export_fabrication_package,
+    export_material_schedule_csv,
+    export_project_summary,
+    export_row_build_guide_csv,
+    export_row_build_guide_text,
+)
 
 from .model import (
     MosaicConfig,
@@ -86,6 +100,18 @@ __all__ = [
     "build_geometry",
     "GridGeometry",
     "TilePlacement",
+    "BuildGuidePiece",
+    "CutPieceRecord",
+    "FabricationData",
+    "MaterialRecord",
+    "build_fabrication_data",
+    "export_assembly_map_svg",
+    "export_cut_piece_schedule_csv",
+    "export_fabrication_package",
+    "export_material_schedule_csv",
+    "export_project_summary",
+    "export_row_build_guide_csv",
+    "export_row_build_guide_text",
 
     "MosaicConfig",
     "MosaicResult",

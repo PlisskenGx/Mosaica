@@ -1,0 +1,3 @@
+palette_id,palette_name,abbreviation,rgb,sku,full_tile_count,cut_piece_count,visible_piece_count,piece_type_counts,equivalent_full_tile_area,area_based_minimum_quantity,waste_factor,recommended_purchase_quantity
+P01,Black,B,#111111,,315,0,315,"{""full"": 315}",315.000000,315,0.1000,347
+P02,White,W,#F5F3ED,,399,122,521,"{""edge_cut"": 122, ""full"": 399}",444.959702,445,0.1000,502
