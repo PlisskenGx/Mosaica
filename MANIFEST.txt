@@ -1,0 +1,11 @@
+Mosaic Engine v0.1
+
+Included files:
+- README.md
+- pyproject.toml
+- mosaic_engine/__init__.py
+- mosaic_engine/model.py
+- mosaic_engine/color.py
+- mosaic_engine/engine.py
+- mosaic_engine/export.py
+- mosaic_engine/cli.py

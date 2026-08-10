@@ -1,0 +1,7 @@
+Metadata-Version: 2.4
+Name: mosaic-engine
+Version: 0.3.0
+Summary: Standalone physical tile mosaic generation engine
+Requires-Python: >=3.11
+Requires-Dist: Pillow>=10.0
+Requires-Dist: CairoSVG>=2.7

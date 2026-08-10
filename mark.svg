@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="2185" height="768" viewBox="0 0 2185 768" xmlns="http://www.w3.org/2000/svg">
+    <path id="mark-right" fill="currentColor" fill-rule="evenodd" stroke="none" d="M 1918 766 L 2184 766 L 1683.675293 120.471924 L 1413.239502 120.471924 L 1413.736572 121.107666 Z"/>
+    <path id="mark-top" fill="currentColor" fill-rule="evenodd" stroke="none" d="M 1324.652344 403.15329 L 1477.265991 202.471924 L 1413.239502 120.471924 L 1413.736572 121.107666 L 1258.28479 317.639893 Z"/>
+    <path id="mark-tail" fill="currentColor" fill-rule="evenodd" stroke="none" d="M 595.0354 2.971924 L 1190.46582 765.971924 L 1606.004028 765.67041 L 1013.677429 2.467285 Z"/>
+    <path id="mark-left" fill="currentColor" fill-rule="evenodd" stroke="none" d="M 595.0354 2.971924 L 1 767 L 120 767 L 656.016235 81.114319 Z"/>
+</svg>

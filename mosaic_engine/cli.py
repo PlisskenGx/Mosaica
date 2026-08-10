@@ -1,0 +1,462 @@
+from __future__ import annotations
+
+import argparse
+
+from email import parser
+from pathlib import Path
+
+from .engine import generate_mosaic
+
+from .export import (
+    export_counts_csv,
+    export_grid_csv,
+    export_placements_csv,
+    export_preview_png,
+)
+
+from .model import (
+    MosaicConfig,
+    PaletteColor,
+)
+
+
+def _parse_color(
+    spec: str,
+) -> PaletteColor:
+
+    """
+    Parse:
+
+        NAME:#RRGGBB
+
+    or:
+
+        NAME:#RRGGBB:SKU
+    """
+
+    parts = spec.split(":")
+
+    if len(parts) < 2:
+        raise argparse.ArgumentTypeError(
+            "Color must be "
+            "NAME:#RRGGBB[:SKU]"
+        )
+
+    name = parts[0]
+
+    hx = (
+        parts[1]
+        .lstrip("#")
+    )
+
+    if len(hx) != 6:
+        raise argparse.ArgumentTypeError(
+            "Hex color must be 6 digits"
+        )
+
+    try:
+        rgb = tuple(
+            int(
+                hx[i:i + 2],
+                16,
+            )
+            for i in (
+                0,
+                2,
+                4,
+            )
+        )
+
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(
+            "Invalid hexadecimal color."
+        ) from exc
+
+    sku = (
+        parts[2]
+        if len(parts) > 2
+        else None
+    )
+
+    return PaletteColor(
+        name=name,
+        rgb=rgb,
+        sku=sku,
+    )
+
+
+def main() -> None:
+
+    parser = argparse.ArgumentParser(
+        description=(
+            "Generate a physical tile mosaic "
+            "from an image"
+        )
+    )
+
+    parser.add_argument(
+        "source",
+        help="source image",
+    )
+
+    parser.add_argument(
+        "--color",
+        action="append",
+        type=_parse_color,
+        required=True,
+
+        help=(
+            "palette color as "
+            "NAME:#RRGGBB[:SKU]"
+        ),
+    )
+
+    parser.add_argument(
+        "--shape",
+        choices=[
+            "square",
+            "hex",
+        ],
+        default="square",
+    )
+
+    parser.add_argument(
+        "--tile",
+        type=float,
+        default=1.0,
+
+        help=(
+            "tile size in inches; "
+            "for hex, this is across-flats"
+        ),
+    )
+
+    parser.add_argument(
+        "--tile-height",
+        type=float,
+
+        help=(
+            "square/rectangular tile height; "
+            "defaults to --tile"
+        ),
+    )
+
+    parser.add_argument(
+        "--hex-orientation",
+        choices=[
+            "pointy",
+            "flat",
+        ],
+        default="pointy",
+    )
+
+    parser.add_argument(
+        "--grout",
+        type=float,
+        default=0.0,
+
+        help=(
+            "clear grout gap in inches"
+        ),
+    )
+
+    parser.add_argument(
+        "--width",
+        type=float,
+    )
+
+    parser.add_argument(
+        "--height",
+        type=float,
+    )
+
+    parser.add_argument(
+        "--cols",
+        type=int,
+    )
+
+    parser.add_argument(
+        "--rows",
+        type=int,
+    )
+
+    parser.add_argument(
+        "--fit",
+        choices=[
+            "contain",
+            "cover",
+            "stretch",
+        ],
+        default="contain",
+    )
+
+    parser.add_argument(
+        "--mode",
+        choices=[
+            "palette",
+            "bw",
+        ],
+        default="palette",
+
+        help=(
+            "color interpretation mode"
+        ),
+    )
+
+    parser.add_argument(
+        "--threshold",
+        type=int,
+        default=128,
+
+        help=(
+            "black/white luminance threshold "
+            "from 0-255"
+        ),
+    )
+
+    parser.add_argument(
+        "--invert",
+        action="store_true",
+
+        help=(
+            "invert foreground/background "
+            "in black/white mode"
+        ),
+    )
+
+    parser.add_argument(
+        "--cleanup",
+        type=int,
+        default=0,
+
+        help=(
+            "number of topology-aware "
+            "cleanup passes"
+        ),
+    )
+
+    parser.add_argument(
+        "--ppi",
+        type=int,
+        default=48,
+
+        help=(
+            "preview pixels per physical inch"
+        ),
+    )
+
+    parser.add_argument(
+        "--out",
+        default="mosaic_output",
+    )
+
+    parser.add_argument(
+        "--art-inset",
+        type=float,
+        default=0.0,
+
+        help=(
+            "reserved inset around the artwork "
+            "in inches"
+        ),
+    )
+
+    parser.add_argument(
+        "--art-scale",
+        type=float,
+        default=1.0,
+
+        help=(
+            "artwork scale inside its available "
+            "region"
+        ),
+    )
+
+    parser.add_argument(
+        "--art-offset-x",
+        type=float,
+        default=0.0,
+
+        help="horizontal artwork offset in inches",
+    )
+
+    parser.add_argument(
+        "--art-offset-y",
+        type=float,
+        default=0.0,
+
+        help="vertical artwork offset in inches",
+    )
+
+    args = parser.parse_args()
+
+    if not 0 <= args.threshold <= 255:
+        parser.error(
+            "--threshold must be "
+            "between 0 and 255"
+        )
+
+    if args.cleanup < 0:
+        parser.error(
+            "--cleanup cannot be negative"
+        )
+
+    config = MosaicConfig(
+
+        tile_shape=args.shape,
+
+        tile_width_in=args.tile,
+
+        tile_height_in=(
+            args.tile_height
+            if args.tile_height
+            is not None
+            else args.tile
+        ),
+
+        grout_width_in=args.grout,
+
+        hex_orientation=(
+            args.hex_orientation
+        ),
+
+        target_width_in=args.width,
+        target_height_in=args.height,
+
+        columns=args.cols,
+        rows=args.rows,
+
+        fit=args.fit,
+
+        quantization_mode=args.mode,
+
+        bw_threshold=args.threshold,
+
+        invert_bw=args.invert,
+
+        cleanup_passes=(
+            args.cleanup
+        ),
+        artwork_inset_in=args.art_inset,
+
+        artwork_scale=args.art_scale,
+
+        artwork_offset_x_in=(
+            args.art_offset_x
+        ),
+
+        artwork_offset_y_in=(
+            args.art_offset_y
+        ),
+    )
+
+    result = generate_mosaic(
+        source=args.source,
+        palette=args.color,
+        config=config,
+    )
+
+    out = Path(
+        args.out
+    )
+
+    out.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    export_preview_png(
+        result,
+
+        out / "preview.png",
+
+        pixels_per_inch=(
+            args.ppi
+        ),
+    )
+
+    export_counts_csv(
+        result,
+        out / "counts.csv",
+    )
+
+    export_grid_csv(
+        result,
+        out / "grid.csv",
+    )
+
+    export_placements_csv(
+        result,
+        out / "placements.csv",
+    )
+
+    print(
+        f"Shape: "
+        f"{config.tile_shape}"
+    )
+
+    if (
+        config.tile_shape
+        == "hex"
+    ):
+        print(
+            "Hex orientation: "
+            f"{config.hex_orientation}"
+        )
+
+        print(
+            "Hex across-flats: "
+            f"{config.tile_width_in:.4f} in"
+        )
+
+    print(
+        "Interpretation: "
+        f"{config.quantization_mode}"
+    )
+
+    if (
+        config.quantization_mode
+        == "bw"
+    ):
+        print(
+            "Threshold: "
+            f"{config.bw_threshold}"
+        )
+
+        print(
+            "Inverted: "
+            f"{config.invert_bw}"
+        )
+
+    print(
+        "Cleanup passes: "
+        f"{config.cleanup_passes}"
+    )
+
+    print(
+        f"Grid: "
+        f"{result.columns} "
+        f"x "
+        f"{result.rows}"
+    )
+
+    print(
+        "Physical size: "
+        f"{result.physical_width_in:.3f} "
+        "x "
+        f"{result.physical_height_in:.3f} "
+        "in"
+    )
+
+    print(
+        "Tiles: "
+        f"{result.columns * result.rows}"
+    )
+
+    print(
+        result.counts()
+    )
+
+
+if __name__ == "__main__":
+    main()
