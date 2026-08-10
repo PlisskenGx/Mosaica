@@ -25,6 +25,10 @@ from .export import (
     export_preview_png,
 )
 from .fabrication import export_fabrication_package
+from .print_parts import (
+    export_calibration_package,
+    export_print_parts_package,
+)
 
 from .model import (
     MosaicConfig,
@@ -419,6 +423,32 @@ def main() -> None:
     )
 
     parser.add_argument(
+        "--print-parts",
+        metavar="PROJECT_JSON",
+        help="export deduplicated printable STL parts from a saved project",
+    )
+
+    parser.add_argument(
+        "--print-calibration",
+        action="store_true",
+        help="export an XY-compensation calibration set",
+    )
+
+    parser.add_argument(
+        "--thickness-mm",
+        type=float,
+        default=3.0,
+        help="printed tile thickness in millimeters; default 3.0",
+    )
+
+    parser.add_argument(
+        "--xy-offset-mm",
+        type=float,
+        default=0.0,
+        help="uniform printable-outline compensation in millimeters",
+    )
+
+    parser.add_argument(
         "--art-inset",
         type=float,
         default=0.0,
@@ -457,6 +487,63 @@ def main() -> None:
     )
 
     args = parser.parse_args()
+
+    if args.print_parts or args.print_calibration:
+        if args.print_parts and args.print_calibration:
+            parser.error("--print-parts and --print-calibration are mutually exclusive")
+        if (
+            args.source
+            or args.color
+            or args.load_project
+            or args.edit_project
+            or args.benchmark
+            or args.refine_proposals
+            or args.cache_evidence
+            or args.fabrication
+            or args.set_override
+            or args.clear_override
+            or args.clear_all_overrides
+            or args.save_project
+        ):
+            parser.error(
+                "generation, editing, fabrication, benchmark, refinement, and "
+                "evidence options cannot be used with print output"
+            )
+        if args.thickness_mm <= 0:
+            parser.error("--thickness-mm must be positive")
+        try:
+            if args.print_calibration:
+                paths = export_calibration_package(
+                    args.out,
+                    shape=args.shape,
+                    tile_size_in=args.tile,
+                    thickness_mm=args.thickness_mm,
+                )
+                label = "Print calibration output"
+            else:
+                project = MosaicProject.load(args.print_parts)
+                generated_before = project.generated_grid
+                overrides_before = project.overrides
+                paths = export_print_parts_package(
+                    project,
+                    args.out,
+                    thickness_mm=args.thickness_mm,
+                    xy_offset_mm=args.xy_offset_mm,
+                )
+                if (
+                    project.generated_grid != generated_before
+                    or project.overrides != overrides_before
+                ):
+                    raise RuntimeError(
+                        "Print-parts export unexpectedly changed project tile state."
+                    )
+                label = "Printable parts output"
+        except ValueError as exc:
+            parser.error(str(exc))
+        print(f"{label}: {Path(args.out).resolve()}")
+        for name, path in paths.items():
+            print(f"  {name}: {path}")
+        return
 
     if args.fabrication:
         if (

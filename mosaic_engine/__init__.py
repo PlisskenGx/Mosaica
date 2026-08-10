@@ -34,6 +34,20 @@ from .fabrication import (
     export_row_build_guide_csv,
     export_row_build_guide_text,
 )
+from .print_parts import (
+    INCH_TO_MM,
+    PlacementPart,
+    PrintablePart,
+    PrintPartsManifest,
+    build_print_parts_manifest,
+    calibration_polygon,
+    export_calibration_package,
+    export_print_parts_package,
+    inches_to_mm,
+    offset_polygon,
+    triangulate_extrusion,
+    write_ascii_stl,
+)
 
 from .model import (
     MosaicConfig,
@@ -112,6 +126,18 @@ __all__ = [
     "export_project_summary",
     "export_row_build_guide_csv",
     "export_row_build_guide_text",
+    "INCH_TO_MM",
+    "PlacementPart",
+    "PrintablePart",
+    "PrintPartsManifest",
+    "build_print_parts_manifest",
+    "calibration_polygon",
+    "export_calibration_package",
+    "export_print_parts_package",
+    "inches_to_mm",
+    "offset_polygon",
+    "triangulate_extrusion",
+    "write_ascii_stl",
 
     "MosaicConfig",
     "MosaicResult",

@@ -1,0 +1,114 @@
+solid mosaic_tile
+  facet normal 0 0 -1
+    outer loop
+      vertex 0.000000000 0.000000000 0.000000000
+      vertex 23.415625000 3.514095097 0.000000000
+      vertex 23.415625000 0.000000000 0.000000000
+    endloop
+  endfacet
+  facet normal 0 0 1
+    outer loop
+      vertex 0.000000000 0.000000000 3.000000000
+      vertex 23.415625000 0.000000000 3.000000000
+      vertex 23.415625000 3.514095097 3.000000000
+    endloop
+  endfacet
+  facet normal 0 0 -1
+    outer loop
+      vertex 0.000000000 0.000000000 0.000000000
+      vertex 12.700000000 9.700764076 0.000000000
+      vertex 23.415625000 3.514095097 0.000000000
+    endloop
+  endfacet
+  facet normal 0 0 1
+    outer loop
+      vertex 0.000000000 0.000000000 3.000000000
+      vertex 23.415625000 3.514095097 3.000000000
+      vertex 12.700000000 9.700764076 3.000000000
+    endloop
+  endfacet
+  facet normal 0 0 -1
+    outer loop
+      vertex 0.000000000 0.000000000 0.000000000
+      vertex 0.000000000 2.368415657 0.000000000
+      vertex 12.700000000 9.700764076 0.000000000
+    endloop
+  endfacet
+  facet normal 0 0 1
+    outer loop
+      vertex 0.000000000 0.000000000 3.000000000
+      vertex 12.700000000 9.700764076 3.000000000
+      vertex 0.000000000 2.368415657 3.000000000
+    endloop
+  endfacet
+  facet normal 0 -1 0
+    outer loop
+      vertex 0.000000000 0.000000000 0.000000000
+      vertex 23.415625000 0.000000000 0.000000000
+      vertex 23.415625000 0.000000000 3.000000000
+    endloop
+  endfacet
+  facet normal 0 -1 0
+    outer loop
+      vertex 0.000000000 0.000000000 0.000000000
+      vertex 23.415625000 0.000000000 3.000000000
+      vertex 0.000000000 0.000000000 3.000000000
+    endloop
+  endfacet
+  facet normal 1 0 0
+    outer loop
+      vertex 23.415625000 0.000000000 0.000000000
+      vertex 23.415625000 3.514095097 0.000000000
+      vertex 23.415625000 3.514095097 3.000000000
+    endloop
+  endfacet
+  facet normal 1 0 0
+    outer loop
+      vertex 23.415625000 0.000000000 0.000000000
+      vertex 23.415625000 3.514095097 3.000000000
+      vertex 23.415625000 0.000000000 3.000000000
+    endloop
+  endfacet
+  facet normal 0.5 0.866025404 0
+    outer loop
+      vertex 23.415625000 3.514095097 0.000000000
+      vertex 12.700000000 9.700764076 0.000000000
+      vertex 12.700000000 9.700764076 3.000000000
+    endloop
+  endfacet
+  facet normal 0.5 0.866025404 -0
+    outer loop
+      vertex 23.415625000 3.514095097 0.000000000
+      vertex 12.700000000 9.700764076 3.000000000
+      vertex 23.415625000 3.514095097 3.000000000
+    endloop
+  endfacet
+  facet normal -0.5 0.866025404 0
+    outer loop
+      vertex 12.700000000 9.700764076 0.000000000
+      vertex 0.000000000 2.368415657 0.000000000
+      vertex 0.000000000 2.368415657 3.000000000
+    endloop
+  endfacet
+  facet normal -0.5 0.866025404 0
+    outer loop
+      vertex 12.700000000 9.700764076 0.000000000
+      vertex 0.000000000 2.368415657 3.000000000
+      vertex 12.700000000 9.700764076 3.000000000
+    endloop
+  endfacet
+  facet normal -1 0 0
+    outer loop
+      vertex 0.000000000 2.368415657 0.000000000
+      vertex 0.000000000 0.000000000 0.000000000
+      vertex 0.000000000 0.000000000 3.000000000
+    endloop
+  endfacet
+  facet normal -1 0 0
+    outer loop
+      vertex 0.000000000 2.368415657 0.000000000
+      vertex 0.000000000 0.000000000 3.000000000
+      vertex 0.000000000 2.368415657 3.000000000
+    endloop
+  endfacet
+endsolid mosaic_tile
