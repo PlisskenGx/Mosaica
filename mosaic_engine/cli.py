@@ -358,10 +358,16 @@ def main() -> None:
     )
 
     parser.add_argument(
+        "--designer",
+        action="store_true",
+        help="launch the Mosaic Designer preset workflow",
+    )
+
+    parser.add_argument(
         "--editor-port",
         type=int,
         default=8765,
-        help="localhost port for the project editor",
+        help="localhost port for the project editor or Mosaic Designer",
     )
 
     parser.add_argument(
@@ -487,6 +493,36 @@ def main() -> None:
     )
 
     args = parser.parse_args()
+
+    if args.designer:
+        if (
+            args.source
+            or args.color
+            or args.load_project
+            or args.edit_project
+            or args.benchmark
+            or args.refine_proposals
+            or args.cache_evidence
+            or args.fabrication
+            or args.print_parts
+            or args.print_calibration
+            or args.set_override
+            or args.clear_override
+            or args.clear_all_overrides
+            or args.save_project
+        ):
+            parser.error(
+                "generation, project editing, export, benchmark, refinement, "
+                "and evidence options cannot be used with --designer"
+            )
+        if not 1 <= args.editor_port <= 65535:
+            parser.error("--editor-port must be between 1 and 65535")
+        from .designer import run_designer
+        run_designer(
+            port=args.editor_port,
+            open_browser=not args.no_browser,
+        )
+        return
 
     if args.print_parts or args.print_calibration:
         if args.print_parts and args.print_calibration:

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mosaic Designer</title>
+  <link rel="stylesheet" href="/designer.css">
+</head>
+<body>
+  <header class="app-bar">
+    <div class="app-bar-left">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <strong>Mosaic Designer</strong>
+      </div>
+      <button id="back" class="back-navigation" hidden>‹ Back</button>
+    </div>
+    <div id="document-title" class="document-title" aria-label="Document title">
+      <span id="document-name">Untitled</span><span id="document-edited" hidden>Edited</span>
+    </div>
+  </header>
+
+  <main>
+    <section id="canvas-screen" class="setup-screen">
+      <div class="setup-heading">
+        <h1>Choose your canvas</h1>
+        <p>The finished dimensions establish the exact physical boundary of your mosaic.</p>
+      </div>
+      <div id="canvas-presets" class="canvas-presets" aria-label="Canvas presets"></div>
+    </section>
+
+    <section id="tile-screen" class="setup-screen" hidden>
+      <div class="setup-heading">
+        <h1>Choose your tile size</h1>
+        <p>Every option uses pointy-top hexagons with a fixed 1.8 mm grout gap.</p>
+      </div>
+      <div id="tile-presets" class="tile-presets" aria-label="Tile presets"></div>
+    </section>
+
+    <section id="workspace" class="workspace" hidden>
+      <div class="canvas-region">
+        <div class="canvas-toolbar">
+          <div><p class="eyebrow">Physical canvas</p><h1 id="workspace-title">Blank mosaic</h1></div>
+        </div>
+        <div id="canvas-viewport" class="canvas-viewport">
+          <svg id="mosaic-canvas" xmlns="http://www.w3.org/2000/svg" aria-label="Blank physical mosaic lattice"></svg>
+        </div>
+      </div>
+
+      <aside class="inspector" aria-label="Design inspector">
+        <div class="inspector-heading"><p class="eyebrow">Design</p><h2>Build your mosaic</h2></div>
+        <div class="unavailable-section"><strong>Artwork</strong><span>Coming later</span></div>
+        <div class="unavailable-section"><strong>Border</strong><span>Coming later</span></div>
+        <div class="unavailable-section"><strong>Colors</strong><span>Coming later</span></div>
+        <div class="unavailable-section"><strong>Paint / Edit</strong><span>Coming later</span></div>
+      </aside>
+      <footer id="workspace-status" class="workspace-status" aria-label="Project physical status"></footer>
+    </section>
+  </main>
+  <div id="status" role="status" aria-live="polite"></div>
+  <script src="/designer.js"></script>
+</body>
+</html>

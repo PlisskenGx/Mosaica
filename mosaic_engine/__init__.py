@@ -48,6 +48,17 @@ from .print_parts import (
     triangulate_extrusion,
     write_ascii_stl,
 )
+from .designer import (
+    CANVAS_PRESETS,
+    DESIGNER_GROUT_MM,
+    MM_PER_INCH,
+    TILE_PRESETS,
+    CanvasPreset,
+    DesignerProjectShell,
+    MosaicDesignerApp,
+    TilePreset,
+    run_designer,
+)
 
 from .model import (
     MosaicConfig,
@@ -138,6 +149,15 @@ __all__ = [
     "offset_polygon",
     "triangulate_extrusion",
     "write_ascii_stl",
+    "CANVAS_PRESETS",
+    "DESIGNER_GROUT_MM",
+    "MM_PER_INCH",
+    "TILE_PRESETS",
+    "CanvasPreset",
+    "DesignerProjectShell",
+    "MosaicDesignerApp",
+    "TilePreset",
+    "run_designer",
 
     "MosaicConfig",
     "MosaicResult",

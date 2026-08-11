@@ -1,0 +1,315 @@
+from io import BytesIO
+import json
+from math import isclose, sqrt
+import sys
+
+import pytest
+
+import mosaic_engine.designer as designer_module
+from mosaic_engine.cli import main
+from mosaic_engine.designer import (
+    CANVAS_PRESETS,
+    CANVAS_PREVIEW_REM_PER_INCH,
+    DESIGNER_GROUT_MM,
+    MM_PER_INCH,
+    P1S_BUILD_AREA_MM,
+    TILE_PRESETS,
+    DesignerProjectShell,
+    MosaicDesignerApp,
+    estimate_minimum_print_plates,
+    run_designer,
+)
+
+
+def _request(app, method, path, body=None):
+    raw = json.dumps(body).encode() if body is not None else b""
+    captured = {}
+    def start_response(status, headers):
+        captured["status"] = status
+        captured["headers"] = dict(headers)
+    response = b"".join(app({
+        "REQUEST_METHOD": method,
+        "PATH_INFO": path,
+        "CONTENT_LENGTH": str(len(raw)),
+        "wsgi.input": BytesIO(raw),
+    }, start_response))
+    if captured["headers"]["Content-Type"].startswith("application/json"):
+        response = json.loads(response)
+    else:
+        response = response.decode()
+    return captured["status"], response
+
+
+def test_all_canvas_presets_have_exact_fixed_dimensions():
+    assert [(value.id, value.name, value.width_in, value.height_in) for value in CANVAS_PRESETS] == [
+        ("square-s", "Square S", 24.0, 24.0),
+        ("square-m", "Square M", 36.0, 36.0),
+        ("square-l", "Square L", 48.0, 48.0),
+        ("landscape", "Landscape", 48.0, 30.0),
+        ("wide", "Wide", 60.0, 30.0),
+        ("panoramic", "Panoramic", 72.0, 30.0),
+    ]
+
+
+def test_tile_presets_are_flat_to_flat_with_fixed_physical_grout():
+    assert [value.flat_to_flat_mm for value in TILE_PRESETS] == [20.0, 24.0, 28.0]
+    assert DESIGNER_GROUT_MM == 1.8
+    for value in TILE_PRESETS:
+        assert isclose(value.flat_to_flat_in, value.flat_to_flat_mm / 25.4)
+        assert isclose(value.side_length_mm, value.flat_to_flat_mm / sqrt(3))
+    assert TILE_PRESETS[1].recommended is True
+
+
+def test_medium_preset_converts_twenty_four_mm_flat_to_flat_to_engine_units():
+    medium = TILE_PRESETS[1]
+    assert isclose(medium.flat_to_flat_in, 24.0 / 25.4)
+    assert isclose(medium.side_length_mm, 24.0 / sqrt(3))
+    assert not isclose(medium.side_length_mm, 24.0)
+
+
+def test_canvas_previews_share_one_physical_scale_and_preserve_aspect():
+    payloads = [value.to_dict() for value in CANVAS_PRESETS]
+    for preset, payload in zip(CANVAS_PRESETS, payloads):
+        assert isclose(payload["preview_width_rem"], (
+            preset.width_in * CANVAS_PREVIEW_REM_PER_INCH
+        ))
+        assert isclose(payload["preview_height_rem"], (
+            preset.height_in * CANVAS_PREVIEW_REM_PER_INCH
+        ))
+        assert isclose(
+            payload["preview_width_rem"] / payload["preview_height_rem"],
+            payload["aspect_ratio"],
+        )
+    squares = payloads[:3]
+    assert [value["preview_width_rem"] for value in squares] == [2.4, 3.6, 4.8]
+    landscape, wide, panoramic = payloads[3:]
+    assert landscape["aspect_ratio"] == 1.6
+    assert wide["aspect_ratio"] == 2.0
+    assert panoramic["aspect_ratio"] == 2.4
+    assert [
+        (value["preview_width_rem"], value["preview_height_rem"])
+        for value in (landscape, wide, panoramic)
+    ] == [(4.8, 3.0), (6.0, 3.0), (7.2, 3.0)]
+
+
+@pytest.mark.parametrize("canvas_id,tile_id", [
+    ("square-s", "s"),
+    ("landscape", "m"),
+    ("panoramic", "l"),
+])
+def test_representative_presets_create_exact_panel_geometry(canvas_id, tile_id):
+    shell = DesignerProjectShell.create(canvas_id, tile_id)
+    assert shell.geometry.width_in == shell.canvas.width_in
+    assert shell.geometry.height_in == shell.canvas.height_in
+    assert shell.geometry.shape == "hex"
+    full = next(value for value in shell.geometry.placements if value.piece_type == "full")
+    across_flats = max(x for x, _ in full.full_vertices_in) - min(
+        x for x, _ in full.full_vertices_in
+    )
+    assert isclose(across_flats * MM_PER_INCH, shell.tile.flat_to_flat_mm, abs_tol=1e-8)
+
+
+def test_blank_lattice_counts_and_payload_are_deterministic():
+    first = DesignerProjectShell.create("landscape", "m").to_dict()
+    second = DesignerProjectShell.create("landscape", "m").to_dict()
+    assert first == second
+    geometry = first["geometry"]
+    assert geometry["full_tile_count"] > 0
+    assert geometry["clipped_piece_count"] > 0
+    assert geometry["visible_piece_count"] == (
+        geometry["full_tile_count"] + geometry["clipped_piece_count"]
+    )
+    assert len(geometry["tiles"]) == geometry["visible_piece_count"]
+    assert all(value["piece_type"] != "outside" for value in geometry["tiles"])
+    assert all(value["vertices_in"] for value in geometry["tiles"])
+
+
+def test_preset_selection_api_state_flow():
+    app = MosaicDesignerApp()
+    status, payload = _request(app, "GET", "/api/designer")
+    assert status == "200 OK"
+    assert payload["stage"] == "canvas"
+    assert len(payload["canvas_presets"]) == 6
+    assert len(payload["tile_presets"]) == 3
+    assert payload["fixed_grout_mm"] == 1.8
+    assert payload["document"] == {"title": "Untitled", "dirty": False}
+
+    status, payload = _request(
+        app, "POST", "/api/designer/canvas", {"canvas_id": "wide"},
+    )
+    assert status == "200 OK"
+    assert payload["stage"] == "tile"
+    assert payload["selected_canvas_id"] == "wide"
+    assert payload["project"] is None
+    assert payload["document"] == {"title": "Untitled", "dirty": False}
+
+    status, payload = _request(
+        app, "POST", "/api/designer/tile", {"tile_id": "m"},
+    )
+    assert status == "200 OK"
+    assert payload["stage"] == "workspace"
+    assert payload["project"]["canvas_preset"]["width_in"] == 60
+    assert payload["project"]["canvas_preset"]["height_in"] == 30
+    assert payload["project"]["geometry"]["width_in"] == 60
+    assert payload["project"]["geometry"]["height_in"] == 30
+    assert payload["project"]["tile_preset"]["flat_to_flat_mm"] == 24
+    assert payload["document"] == {"title": "Untitled", "dirty": False}
+
+    status, payload = _request(app, "POST", "/api/designer/back", {})
+    assert status == "200 OK"
+    assert payload["stage"] == "tile"
+
+    status, payload = _request(app, "POST", "/api/designer/back", {})
+    assert status == "200 OK"
+    assert payload["stage"] == "canvas"
+    assert payload["selected_canvas_id"] is None
+
+
+def test_tile_cannot_be_selected_before_canvas_and_presets_are_closed():
+    app = MosaicDesignerApp()
+    status, payload = _request(
+        app, "POST", "/api/designer/tile", {"tile_id": "m"},
+    )
+    assert status == "400 Bad Request"
+    assert "canvas" in payload["error"]
+    status, payload = _request(
+        app, "POST", "/api/designer/canvas", {"canvas_id": "custom"},
+    )
+    assert status == "400 Bad Request"
+    assert "Unknown canvas preset" in payload["error"]
+
+
+def test_designer_assets_use_backend_polygons_and_responsive_regions():
+    app = MosaicDesignerApp()
+    status, html = _request(app, "GET", "/")
+    assert status == "200 OK"
+    assert "Mosaic Designer" in html
+    assert "New mosaic" not in html
+    assert "Physical tile system" not in html
+    assert "Choose your canvas" in html
+    assert "Choose your tile size" in html
+    assert "canvas-presets" in html
+    assert "tile-presets" in html
+    assert "mosaic-canvas" in html
+    assert 'id="canvas-viewport"' in html
+    assert 'id="fit-workspace"' not in html
+    assert "Fit to Workspace" not in html
+    assert 'id="workspace-status"' in html
+    assert 'id="document-name">Untitled' in html
+    assert '<div class="app-bar-left">' in html
+    assert '<button id="back" class="back-navigation" hidden>‹ Back</button>' in html
+    assert html.index('class="brand"') < html.index('id="back"')
+    assert html.index('id="back"') < html.index('id="document-title"')
+    assert "Paint / Edit" in html
+    assert '<span class="brand-mark" aria-hidden="true"></span>' in html
+    assert '<svg class="brand-mark"' not in html
+    assert "<polygon points=" not in html
+
+    _, script = _request(app, "GET", "/designer.js")
+    assert "geometry.tiles" in script
+    assert "tile.vertices_in" in script
+    assert "createElementNS" in script
+    assert "hex_geometry" not in script
+    assert "/api/designer/canvas" in script
+    assert "/api/designer/tile" in script
+    assert "calculateFitSize" in script
+    assert "fitToWorkspace" in script
+    assert 'addEventListener("click", fitToWorkspace)' not in script
+    assert "requestAnimationFrame(fitToWorkspace)" in script
+    assert 'window.addEventListener("resize", fitToWorkspace)' in script
+    assert "ResizeObserver" in script
+    assert "preserveAspectRatio" in script
+    assert "project.print_plate_estimate" in script
+    assert "Est. minimum:" in script
+    assert "preset.best_for" not in script
+    assert "preset.tradeoff" not in script
+    assert 'byId("back").hidden = stage === "canvas"' in script
+    assert 'request("/api/designer/back", {})' in script
+
+    _, stylesheet = _request(app, "GET", "/designer.css")
+    assert "grid-template-columns: minmax(0, 1fr)" in stylesheet
+    assert "@media (max-width: 680px)" in stylesheet
+    assert "touch-action" not in stylesheet
+    assert "height: calc(100dvh - var(--app-bar-height))" in stylesheet
+    assert ".canvas-viewport" in stylesheet
+    assert "min-height: 0" in stylesheet
+    assert "overflow: hidden" in stylesheet
+    assert ".workspace-status" in stylesheet
+    assert "grid-column: 3" in stylesheet
+    assert "justify-self: end" in stylesheet
+    assert "border: 2px solid #303033" in stylesheet
+    assert "border-radius: 38%" in stylesheet
+    assert "transform: rotate(30deg)" in stylesheet
+    assert ".app-bar-left { grid-column: 1" in stylesheet
+    assert ".back-navigation" in stylesheet
+    assert "border: 0" in stylesheet
+    assert "background: transparent" in stylesheet
+    assert "min-height: 2.75rem" in stylesheet
+    assert ".back-navigation:focus-visible" in stylesheet
+    assert ".quiet-button" not in stylesheet
+
+
+@pytest.mark.parametrize("canvas_id,columns,rows,total", [
+    ("square-s", 3, 3, 9),
+    ("square-m", 4, 4, 16),
+    ("square-l", 5, 5, 25),
+    ("landscape", 5, 3, 15),
+    ("wide", 6, 3, 18),
+    ("panoramic", 8, 3, 24),
+])
+def test_p1s_rectangular_lower_bound_for_every_canvas(
+    canvas_id, columns, rows, total,
+):
+    canvas = next(value for value in CANVAS_PRESETS if value.id == canvas_id)
+    estimate = estimate_minimum_print_plates(canvas.width_in, canvas.height_in)
+    assert estimate == {
+        "build_area_mm": 256.0,
+        "columns": columns,
+        "rows": rows,
+        "estimated_minimum_plates": total,
+        "method": "rectangular lower bound",
+    }
+    assert P1S_BUILD_AREA_MM == 256.0
+
+
+def test_plate_estimate_is_informational_and_does_not_mutate_geometry():
+    shell = DesignerProjectShell.create("square-s", "m")
+    placements_before = shell.geometry.placements
+    geometry_before = shell.to_dict()["geometry"]
+    estimate = estimate_minimum_print_plates(
+        shell.geometry.width_in, shell.geometry.height_in,
+    )
+    assert estimate["estimated_minimum_plates"] == 9
+    assert shell.geometry.placements == placements_before
+    assert shell.to_dict()["geometry"] == geometry_before
+
+
+def test_workspace_status_payload_contains_updated_physical_facts():
+    payload = DesignerProjectShell.create("square-m", "m").to_dict()
+    assert payload["canvas_preset"]["width_in"] == 36
+    assert payload["tile_preset"]["flat_to_flat_mm"] == 24
+    assert payload["grout_mm"] == 1.8
+    assert payload["geometry"]["visible_piece_count"] > 0
+    assert payload["print_plate_estimate"]["estimated_minimum_plates"] == 16
+
+
+def test_designer_localhost_and_occupied_port_errors(monkeypatch):
+    with pytest.raises(ValueError, match="localhost only"):
+        run_designer(host="0.0.0.0", open_browser=False)
+    def occupied(*args, **kwargs):
+        raise OSError("occupied")
+    monkeypatch.setattr(designer_module, "make_server", occupied)
+    with pytest.raises(RuntimeError, match="requested port is unavailable"):
+        run_designer(port=9876, open_browser=False)
+
+
+def test_cli_launches_designer_without_changing_editor_behavior(monkeypatch):
+    called = {}
+    def fake_run_designer(**options):
+        called.update(options)
+    monkeypatch.setattr(designer_module, "run_designer", fake_run_designer)
+    monkeypatch.setattr(sys, "argv", [
+        "mosaic-engine", "--designer", "--editor-port", "9124", "--no-browser",
+    ])
+    main()
+    assert called == {"port": 9124, "open_browser": False}
