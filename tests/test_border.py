@@ -260,3 +260,8 @@ def test_border_inspector_and_frontend_use_backend_membership():
     assert ".border-preview.solid" in stylesheet
     assert ".border-preview.double" in stylesheet
     assert ".border-preview.alternating" in stylesheet
+    assert ".border-control { container-type: inline-size" in stylesheet
+    assert "@container (max-width: 16.5rem)" in stylesheet
+    assert ".border-presets { grid-template-columns: minmax(0, 1fr); }" in stylesheet
+    assert ".border-preset > span:last-child { min-width: 0; overflow-wrap: anywhere; }" in stylesheet
+    assert "min-width: 1.55rem; flex: none" in stylesheet

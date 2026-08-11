@@ -360,14 +360,14 @@ def main() -> None:
     parser.add_argument(
         "--designer",
         action="store_true",
-        help="launch the Mosaic Designer preset workflow",
+        help="launch the Mosaica preset workflow",
     )
 
     parser.add_argument(
         "--editor-port",
         type=int,
         default=8765,
-        help="localhost port for the project editor or Mosaic Designer",
+        help="localhost port for the project editor or Mosaica",
     )
 
     parser.add_argument(

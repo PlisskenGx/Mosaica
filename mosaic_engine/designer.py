@@ -15,6 +15,12 @@ from .border import (
     border_preset,
 )
 from .designer_colors import DEFAULT_DESIGNER_COLORS
+from .artwork import (
+    DesignerArtwork,
+    create_artwork,
+    reset_artwork,
+    update_artwork_transform,
+)
 
 
 MM_PER_INCH = 25.4
@@ -240,6 +246,7 @@ class MosaicDesignerApp:
     def __init__(self) -> None:
         self.canvas_id: str | None = None
         self.project: DesignerProjectShell | None = None
+        self.artwork: DesignerArtwork | None = None
         self.document_title = "Untitled"
         self.document_dirty = False
 
@@ -257,6 +264,7 @@ class MosaicDesignerApp:
                     raise ValueError(f"Unknown canvas preset: {canvas_id}")
                 self.canvas_id = canvas_id
                 self.project = None
+                self.artwork = None
                 self.document_dirty = False
                 return self._json(start_response, "200 OK", self.payload())
             if method == "POST" and path == "/api/designer/tile":
@@ -264,6 +272,7 @@ class MosaicDesignerApp:
                     raise ValueError("Select a canvas preset before a tile preset.")
                 tile_id = self._request_json(environ).get("tile_id")
                 self.project = DesignerProjectShell.create(self.canvas_id, tile_id)
+                self.artwork = None
                 self.document_dirty = False
                 return self._json(start_response, "200 OK", self.payload())
             if method == "POST" and path == "/api/designer/border":
@@ -274,9 +283,73 @@ class MosaicDesignerApp:
                 self.project = self.project.with_border(preset_id)
                 self.document_dirty = self.document_dirty or changed
                 return self._json(start_response, "200 OK", self.payload())
+            if method == "POST" and path in {
+                "/api/designer/artwork/upload",
+                "/api/designer/artwork/replace",
+            }:
+                project = self._require_project()
+                if path.endswith("/replace"):
+                    self._require_artwork()
+                body = self._request_json(environ)
+                filename = body.get("filename")
+                svg_content = body.get("svg_content")
+                if not isinstance(filename, str) or not isinstance(svg_content, str):
+                    raise ValueError("SVG upload requires filename and svg_content strings.")
+                border = build_border_layer(
+                    project.geometry, project.border_preset_id,
+                )
+                self.artwork = create_artwork(
+                    filename, svg_content, project.geometry, border,
+                )
+                self.document_dirty = True
+                return self._json(
+                    start_response, "200 OK", self._artwork_payload(),
+                )
+            if method == "POST" and path == "/api/designer/artwork/transform":
+                self._require_artwork()
+                body = self._request_json(environ)
+                self.artwork = update_artwork_transform(
+                    self.artwork,
+                    x_in=body.get("x_in"),
+                    y_in=body.get("y_in"),
+                    width_in=body.get("width_in"),
+                    height_in=body.get("height_in"),
+                )
+                self.document_dirty = True
+                return self._json(
+                    start_response, "200 OK", self._artwork_payload(),
+                )
+            if method == "POST" and path == "/api/designer/artwork/selection":
+                artwork = self._require_artwork()
+                selected = self._request_json(environ).get("selected")
+                if not isinstance(selected, bool):
+                    raise ValueError("Artwork selected state must be boolean.")
+                self.artwork = replace(artwork, selected=selected)
+                return self._json(
+                    start_response, "200 OK", self._artwork_payload(),
+                )
+            if method == "POST" and path == "/api/designer/artwork/reset":
+                project = self._require_project()
+                artwork = self._require_artwork()
+                border = build_border_layer(
+                    project.geometry, project.border_preset_id,
+                )
+                self.artwork = reset_artwork(artwork, project.geometry, border)
+                self.document_dirty = True
+                return self._json(
+                    start_response, "200 OK", self._artwork_payload(),
+                )
+            if method == "POST" and path == "/api/designer/artwork/remove":
+                self._require_artwork()
+                self.artwork = None
+                self.document_dirty = True
+                return self._json(
+                    start_response, "200 OK", self._artwork_payload(),
+                )
             if method == "POST" and path == "/api/designer/back":
                 if self.project is not None:
                     self.project = None
+                    self.artwork = None
                     self.document_dirty = False
                 else:
                     self.canvas_id = None
@@ -286,6 +359,11 @@ class MosaicDesignerApp:
             return self._json(start_response, "400 Bad Request", {"error": str(exc)})
 
     def payload(self) -> dict:
+        project_payload = self.project.to_dict() if self.project is not None else None
+        if project_payload is not None:
+            project_payload["artwork"] = (
+                self.artwork.to_dict() if self.artwork is not None else None
+            )
         return {
             "stage": (
                 "workspace" if self.project is not None
@@ -301,7 +379,26 @@ class MosaicDesignerApp:
                 "title": self.document_title,
                 "dirty": self.document_dirty,
             },
-            "project": self.project.to_dict() if self.project is not None else None,
+            "project": project_payload,
+        }
+
+    def _require_project(self) -> DesignerProjectShell:
+        if self.project is None:
+            raise ValueError("Create a Designer project before editing artwork.")
+        return self.project
+
+    def _require_artwork(self) -> DesignerArtwork:
+        if self.artwork is None:
+            raise ValueError("No SVG artwork is loaded.")
+        return self.artwork
+
+    def _artwork_payload(self) -> dict:
+        return {
+            "artwork": self.artwork.to_dict() if self.artwork is not None else None,
+            "document": {
+                "title": self.document_title,
+                "dirty": self.document_dirty,
+            },
         }
 
     @staticmethod
@@ -339,18 +436,18 @@ def run_designer(
     open_browser: bool = True,
 ) -> None:
     if host not in {"127.0.0.1", "localhost", "::1"}:
-        raise ValueError("Mosaic Designer may bind to localhost only.")
+        raise ValueError("Mosaica may bind to localhost only.")
     app = MosaicDesignerApp()
     url = f"http://127.0.0.1:{port}/"
     try:
         server = make_server("127.0.0.1", port, app)
     except OSError as exc:
         raise RuntimeError(
-            f"Cannot start Mosaic Designer on 127.0.0.1:{port}; "
+            f"Cannot start Mosaica on 127.0.0.1:{port}; "
             "the requested port is unavailable."
         ) from exc
     with server:
-        print(f"Mosaic Designer: {url}")
+        print(f"Mosaica: {url}")
         print("Press Ctrl+C to stop.")
         if open_browser:
             webbrowser.open(url)

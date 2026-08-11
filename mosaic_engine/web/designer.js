@@ -2,6 +2,8 @@
   const SVG_NS = "http://www.w3.org/2000/svg";
   let state = null;
   let viewportObserver = null;
+  let artworkInteraction = null;
+  let artworkUploadPath = "/api/designer/artwork/upload";
   const byId = (id) => document.getElementById(id);
 
   async function request(path, body) {
@@ -71,6 +73,10 @@
     svg.replaceChildren();
     svg.setAttribute("viewBox", `0 0 ${geometry.width_in} ${geometry.height_in}`);
     svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    const baseLayer = document.createElementNS(SVG_NS, "g");
+    baseLayer.classList.add("base-tile-layer");
+    const protectedLayer = document.createElementNS(SVG_NS, "g");
+    protectedLayer.classList.add("protected-layer");
     for (const tile of geometry.tiles) {
       const polygon = document.createElementNS(SVG_NS, "polygon");
       polygon.id = tile.id;
@@ -81,8 +87,11 @@
       polygon.style.fill = tile.display_color;
       polygon.setAttribute("points", tile.vertices_in.map((point) => point.join(",")).join(" "));
       polygon.setAttribute("aria-label", `${tile.piece_type} tile, row ${tile.row + 1}, column ${tile.column + 1}`);
-      svg.appendChild(polygon);
+      (tile.protected ? protectedLayer : baseLayer).appendChild(polygon);
     }
+    svg.appendChild(baseLayer);
+    renderArtwork(svg, project.artwork);
+    svg.appendChild(protectedLayer);
     const boundary = document.createElementNS(SVG_NS, "rect");
     boundary.classList.add("panel-boundary");
     boundary.setAttribute("x", "0");
@@ -90,6 +99,7 @@
     boundary.setAttribute("width", geometry.width_in);
     boundary.setAttribute("height", geometry.height_in);
     svg.appendChild(boundary);
+    renderArtworkSelection(svg, project.artwork);
 
     const plateEstimate = project.print_plate_estimate;
     const statusBar = byId("workspace-status");
@@ -107,6 +117,101 @@
     );
     renderColorCounts(statusBar, project.color_counts);
     requestAnimationFrame(fitToWorkspace);
+  }
+
+  function renderArtwork(svg, artwork) {
+    if (!artwork) return;
+    const source = new DOMParser().parseFromString(
+      artwork.sanitized_svg, "image/svg+xml",
+    ).documentElement;
+    const imported = document.importNode(source, true);
+    const transform = artwork.transform;
+    imported.classList.add("artwork-vector");
+    imported.setAttribute("x", transform.x_in);
+    imported.setAttribute("y", transform.y_in);
+    imported.setAttribute("width", transform.width_in);
+    imported.setAttribute("height", transform.height_in);
+    imported.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    const group = document.createElementNS(SVG_NS, "g");
+    group.classList.add("artwork-object");
+    group.setAttribute("aria-label", `${artwork.source_filename} artwork`);
+    group.appendChild(imported);
+    const hit = document.createElementNS(SVG_NS, "rect");
+    hit.classList.add("artwork-hit");
+    setRectTransform(hit, transform);
+    group.appendChild(hit);
+    svg.appendChild(group);
+  }
+
+  function renderArtworkSelection(svg, artwork) {
+    if (!artwork?.selected) return;
+    const transform = artwork.transform;
+    const selection = document.createElementNS(SVG_NS, "g");
+    selection.classList.add("artwork-selection-layer");
+    const outline = document.createElementNS(SVG_NS, "rect");
+    outline.classList.add("artwork-selection");
+    setRectTransform(outline, transform);
+    selection.appendChild(outline);
+    for (const [corner, x, y] of artworkCorners(transform)) {
+      const target = document.createElementNS(SVG_NS, "circle");
+      target.classList.add("artwork-handle-target");
+      target.dataset.corner = corner;
+      target.setAttribute("cx", x);
+      target.setAttribute("cy", y);
+      target.setAttribute("r", ".16");
+      target.setAttribute("aria-label", `Scale artwork from ${corner} corner`);
+      const visible = document.createElementNS(SVG_NS, "circle");
+      visible.classList.add("artwork-handle");
+      visible.dataset.corner = corner;
+      visible.setAttribute("cx", x);
+      visible.setAttribute("cy", y);
+      visible.setAttribute("r", ".16");
+      visible.setAttribute("pointer-events", "none");
+      selection.append(target, visible);
+    }
+    svg.appendChild(selection);
+  }
+
+  function artworkCorners(transform) {
+    return [
+      ["nw", transform.x_in, transform.y_in],
+      ["ne", transform.x_in + transform.width_in, transform.y_in],
+      ["se", transform.x_in + transform.width_in, transform.y_in + transform.height_in],
+      ["sw", transform.x_in, transform.y_in + transform.height_in],
+    ];
+  }
+
+  function setRectTransform(element, transform) {
+    element.setAttribute("x", transform.x_in);
+    element.setAttribute("y", transform.y_in);
+    element.setAttribute("width", transform.width_in);
+    element.setAttribute("height", transform.height_in);
+  }
+
+  function updateArtworkVisual(transform) {
+    const svg = byId("mosaic-canvas");
+    const vector = svg.querySelector(".artwork-vector");
+    if (vector) {
+      vector.setAttribute("x", transform.x_in);
+      vector.setAttribute("y", transform.y_in);
+      vector.setAttribute("width", transform.width_in);
+      vector.setAttribute("height", transform.height_in);
+    }
+    const hit = svg.querySelector(".artwork-hit");
+    const outline = svg.querySelector(".artwork-selection");
+    if (hit) setRectTransform(hit, transform);
+    if (outline) setRectTransform(outline, transform);
+    const corners = new Map(artworkCorners(transform).map((value) => [value[0], value]));
+    for (const name of ["nw", "ne", "se", "sw"]) {
+      const corner = corners.get(name);
+      const target = svg.querySelector(`.artwork-handle-target[data-corner="${name}"]`);
+      const visible = svg.querySelector(`.artwork-handle[data-corner="${name}"]`);
+      for (const handle of [target, visible]) {
+        if (!handle) continue;
+        handle.setAttribute("cx", corner[1]);
+        handle.setAttribute("cy", corner[2]);
+      }
+    }
   }
 
   function createStatusGroup(className, values) {
@@ -165,6 +270,147 @@
     );
   }
 
+  function renderArtworkInspector() {
+    if (!state.project) return;
+    const artwork = state.project.artwork;
+    byId("artwork-empty").hidden = Boolean(artwork);
+    byId("artwork-loaded").hidden = !artwork;
+    byId("artwork-selection-state").textContent = artwork?.selected ? "Selected" : "";
+    if (artwork) {
+      byId("artwork-filename").textContent = artwork.source_filename;
+      byId("artwork-size").textContent = (
+        `${artwork.transform.width_in.toFixed(2)} × ${artwork.transform.height_in.toFixed(2)} in`
+      );
+    }
+  }
+
+  function applyArtworkPayload(payload) {
+    state.project.artwork = payload.artwork;
+    state.document = payload.document;
+    render();
+  }
+
+  async function uploadArtwork(file) {
+    if (!file) return;
+    try {
+      const svgContent = await file.text();
+      const payload = await request(artworkUploadPath, {
+        filename: file.name,
+        svg_content: svgContent,
+      });
+      applyArtworkPayload(payload);
+    } catch (error) {
+      byId("status").textContent = error.message;
+    } finally {
+      byId("artwork-file").value = "";
+      artworkUploadPath = "/api/designer/artwork/upload";
+    }
+  }
+
+  async function artworkAction(path, body = {}) {
+    try {
+      const payload = await request(path, body);
+      applyArtworkPayload(payload);
+    } catch (error) {
+      byId("status").textContent = error.message;
+    }
+  }
+
+  function canvasPoint(event) {
+    const svg = byId("mosaic-canvas");
+    const point = svg.createSVGPoint();
+    point.x = event.clientX;
+    point.y = event.clientY;
+    return point.matrixTransform(svg.getScreenCTM().inverse());
+  }
+
+  function beginArtworkInteraction(event) {
+    if (!state?.project?.artwork || event.button > 0) return;
+    const handle = event.target.closest?.(".artwork-handle-target");
+    const object = event.target.closest?.(".artwork-object");
+    if (!handle && !object) {
+      if (state.project.artwork.selected) {
+        artworkAction("/api/designer/artwork/selection", { selected: false });
+      }
+      return;
+    }
+    event.preventDefault();
+    if (!state.project.artwork.selected) {
+      artworkAction("/api/designer/artwork/selection", { selected: true });
+      return;
+    }
+    const svg = byId("mosaic-canvas");
+    const start = canvasPoint(event);
+    const transform = { ...state.project.artwork.transform };
+    artworkInteraction = {
+      pointerId: event.pointerId,
+      mode: handle ? "scale" : "move",
+      corner: handle?.dataset.corner,
+      start,
+      transform,
+    };
+    svg.setPointerCapture(event.pointerId);
+  }
+
+  function moveArtworkInteraction(event) {
+    if (!artworkInteraction || event.pointerId !== artworkInteraction.pointerId) return;
+    event.preventDefault();
+    const point = canvasPoint(event);
+    let transform;
+    if (artworkInteraction.mode === "move") {
+      transform = {
+        ...artworkInteraction.transform,
+        x_in: artworkInteraction.transform.x_in + point.x - artworkInteraction.start.x,
+        y_in: artworkInteraction.transform.y_in + point.y - artworkInteraction.start.y,
+      };
+    } else {
+      transform = scaledArtworkTransform(
+        artworkInteraction.transform,
+        artworkInteraction.corner,
+        point,
+        state.project.artwork.source_aspect_ratio,
+      );
+    }
+    state.project.artwork.transform = transform;
+    updateArtworkVisual(transform);
+    renderArtworkInspector();
+  }
+
+  function scaledArtworkTransform(transform, corner, point, aspectRatio) {
+    const right = transform.x_in + transform.width_in;
+    const bottom = transform.y_in + transform.height_in;
+    const anchors = {
+      nw: { x: right, y: bottom, sx: -1, sy: -1 },
+      ne: { x: transform.x_in, y: bottom, sx: 1, sy: -1 },
+      se: { x: transform.x_in, y: transform.y_in, sx: 1, sy: 1 },
+      sw: { x: right, y: transform.y_in, sx: -1, sy: 1 },
+    };
+    const anchor = anchors[corner];
+    const projectedWidth = (
+      anchor.sx * (point.x - anchor.x)
+      + (anchor.sy / aspectRatio) * (point.y - anchor.y)
+    ) / (1 + 1 / (aspectRatio * aspectRatio));
+    const width = Math.max(.05, projectedWidth);
+    const height = width / aspectRatio;
+    return {
+      x_in: anchor.sx > 0 ? anchor.x : anchor.x - width,
+      y_in: anchor.sy > 0 ? anchor.y : anchor.y - height,
+      width_in: width,
+      height_in: height,
+    };
+  }
+
+  async function finishArtworkInteraction(event) {
+    if (!artworkInteraction || event.pointerId !== artworkInteraction.pointerId) return;
+    const svg = byId("mosaic-canvas");
+    if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
+    artworkInteraction = null;
+    await artworkAction(
+      "/api/designer/artwork/transform",
+      state.project.artwork.transform,
+    );
+  }
+
   function calculateFitSize(
     viewportWidth, viewportHeight, canvasWidth, canvasHeight,
     horizontalPadding = 0, verticalPadding = horizontalPadding,
@@ -207,6 +453,7 @@
     renderTilePresets();
     renderWorkspace();
     renderBorderInspector();
+    renderArtworkInspector();
     if (state.stage === "workspace" && !viewportObserver && "ResizeObserver" in window) {
       viewportObserver = new ResizeObserver(() => fitToWorkspace());
       viewportObserver.observe(byId("canvas-viewport"));
@@ -236,6 +483,22 @@
     try { state = await request("/api/designer/back", {}); render(); }
     catch (error) { byId("status").textContent = error.message; }
   });
+  byId("artwork-upload").addEventListener("click", () => {
+    artworkUploadPath = "/api/designer/artwork/upload";
+    byId("artwork-file").click();
+  });
+  byId("artwork-replace").addEventListener("click", () => {
+    artworkUploadPath = "/api/designer/artwork/replace";
+    byId("artwork-file").click();
+  });
+  byId("artwork-file").addEventListener("change", (event) => uploadArtwork(event.target.files[0]));
+  byId("artwork-remove").addEventListener("click", () => artworkAction("/api/designer/artwork/remove"));
+  byId("artwork-reset").addEventListener("click", () => artworkAction("/api/designer/artwork/reset"));
+  byId("mosaic-canvas").addEventListener("pointerdown", beginArtworkInteraction);
+  byId("mosaic-canvas").addEventListener("pointermove", moveArtworkInteraction);
+  byId("mosaic-canvas").addEventListener("pointerup", finishArtworkInteraction);
+  byId("mosaic-canvas").addEventListener("pointercancel", finishArtworkInteraction);
+  byId("mosaic-canvas").addEventListener("dragstart", (event) => event.preventDefault());
   window.addEventListener("resize", fitToWorkspace);
 
   request("/api/designer").then((payload) => { state = payload; render(); })

@@ -77,6 +77,16 @@ from .designer_colors import (
     PhysicalColor,
     PhysicalColorCount,
 )
+from .artwork import (
+    ArtworkTransform,
+    DesignerArtwork,
+    available_artwork_bounds,
+    create_artwork,
+    initial_artwork_transform,
+    reset_artwork,
+    sanitize_svg,
+    update_artwork_transform,
+)
 
 from .model import (
     MosaicConfig,
@@ -190,6 +200,14 @@ __all__ = [
     "DesignerColorResolution",
     "PhysicalColor",
     "PhysicalColorCount",
+    "ArtworkTransform",
+    "DesignerArtwork",
+    "available_artwork_bounds",
+    "create_artwork",
+    "initial_artwork_transform",
+    "reset_artwork",
+    "sanitize_svg",
+    "update_artwork_transform",
 
     "MosaicConfig",
     "MosaicResult",

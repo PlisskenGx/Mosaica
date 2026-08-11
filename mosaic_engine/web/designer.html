@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Mosaic Designer</title>
+  <title>Mosaica</title>
   <link rel="stylesheet" href="/designer.css">
 </head>
 <body>
@@ -11,7 +11,10 @@
     <div class="app-bar-left">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true"></span>
-        <strong>Mosaic Designer</strong>
+        <span class="brand-copy">
+          <strong>Mosaica</strong>
+          <span class="brand-attribution">by Veradura Design</span>
+        </span>
       </div>
       <button id="back" class="back-navigation" hidden>‹ Back</button>
     </div>
@@ -49,7 +52,27 @@
 
       <aside class="inspector" aria-label="Design inspector">
         <div class="inspector-heading"><p class="eyebrow">Design</p><h2>Build your mosaic</h2></div>
-        <div class="unavailable-section"><strong>Artwork</strong><span>Coming later</span></div>
+        <section class="artwork-control" aria-labelledby="artwork-heading">
+          <div class="artwork-control-heading">
+            <strong id="artwork-heading">Artwork</strong>
+            <span id="artwork-selection-state"></span>
+          </div>
+          <input id="artwork-file" class="visually-hidden" type="file" accept=".svg,image/svg+xml">
+          <div id="artwork-empty">
+            <button id="artwork-upload" class="inspector-action primary" type="button">Upload SVG</button>
+          </div>
+          <div id="artwork-loaded" hidden>
+            <div class="artwork-file-row">
+              <span id="artwork-filename"></span>
+              <span id="artwork-size"></span>
+            </div>
+            <div class="artwork-actions">
+              <button id="artwork-replace" class="inspector-action" type="button">Replace</button>
+              <button id="artwork-reset" class="inspector-action" type="button">Reset</button>
+              <button id="artwork-remove" class="inspector-action danger-text" type="button">Remove</button>
+            </div>
+          </div>
+        </section>
         <section class="border-control" aria-labelledby="border-heading">
           <div class="border-control-heading">
             <strong id="border-heading">Border</strong>

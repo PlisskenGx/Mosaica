@@ -181,9 +181,13 @@ def test_tile_cannot_be_selected_before_canvas_and_presets_are_closed():
 
 def test_designer_assets_use_backend_polygons_and_responsive_regions():
     app = MosaicDesignerApp()
+    assert type(app).__name__ == "MosaicDesignerApp"
     status, html = _request(app, "GET", "/")
     assert status == "200 OK"
-    assert "Mosaic Designer" in html
+    assert "Mosaica" in html
+    assert "by Veradura Design" in html
+    assert "Mosaic Designer" not in html
+    assert "<title>Mosaica</title>" in html
     assert "New mosaic" not in html
     assert "Physical tile system" not in html
     assert "Choose your canvas" in html
@@ -202,6 +206,8 @@ def test_designer_assets_use_backend_polygons_and_responsive_regions():
     assert html.index('id="back"') < html.index('id="document-title"')
     assert "Paint / Edit" in html
     assert '<span class="brand-mark" aria-hidden="true"></span>' in html
+    assert '<span class="brand-copy">' in html
+    assert '<span class="brand-attribution">by Veradura Design</span>' in html
     assert '<svg class="brand-mark"' not in html
     assert "<polygon points=" not in html
 
@@ -212,6 +218,7 @@ def test_designer_assets_use_backend_polygons_and_responsive_regions():
     assert "hex_geometry" not in script
     assert "/api/designer/canvas" in script
     assert "/api/designer/tile" in script
+    assert "/api/mosaica" not in script
     assert "calculateFitSize" in script
     assert "fitToWorkspace" in script
     assert 'addEventListener("click", fitToWorkspace)' not in script
@@ -230,7 +237,7 @@ def test_designer_assets_use_backend_polygons_and_responsive_regions():
     _, stylesheet = _request(app, "GET", "/designer.css")
     assert "grid-template-columns: minmax(0, 1fr)" in stylesheet
     assert "@media (max-width: 680px)" in stylesheet
-    assert "touch-action" not in stylesheet
+    assert ".artwork-object { cursor: move; touch-action: none; }" in stylesheet
     assert "height: calc(100dvh - var(--app-bar-height))" in stylesheet
     assert ".canvas-viewport" in stylesheet
     assert "min-height: 0" in stylesheet
@@ -242,6 +249,10 @@ def test_designer_assets_use_backend_polygons_and_responsive_regions():
     assert "border-radius: 38%" in stylesheet
     assert "transform: rotate(30deg)" in stylesheet
     assert ".app-bar-left { grid-column: 1" in stylesheet
+    assert ".brand-attribution" in stylesheet
+    assert ".brand-copy { display: flex; align-items: baseline" in stylesheet
+    assert ".brand-copy strong { font-size: 1.2rem; }" in stylesheet
+    assert ".brand-attribution { display: none; }" in stylesheet
     assert ".back-navigation" in stylesheet
     assert "border: 0" in stylesheet
     assert "background: transparent" in stylesheet
