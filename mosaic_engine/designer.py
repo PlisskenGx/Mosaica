@@ -11,11 +11,10 @@ from .geometry import GridGeometry, build_panel_geometry
 from .model import MosaicConfig
 from .border import (
     BORDER_PRESETS,
-    MAX_PROJECT_COLORS,
-    PROJECT_COLOR_ROLES,
     build_border_layer,
     border_preset,
 )
+from .designer_colors import DEFAULT_DESIGNER_COLORS
 
 
 MM_PER_INCH = 25.4
@@ -162,15 +161,27 @@ class DesignerProjectShell:
             for value in border.assignments
         }
         available = set(border.available_artwork_placement_ids)
+        effective_roles = {
+            f"placement-{index:06d}": (
+                assignments[f"placement-{index:06d}"].color_role
+                if f"placement-{index:06d}" in assignments
+                else "background"
+            )
+            for index, _ in enumerate(self.geometry.placements)
+        }
+        color_counts = DEFAULT_DESIGNER_COLORS.count_visible(
+            (
+                placement.piece_type,
+                effective_roles[f"placement-{index:06d}"],
+            )
+            for index, placement in enumerate(self.geometry.placements)
+        )
         return {
             "canvas_preset": self.canvas.to_dict(),
             "tile_preset": self.tile.to_dict(),
             "grout_mm": self.grout_mm,
-            "color_system": {
-                "maximum_project_colors": MAX_PROJECT_COLORS,
-                "roles": PROJECT_COLOR_ROLES,
-                "shared_project_palette": True,
-            },
+            "color_system": DEFAULT_DESIGNER_COLORS.to_dict(),
+            "color_counts": [value.to_dict() for value in color_counts],
             "border": border.to_dict(),
             "print_plate_estimate": estimate_minimum_print_plates(
                 self.canvas.width_in,
@@ -201,11 +212,13 @@ class DesignerProjectShell:
                         "border_owned": f"placement-{index:06d}" in assignments,
                         "protected": f"placement-{index:06d}" in assignments,
                         "artwork_available": f"placement-{index:06d}" in available,
-                        "color_role": (
-                            assignments[f"placement-{index:06d}"].color_role
-                            if f"placement-{index:06d}" in assignments
-                            else "background"
-                        ),
+                        "color_role": effective_roles[f"placement-{index:06d}"],
+                        "color_id": DEFAULT_DESIGNER_COLORS.resolve(
+                            effective_roles[f"placement-{index:06d}"]
+                        ).color_id,
+                        "display_color": DEFAULT_DESIGNER_COLORS.resolve(
+                            effective_roles[f"placement-{index:06d}"]
+                        ).display_color,
                     }
                     for index, placement in enumerate(self.geometry.placements)
                     if placement.piece_type != "outside"

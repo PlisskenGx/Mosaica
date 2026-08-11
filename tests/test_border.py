@@ -251,7 +251,8 @@ def test_border_inspector_and_frontend_use_backend_membership():
     assert 'request("/api/designer/border"' in script
     assert "tile.border_owned" in script
     assert "tile.artwork_available" in script
-    assert "tile.color_role" in script
+    assert "tile.display_color" in script
+    assert "tile.color_role" not in script
     assert "tile_neighbors" not in script
     assert "physical_perimeter" not in script
     _, stylesheet = _request(app, "GET", "/designer.css")

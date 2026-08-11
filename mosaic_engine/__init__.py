@@ -71,6 +71,12 @@ from .border import (
     perimeter_order,
     physical_perimeter_rings,
 )
+from .designer_colors import (
+    DEFAULT_DESIGNER_COLORS,
+    DesignerColorResolution,
+    PhysicalColor,
+    PhysicalColorCount,
+)
 
 from .model import (
     MosaicConfig,
@@ -180,6 +186,10 @@ __all__ = [
     "build_border_layer",
     "perimeter_order",
     "physical_perimeter_rings",
+    "DEFAULT_DESIGNER_COLORS",
+    "DesignerColorResolution",
+    "PhysicalColor",
+    "PhysicalColorCount",
 
     "MosaicConfig",
     "MosaicResult",

@@ -78,7 +78,7 @@
       if (tile.piece_type !== "full") polygon.classList.add("cut");
       if (tile.border_owned) polygon.classList.add("border-owned");
       if (tile.artwork_available) polygon.classList.add("artwork-available");
-      polygon.style.fill = project.color_system.roles[tile.color_role].preview_hex;
+      polygon.style.fill = tile.display_color;
       polygon.setAttribute("points", tile.vertices_in.map((point) => point.join(",")).join(" "));
       polygon.setAttribute("aria-label", `${tile.piece_type} tile, row ${tile.row + 1}, column ${tile.column + 1}`);
       svg.appendChild(polygon);
@@ -102,10 +102,35 @@
       `Est. minimum: ${plateEstimate.estimated_minimum_plates} plates`,
       `Border: ${borderPresetName(project.border.preset_id)} · ${project.border.counts.protected.toLocaleString()} protected`,
     ];
-    byId("workspace-status").innerHTML = stats.map((value, index) => (
+    const statusBar = byId("workspace-status");
+    statusBar.innerHTML = stats.map((value, index) => (
       `${index ? '<span class="status-separator">·</span>' : ''}<strong>${value}</strong>`
     )).join("");
+    renderColorCounts(statusBar, project.color_counts);
     requestAnimationFrame(fitToWorkspace);
+  }
+
+  function renderColorCounts(statusBar, colorCounts) {
+    const separator = document.createElement("span");
+    separator.className = "status-separator";
+    separator.textContent = "·";
+    const group = document.createElement("span");
+    group.className = "physical-color-counts";
+    group.setAttribute("aria-label", "Visible pieces by physical color");
+    for (const color of colorCounts) {
+      const item = document.createElement("span");
+      item.className = "physical-color-count";
+      item.setAttribute("aria-label", `${color.name}, ${color.count.toLocaleString()} pieces`);
+      const swatch = document.createElement("span");
+      swatch.className = "physical-color-swatch";
+      swatch.style.backgroundColor = color.display_color;
+      swatch.setAttribute("aria-hidden", "true");
+      const count = document.createElement("strong");
+      count.textContent = color.count.toLocaleString();
+      item.append(swatch, count);
+      group.appendChild(item);
+    }
+    statusBar.append(separator, group);
   }
 
   function borderPresetName(presetId) {
