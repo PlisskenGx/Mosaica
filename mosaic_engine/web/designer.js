@@ -92,30 +92,43 @@
     svg.appendChild(boundary);
 
     const plateEstimate = project.print_plate_estimate;
-    const stats = [
-      `${geometry.width_in} × ${geometry.height_in} in`,
-      `${project.tile_preset.id.toUpperCase()} · ${project.tile_preset.flat_to_flat_mm} mm`,
-      `${project.grout_mm} mm grout`,
-      `${geometry.full_tile_count.toLocaleString()} full`,
-      `${geometry.clipped_piece_count.toLocaleString()} clipped`,
-      `${geometry.visible_piece_count.toLocaleString()} pieces`,
-      `Est. minimum: ${plateEstimate.estimated_minimum_plates} plates`,
-      `Border: ${borderPresetName(project.border.preset_id)} · ${project.border.counts.protected.toLocaleString()} protected`,
-    ];
     const statusBar = byId("workspace-status");
-    statusBar.innerHTML = stats.map((value, index) => (
-      `${index ? '<span class="status-separator">·</span>' : ''}<strong>${value}</strong>`
-    )).join("");
+    statusBar.replaceChildren(
+      createStatusGroup("status-physical-setup", [
+        `${geometry.width_in} × ${geometry.height_in} in`,
+        project.tile_preset.id.toUpperCase(),
+        `${project.tile_preset.flat_to_flat_mm} mm`,
+        `${project.grout_mm} mm grout`,
+      ]),
+      createStatusGroup("status-production", [
+        `${geometry.visible_piece_count.toLocaleString()} pieces`,
+        `Est. ${plateEstimate.estimated_minimum_plates} plates`,
+      ]),
+    );
     renderColorCounts(statusBar, project.color_counts);
     requestAnimationFrame(fitToWorkspace);
   }
 
-  function renderColorCounts(statusBar, colorCounts) {
-    const separator = document.createElement("span");
-    separator.className = "status-separator";
-    separator.textContent = "·";
+  function createStatusGroup(className, values) {
     const group = document.createElement("span");
-    group.className = "physical-color-counts";
+    group.className = `status-group ${className}`;
+    values.forEach((value, index) => {
+      if (index) {
+        const separator = document.createElement("span");
+        separator.className = "status-separator";
+        separator.textContent = "·";
+        group.appendChild(separator);
+      }
+      const text = document.createElement("strong");
+      text.textContent = value;
+      group.appendChild(text);
+    });
+    return group;
+  }
+
+  function renderColorCounts(statusBar, colorCounts) {
+    const group = document.createElement("span");
+    group.className = "status-group status-colors physical-color-counts";
     group.setAttribute("aria-label", "Visible pieces by physical color");
     for (const color of colorCounts) {
       const item = document.createElement("span");
@@ -130,11 +143,7 @@
       item.append(swatch, count);
       group.appendChild(item);
     }
-    statusBar.append(separator, group);
-  }
-
-  function borderPresetName(presetId) {
-    return state.border_presets.find((value) => value.id === presetId)?.name || presetId;
+    statusBar.appendChild(group);
   }
 
   function renderBorderInspector() {

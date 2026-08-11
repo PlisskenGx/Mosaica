@@ -195,6 +195,9 @@ def test_api_and_status_ui_render_backend_counts_without_inference():
     _request(app, "POST", "/api/designer/canvas", {"canvas_id": "square-s"})
     _, payload = _request(app, "POST", "/api/designer/tile", {"tile_id": "m"})
     assert payload["project"]["color_counts"]
+    assert payload["project"]["geometry"]["full_tile_count"] > 0
+    assert payload["project"]["geometry"]["clipped_piece_count"] > 0
+    assert payload["project"]["border"]["counts"]["protected"] > 0
     _, script = _request(app, "GET", "/designer.js")
     assert "project.color_counts" in script
     assert "renderColorCounts" in script
@@ -205,8 +208,29 @@ def test_api_and_status_ui_render_backend_counts_without_inference():
     assert "querySelectorAll" not in script
     assert ".reduce(" not in script
     assert "tile.color_role" not in script
+    status_rendering = script[
+        script.index('const statusBar = byId("workspace-status")'):
+        script.index("requestAnimationFrame(fitToWorkspace)")
+    ]
+    assert "geometry.width_in" in status_rendering
+    assert "project.tile_preset.id" in status_rendering
+    assert "project.tile_preset.flat_to_flat_mm" in status_rendering
+    assert "project.grout_mm" in status_rendering
+    assert "geometry.visible_piece_count" in status_rendering
+    assert "project.color_counts" in status_rendering
+    assert "Est. ${plateEstimate.estimated_minimum_plates} plates" in status_rendering
+    assert "Est. minimum" not in status_rendering
+    assert "full_tile_count" not in status_rendering
+    assert "clipped_piece_count" not in status_rendering
+    assert "Border:" not in status_rendering
+    assert "protected" not in status_rendering
+    assert "status-physical-setup" in status_rendering
+    assert "status-production" in status_rendering
     _, stylesheet = _request(app, "GET", "/designer.css")
     assert ".physical-color-counts" in stylesheet
     assert ".physical-color-count" in stylesheet
     assert ".physical-color-swatch" in stylesheet
     assert ".workspace-status" in stylesheet
+    assert ".status-group" in stylesheet
+    assert "flex-wrap: wrap" in stylesheet
+    assert "white-space: nowrap" in stylesheet

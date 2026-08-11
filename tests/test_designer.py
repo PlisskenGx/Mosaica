@@ -220,7 +220,8 @@ def test_designer_assets_use_backend_polygons_and_responsive_regions():
     assert "ResizeObserver" in script
     assert "preserveAspectRatio" in script
     assert "project.print_plate_estimate" in script
-    assert "Est. minimum:" in script
+    assert "Est. ${plateEstimate.estimated_minimum_plates} plates" in script
+    assert "Est. minimum:" not in script
     assert "preset.best_for" not in script
     assert "preset.tradeoff" not in script
     assert 'byId("back").hidden = stage === "canvas"' in script
