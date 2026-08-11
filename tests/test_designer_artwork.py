@@ -115,7 +115,8 @@ def test_artwork_api_uses_physical_state_and_artwork_only_transform_response():
     design_before = app.project.to_dict()
     status, uploaded = _upload(app)
     assert status == "200 OK"
-    assert set(uploaded) == {"artwork", "document"}
+    assert uploaded["payload_kind"] == "artwork_state"
+    assert uploaded["generated_artwork"] is None
     transform = uploaded["artwork"]["transform"]
     assert set(transform) == {"x_in", "y_in", "width_in", "height_in"}
 
@@ -186,10 +187,11 @@ def test_replace_remove_and_reset_are_artwork_only_actions():
     _, replaced = _request(app, "POST", "/api/designer/artwork/replace", {
         "filename": "portrait.svg", "svg_content": PORTRAIT_SVG,
     })
-    assert replaced["artwork"]["source_filename"] == "portrait.svg"
-    assert replaced["artwork"]["source_aspect_ratio"] == pytest.approx(0.5)
-    assert replaced["artwork"]["sanitized_svg"] != original_svg
-    assert replaced["artwork"]["transform"]["width_in"] / replaced["artwork"]["transform"]["height_in"] == pytest.approx(0.5)
+    replacement = replaced["artwork"]
+    assert replacement["source_filename"] == "portrait.svg"
+    assert replacement["source_aspect_ratio"] == pytest.approx(0.5)
+    assert replacement["sanitized_svg"] != original_svg
+    assert replacement["transform"]["width_in"] / replacement["transform"]["height_in"] == pytest.approx(0.5)
 
     status, removed = _request(app, "POST", "/api/designer/artwork/remove", {})
     assert status == "200 OK" and removed["artwork"] is None
@@ -205,8 +207,8 @@ def test_border_change_preserves_transform_and_reset_uses_current_field():
     _, bordered = _request(
         app, "POST", "/api/designer/border", {"preset_id": "double"},
     )
-    assert bordered["project"]["artwork"]["transform"] == moved
-    assert bordered["project"]["border"]["preset_id"] == "double"
+    assert bordered["artwork"]["transform"] == moved
+    assert bordered["border"]["preset_id"] == "double"
 
     _, reset = _request(app, "POST", "/api/designer/artwork/reset", {})
     expected = create_artwork(

@@ -87,6 +87,14 @@ from .artwork import (
     sanitize_svg,
     update_artwork_transform,
 )
+from .designer_generation import (
+    DESIGNER_COVERAGE_THRESHOLD,
+    DESIGNER_SAMPLES_PER_AXIS,
+    DesignerGeneratedArtwork,
+    GeneratedArtworkAssignment,
+    generate_designer_artwork,
+    mark_generated_stale,
+)
 
 from .model import (
     MosaicConfig,
@@ -208,6 +216,12 @@ __all__ = [
     "reset_artwork",
     "sanitize_svg",
     "update_artwork_transform",
+    "DESIGNER_COVERAGE_THRESHOLD",
+    "DESIGNER_SAMPLES_PER_AXIS",
+    "DesignerGeneratedArtwork",
+    "GeneratedArtworkAssignment",
+    "generate_designer_artwork",
+    "mark_generated_stale",
 
     "MosaicConfig",
     "MosaicResult",

@@ -171,14 +171,15 @@ def test_switching_refreshes_counts_without_stale_values_and_keeps_order():
         )
         payloads.append(current)
     for payload in payloads:
-        counts = payload["project"]["color_counts"]
+        project = payload.get("project", payload)
+        counts = project["color_counts"]
         assert sum(value["count"] for value in counts) == (
-            payload["project"]["geometry"]["visible_piece_count"]
+            app.project.to_dict()["geometry"]["visible_piece_count"]
         )
         assert [value["order"] for value in counts] == sorted(
             value["order"] for value in counts
         )
-    assert payloads[0]["project"]["color_counts"] == payloads[-1]["project"]["color_counts"]
+    assert payloads[0]["project"]["color_counts"] == payloads[-1]["color_counts"]
 
 
 def test_fifth_physical_color_is_rejected():
@@ -208,10 +209,8 @@ def test_api_and_status_ui_render_backend_counts_without_inference():
     assert "querySelectorAll" not in script
     assert ".reduce(" not in script
     assert "tile.color_role" not in script
-    status_rendering = script[
-        script.index('const statusBar = byId("workspace-status")'):
-        script.index("requestAnimationFrame(fitToWorkspace)")
-    ]
+    start = script.index("function renderWorkspaceStatus(project)")
+    status_rendering = script[start:script.index("function refreshArtworkLayers", start)]
     assert "geometry.width_in" in status_rendering
     assert "project.tile_preset.id" in status_rendering
     assert "project.tile_preset.flat_to_flat_mm" in status_rendering

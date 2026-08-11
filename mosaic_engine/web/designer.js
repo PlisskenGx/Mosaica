@@ -4,16 +4,51 @@
   let viewportObserver = null;
   let artworkInteraction = null;
   let artworkUploadPath = "/api/designer/artwork/upload";
+  let generationInFlight = false;
+  let mutationQueue = Promise.resolve();
   const byId = (id) => document.getElementById(id);
+  const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
 
-  async function request(path, body) {
-    const response = await fetch(path, body === undefined ? {} : {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const payload = await response.json();
-    if (!response.ok) throw new Error(payload.error || "Request failed");
+  async function request(path, body, mutationName = "Designer load") {
+    const method = body === undefined ? "GET" : "POST";
+    let response;
+    try {
+      response = await fetch(path, body === undefined ? {} : {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    } catch (error) {
+      console.error(`[Mosaica] ${mutationName}: ${method} ${path} network failure`, error);
+      throw new Error(`${mutationName} could not reach the local Mosaica server.`);
+    }
+    let responseText;
+    try {
+      responseText = await response.text();
+    } catch (error) {
+      console.error(
+        `[Mosaica] ${mutationName}: ${method} ${path} returned ${response.status} but its body could not be read`,
+        error,
+      );
+      throw new Error(`${mutationName} could not read the local server response.`);
+    }
+    let payload;
+    try {
+      payload = JSON.parse(responseText);
+    } catch (error) {
+      console.error(
+        `[Mosaica] ${mutationName}: ${method} ${path} returned ${response.status} with invalid JSON`,
+        responseText,
+      );
+      throw new Error(`${mutationName} received an invalid server response.`);
+    }
+    if (!response.ok) {
+      console.error(
+        `[Mosaica] ${mutationName}: ${method} ${path} returned ${response.status}`,
+        payload,
+      );
+      throw new Error(payload.error || `${mutationName} failed.`);
+    }
     return payload;
   }
 
@@ -90,7 +125,9 @@
       (tile.protected ? protectedLayer : baseLayer).appendChild(polygon);
     }
     svg.appendChild(baseLayer);
-    renderArtwork(svg, project.artwork);
+    if (project.artwork?.edit_mode || !project.generated_artwork) {
+      renderArtwork(svg, project.artwork);
+    }
     svg.appendChild(protectedLayer);
     const boundary = document.createElementNS(SVG_NS, "rect");
     boundary.classList.add("panel-boundary");
@@ -99,8 +136,16 @@
     boundary.setAttribute("width", geometry.width_in);
     boundary.setAttribute("height", geometry.height_in);
     svg.appendChild(boundary);
-    renderArtworkSelection(svg, project.artwork);
+    if (project.artwork?.edit_mode || !project.generated_artwork) {
+      renderArtworkSelection(svg, project.artwork);
+    }
 
+    renderWorkspaceStatus(project);
+    requestAnimationFrame(fitToWorkspace);
+  }
+
+  function renderWorkspaceStatus(project) {
+    const geometry = project.geometry;
     const plateEstimate = project.print_plate_estimate;
     const statusBar = byId("workspace-status");
     statusBar.replaceChildren(
@@ -116,6 +161,45 @@
       ]),
     );
     renderColorCounts(statusBar, project.color_counts);
+  }
+
+  function refreshArtworkLayers() {
+    const svg = byId("mosaic-canvas");
+    svg.querySelector(".artwork-object")?.remove();
+    svg.querySelector(".artwork-selection-layer")?.remove();
+    const artwork = state.project.artwork;
+    if (!(artwork?.edit_mode || !state.project.generated_artwork)) return;
+    renderArtwork(svg, artwork);
+    const object = svg.querySelector(".artwork-object");
+    const protectedLayer = svg.querySelector(".protected-layer");
+    if (object && protectedLayer) svg.insertBefore(object, protectedLayer);
+    renderArtworkSelection(svg, artwork);
+  }
+
+  function updateExistingTiles() {
+    const svg = byId("mosaic-canvas");
+    const baseLayer = svg.querySelector(".base-tile-layer");
+    const protectedLayer = svg.querySelector(".protected-layer");
+    if (!baseLayer || !protectedLayer) {
+      throw new Error("Mosaica cannot reconcile tiles before geometry is loaded.");
+    }
+    for (const tile of state.project.geometry.tiles) {
+      const polygon = byId(tile.id);
+      if (!polygon) throw new Error(`Mosaica could not find tile ${tile.id}.`);
+      polygon.style.fill = tile.display_color;
+      polygon.classList.toggle("border-owned", tile.border_owned);
+      polygon.classList.toggle("artwork-available", tile.artwork_available);
+      (tile.protected ? protectedLayer : baseLayer).appendChild(polygon);
+    }
+  }
+
+  function renderCompactWorkspace(updateTiles = false) {
+    showScreen(state.stage);
+    if (updateTiles) updateExistingTiles();
+    refreshArtworkLayers();
+    renderWorkspaceStatus(state.project);
+    renderBorderInspector();
+    renderArtworkInspector();
     requestAnimationFrame(fitToWorkspace);
   }
 
@@ -270,35 +354,203 @@
     );
   }
 
-  function renderArtworkInspector() {
+  function renderArtworkInspector(previewTransform = null) {
     if (!state.project) return;
     const artwork = state.project.artwork;
+    const generated = state.project.generated_artwork;
     byId("artwork-empty").hidden = Boolean(artwork);
     byId("artwork-loaded").hidden = !artwork;
     byId("artwork-selection-state").textContent = artwork?.selected ? "Selected" : "";
     if (artwork) {
+      const transform = previewTransform || artwork.transform;
       byId("artwork-filename").textContent = artwork.source_filename;
       byId("artwork-size").textContent = (
-        `${artwork.transform.width_in.toFixed(2)} × ${artwork.transform.height_in.toFixed(2)} in`
+        `${transform.width_in.toFixed(2)} × ${transform.height_in.toFixed(2)} in`
       );
+      byId("artwork-generate").textContent = generated ? "Regenerate Mosaic" : "Generate Mosaic";
+      byId("artwork-edit").hidden = !generated || artwork.edit_mode;
+      byId("artwork-generation-state").textContent = generated?.needs_regeneration
+        ? "Needs update"
+        : generated ? "Mosaic generated" : "";
     }
   }
 
-  function applyArtworkPayload(payload) {
-    state.project.artwork = payload.artwork;
-    state.document = payload.document;
+  function validateDesignerState(payload, requireGenerated = false) {
+    if (payload?.payload_kind === "artwork_state") {
+      if (
+        payload.stage !== "workspace"
+        || !payload.document
+        || !hasOwn(payload, "artwork")
+        || !hasOwn(payload, "generated_artwork")
+      ) {
+        throw new Error("Mosaica returned incomplete artwork state.");
+      }
+      return;
+    }
+    if (payload?.payload_kind === "design_state") {
+      if (
+        payload.stage !== "workspace"
+        || !payload.document
+        || !hasOwn(payload, "artwork")
+        || !hasOwn(payload, "generated_artwork")
+        || !payload.border
+        || !payload.color_system
+        || !Array.isArray(payload.color_counts)
+        || !Array.isArray(payload.tile_updates)
+        || (requireGenerated && !payload.generated_artwork)
+      ) {
+        throw new Error("Mosaica returned incomplete design state.");
+      }
+      return;
+    }
+    if (
+      !payload
+      || typeof payload !== "object"
+      || !["canvas", "tile", "workspace"].includes(payload.stage)
+      || !payload.document
+      || !Array.isArray(payload.canvas_presets)
+      || !Array.isArray(payload.tile_presets)
+      || !Array.isArray(payload.border_presets)
+    ) {
+      throw new Error("Mosaica returned an invalid Designer response.");
+    }
+    if (payload.stage !== "workspace") return;
+    const project = payload.project;
+    if (
+      !project
+      || !hasOwn(project, "artwork")
+      || !hasOwn(project, "generated_artwork")
+      || !Array.isArray(project.geometry?.tiles)
+      || !Array.isArray(project.color_counts)
+      || (requireGenerated && !project.generated_artwork)
+    ) {
+      throw new Error("Mosaica returned incomplete project state.");
+    }
+  }
+
+  function applyDesignerState(payload, requireGenerated = false) {
+    validateDesignerState(payload, requireGenerated);
+    if (payload.payload_kind === "artwork_state") {
+      if (!state?.project) {
+        throw new Error("Mosaica cannot apply artwork state without an open project.");
+      }
+      state = {
+        ...state,
+        stage: payload.stage,
+        document: payload.document,
+        project: {
+          ...state.project,
+          artwork: payload.artwork,
+          generated_artwork: payload.generated_artwork,
+        },
+      };
+      renderCompactWorkspace(false);
+      return;
+    } else if (payload.payload_kind === "design_state") {
+      if (!state?.project?.geometry?.tiles) {
+        throw new Error("Mosaica cannot apply design state without an open project.");
+      }
+      const updates = new Map();
+      for (const update of payload.tile_updates) {
+        if (!update?.id || updates.has(update.id)) {
+          throw new Error("Mosaica returned invalid tile updates.");
+        }
+        updates.set(update.id, update);
+      }
+      const knownIds = new Set(state.project.geometry.tiles.map((tile) => tile.id));
+      if ([...updates.keys()].some((id) => !knownIds.has(id))) {
+        throw new Error("Mosaica returned an update for unknown geometry.");
+      }
+      const tiles = state.project.geometry.tiles.map((tile) => (
+        updates.has(tile.id) ? { ...tile, ...updates.get(tile.id) } : tile
+      ));
+      state = {
+        ...state,
+        stage: payload.stage,
+        document: payload.document,
+        project: {
+          ...state.project,
+          artwork: payload.artwork,
+          generated_artwork: payload.generated_artwork,
+          border: payload.border,
+          color_system: payload.color_system,
+          color_counts: payload.color_counts,
+          geometry: { ...state.project.geometry, tiles },
+        },
+      };
+      renderCompactWorkspace(true);
+      return;
+    } else {
+      state = payload;
+    }
     render();
+  }
+
+  function performDesignerMutation(path, body = {}, options = {}) {
+    const operation = async () => {
+      const previousState = state;
+      try {
+        const payload = await request(path, body, options.name || path);
+        applyDesignerState(payload, options.requireGenerated === true);
+        const status = byId("status");
+        if (status) status.textContent = "";
+        return payload;
+      } catch (error) {
+        if (state !== previousState) {
+          state = previousState;
+          try {
+            render();
+          } catch (renderError) {
+            // Error reporting and later mutations must survive recovery failure.
+          }
+        }
+        const status = byId("status");
+        if (status) status.textContent = error?.message || "Mosaica could not apply that change.";
+        return null;
+      }
+    };
+    const result = mutationQueue.then(operation, operation);
+    mutationQueue = result.then(() => undefined, () => undefined);
+    return result;
+  }
+
+  function syncGenerationControl() {
+    const button = byId("artwork-generate");
+    if (!button) return;
+    button.disabled = generationInFlight;
+    button.setAttribute("aria-busy", String(generationInFlight));
+    if (generationInFlight) {
+      button.textContent = "Generating…";
+      return;
+    }
+    button.textContent = state?.project?.generated_artwork
+      ? "Regenerate Mosaic" : "Generate Mosaic";
+  }
+
+  async function generateArtwork() {
+    if (generationInFlight) return;
+    generationInFlight = true;
+    syncGenerationControl();
+    byId("status").textContent = "";
+    try {
+      await performDesignerMutation(
+        "/api/designer/artwork/generate", {},
+        { requireGenerated: true, name: "Generate Mosaic" },
+      );
+    } finally {
+      generationInFlight = false;
+      syncGenerationControl();
+    }
   }
 
   async function uploadArtwork(file) {
     if (!file) return;
     try {
       const svgContent = await file.text();
-      const payload = await request(artworkUploadPath, {
+      await performDesignerMutation(artworkUploadPath, {
         filename: file.name,
         svg_content: svgContent,
-      });
-      applyArtworkPayload(payload);
+      }, { name: artworkUploadPath.endsWith("/replace") ? "Replace artwork" : "Upload artwork" });
     } catch (error) {
       byId("status").textContent = error.message;
     } finally {
@@ -307,13 +559,8 @@
     }
   }
 
-  async function artworkAction(path, body = {}) {
-    try {
-      const payload = await request(path, body);
-      applyArtworkPayload(payload);
-    } catch (error) {
-      byId("status").textContent = error.message;
-    }
+  async function artworkAction(path, body = {}, name = "Artwork change") {
+    await performDesignerMutation(path, body, { name });
   }
 
   function canvasPoint(event) {
@@ -330,13 +577,13 @@
     const object = event.target.closest?.(".artwork-object");
     if (!handle && !object) {
       if (state.project.artwork.selected) {
-        artworkAction("/api/designer/artwork/selection", { selected: false });
+        artworkAction("/api/designer/artwork/selection", { selected: false }, "Deselect artwork");
       }
       return;
     }
     event.preventDefault();
     if (!state.project.artwork.selected) {
-      artworkAction("/api/designer/artwork/selection", { selected: true });
+      artworkAction("/api/designer/artwork/selection", { selected: true }, "Select artwork");
       return;
     }
     const svg = byId("mosaic-canvas");
@@ -348,6 +595,7 @@
       corner: handle?.dataset.corner,
       start,
       transform,
+      previewTransform: transform,
     };
     svg.setPointerCapture(event.pointerId);
   }
@@ -371,9 +619,9 @@
         state.project.artwork.source_aspect_ratio,
       );
     }
-    state.project.artwork.transform = transform;
+    artworkInteraction.previewTransform = transform;
     updateArtworkVisual(transform);
-    renderArtworkInspector();
+    renderArtworkInspector(transform);
   }
 
   function scaledArtworkTransform(transform, corner, point, aspectRatio) {
@@ -404,10 +652,12 @@
     if (!artworkInteraction || event.pointerId !== artworkInteraction.pointerId) return;
     const svg = byId("mosaic-canvas");
     if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
+    const proposedTransform = artworkInteraction.previewTransform;
     artworkInteraction = null;
     await artworkAction(
       "/api/designer/artwork/transform",
-      state.project.artwork.transform,
+      proposedTransform,
+      "Move or scale artwork",
     );
   }
 
@@ -461,27 +711,19 @@
   }
 
   async function chooseCanvas(canvasId) {
-    try { state = await request("/api/designer/canvas", { canvas_id: canvasId }); render(); }
-    catch (error) { byId("status").textContent = error.message; }
+    await performDesignerMutation("/api/designer/canvas", { canvas_id: canvasId }, { name: "Choose canvas" });
   }
 
   async function chooseTile(tileId) {
-    try { state = await request("/api/designer/tile", { tile_id: tileId }); render(); }
-    catch (error) { byId("status").textContent = error.message; }
+    await performDesignerMutation("/api/designer/tile", { tile_id: tileId }, { name: "Choose tile" });
   }
 
   async function chooseBorder(presetId) {
-    try {
-      state = await request("/api/designer/border", { preset_id: presetId });
-      render();
-    } catch (error) {
-      byId("status").textContent = error.message;
-    }
+    await performDesignerMutation("/api/designer/border", { preset_id: presetId }, { name: "Change Border" });
   }
 
   byId("back").addEventListener("click", async () => {
-    try { state = await request("/api/designer/back", {}); render(); }
-    catch (error) { byId("status").textContent = error.message; }
+    await performDesignerMutation("/api/designer/back", {}, { name: "Back" });
   });
   byId("artwork-upload").addEventListener("click", () => {
     artworkUploadPath = "/api/designer/artwork/upload";
@@ -492,8 +734,10 @@
     byId("artwork-file").click();
   });
   byId("artwork-file").addEventListener("change", (event) => uploadArtwork(event.target.files[0]));
-  byId("artwork-remove").addEventListener("click", () => artworkAction("/api/designer/artwork/remove"));
-  byId("artwork-reset").addEventListener("click", () => artworkAction("/api/designer/artwork/reset"));
+  byId("artwork-remove").addEventListener("click", () => artworkAction("/api/designer/artwork/remove", {}, "Remove artwork"));
+  byId("artwork-reset").addEventListener("click", () => artworkAction("/api/designer/artwork/reset", {}, "Reset artwork"));
+  byId("artwork-generate").addEventListener("click", generateArtwork);
+  byId("artwork-edit").addEventListener("click", () => artworkAction("/api/designer/artwork/edit", {}, "Edit artwork"));
   byId("mosaic-canvas").addEventListener("pointerdown", beginArtworkInteraction);
   byId("mosaic-canvas").addEventListener("pointermove", moveArtworkInteraction);
   byId("mosaic-canvas").addEventListener("pointerup", finishArtworkInteraction);
@@ -501,6 +745,8 @@
   byId("mosaic-canvas").addEventListener("dragstart", (event) => event.preventDefault());
   window.addEventListener("resize", fitToWorkspace);
 
-  request("/api/designer").then((payload) => { state = payload; render(); })
+  request("/api/designer", undefined, "Initial Designer load").then((payload) => {
+    applyDesignerState(payload);
+  })
     .catch((error) => { byId("status").textContent = error.message; });
 })();

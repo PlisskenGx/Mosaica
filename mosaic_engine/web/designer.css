@@ -155,6 +155,8 @@ h1, h2, h3, p { margin-top: 0; }
 #artwork-filename { overflow: hidden; color: #3f3f44; font-size: .82rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 #artwork-size { color: #77777c; font-size: .7rem; }
 .artwork-actions { display: flex; flex-wrap: wrap; gap: .4rem; padding: 0 .8rem; }
+.artwork-generation { display: grid; gap: .5rem; padding: .8rem .8rem 0; }
+#artwork-generation-state { min-height: .8rem; color: #77777c; font-size: .68rem; }
 .border-control { container-type: inline-size; padding: 1rem .1rem 1.2rem; border-top: 1px solid #e4e4e7; }
 .border-control-heading { display: flex; align-items: center; justify-content: space-between; padding: 0 .8rem .75rem; }
 .border-control-heading strong { font-size: .9rem; }

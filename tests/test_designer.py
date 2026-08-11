@@ -232,7 +232,7 @@ def test_designer_assets_use_backend_polygons_and_responsive_regions():
     assert "preset.best_for" not in script
     assert "preset.tradeoff" not in script
     assert 'byId("back").hidden = stage === "canvas"' in script
-    assert 'request("/api/designer/back", {})' in script
+    assert 'performDesignerMutation("/api/designer/back", {}, { name: "Back" })' in script
 
     _, stylesheet = _request(app, "GET", "/designer.css")
     assert "grid-template-columns: minmax(0, 1fr)" in stylesheet

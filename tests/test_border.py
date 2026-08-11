@@ -219,10 +219,10 @@ def test_designer_border_api_switches_without_stale_state():
     _, none = _request(
         app, "POST", "/api/designer/border", {"preset_id": "none"},
     )
-    assert none["project"]["border"]["preset_id"] == "none"
-    assert set(none["project"]["border"]["protected_placement_ids"]) == none_ids
-    assert solid["project"]["border"]["counts"]["protected"] < (
-        double["project"]["border"]["counts"]["protected"]
+    assert none["border"]["preset_id"] == "none"
+    assert set(none["border"]["protected_placement_ids"]) == none_ids
+    assert solid["border"]["counts"]["protected"] < (
+        double["border"]["counts"]["protected"]
     )
     assert none["document"]["dirty"] is True
 
@@ -248,7 +248,7 @@ def test_border_inspector_and_frontend_use_backend_membership():
     assert 'id="border-lock-state"' in html
     assert "Coming later</span></div>" in html
     _, script = _request(app, "GET", "/designer.js")
-    assert 'request("/api/designer/border"' in script
+    assert 'performDesignerMutation("/api/designer/border"' in script
     assert "tile.border_owned" in script
     assert "tile.artwork_available" in script
     assert "tile.display_color" in script

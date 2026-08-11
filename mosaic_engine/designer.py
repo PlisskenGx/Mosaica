@@ -21,6 +21,11 @@ from .artwork import (
     reset_artwork,
     update_artwork_transform,
 )
+from .designer_generation import (
+    DesignerGeneratedArtwork,
+    generate_designer_artwork,
+    mark_generated_stale,
+)
 
 
 MM_PER_INCH = 25.4
@@ -155,7 +160,10 @@ class DesignerProjectShell:
         border_preset(preset_id)
         return replace(self, border_preset_id=preset_id)
 
-    def to_dict(self) -> dict:
+    def to_dict(
+        self,
+        generated_artwork: DesignerGeneratedArtwork | None = None,
+    ) -> dict:
         visible = tuple(
             value for value in self.geometry.placements
             if value.piece_type != "outside"
@@ -175,10 +183,47 @@ class DesignerProjectShell:
             )
             for index, _ in enumerate(self.geometry.placements)
         }
-        color_counts = DEFAULT_DESIGNER_COLORS.count_visible(
+        generated_assignments = {
+            value.tile_id: value
+            for value in generated_artwork.assignments
+        } if generated_artwork is not None else {}
+        active_role_color_ids = {
+            DEFAULT_DESIGNER_COLORS.resolve(role).color_id
+            for role in set(effective_roles.values())
+        }
+        generated_replacements = {
+            value.color_id: value
+            for value in generated_artwork.physical_colors
+            if value != next(
+                base for base in DEFAULT_DESIGNER_COLORS.colors
+                if base.color_id == value.color_id
+            )
+        } if generated_artwork is not None else {}
+        generated_display_active = not any(
+            color_id in active_role_color_ids
+            for color_id in generated_replacements
+        )
+        if not generated_display_active:
+            generated_assignments = {}
+        effective_color_ids = {
+            tile_id: (
+                generated_assignments[tile_id].physical_color_id
+                if tile_id in generated_assignments and tile_id in available
+                else DEFAULT_DESIGNER_COLORS.resolve(role).color_id
+            )
+            for tile_id, role in effective_roles.items()
+        }
+        effective_resolution = (
+            DEFAULT_DESIGNER_COLORS.with_physical_colors(
+                generated_artwork.physical_colors
+            )
+            if generated_artwork is not None and generated_display_active
+            else DEFAULT_DESIGNER_COLORS
+        )
+        color_counts = effective_resolution.count_visible_color_ids(
             (
                 placement.piece_type,
-                effective_roles[f"placement-{index:06d}"],
+                effective_color_ids[f"placement-{index:06d}"],
             )
             for index, placement in enumerate(self.geometry.placements)
         )
@@ -186,9 +231,16 @@ class DesignerProjectShell:
             "canvas_preset": self.canvas.to_dict(),
             "tile_preset": self.tile.to_dict(),
             "grout_mm": self.grout_mm,
-            "color_system": DEFAULT_DESIGNER_COLORS.to_dict(),
+            "color_system": effective_resolution.to_dict(),
             "color_counts": [value.to_dict() for value in color_counts],
             "border": border.to_dict(),
+            "generated_artwork": (
+                {
+                    **generated_artwork.to_dict(),
+                    "display_active": generated_display_active,
+                }
+                if generated_artwork is not None else None
+            ),
             "print_plate_estimate": estimate_minimum_print_plates(
                 self.canvas.width_in,
                 self.canvas.height_in,
@@ -219,12 +271,17 @@ class DesignerProjectShell:
                         "protected": f"placement-{index:06d}" in assignments,
                         "artwork_available": f"placement-{index:06d}" in available,
                         "color_role": effective_roles[f"placement-{index:06d}"],
-                        "color_id": DEFAULT_DESIGNER_COLORS.resolve(
-                            effective_roles[f"placement-{index:06d}"]
-                        ).color_id,
-                        "display_color": DEFAULT_DESIGNER_COLORS.resolve(
-                            effective_roles[f"placement-{index:06d}"]
-                        ).display_color,
+                        "color_id": effective_color_ids[f"placement-{index:06d}"],
+                        "display_color": next(
+                            color.display_color for color in effective_resolution.colors
+                            if color.color_id == effective_color_ids[
+                                f"placement-{index:06d}"
+                            ]
+                        ),
+                        "generated_artwork": (
+                            f"placement-{index:06d}" in generated_assignments
+                            and f"placement-{index:06d}" in available
+                        ),
                     }
                     for index, placement in enumerate(self.geometry.placements)
                     if placement.piece_type != "outside"
@@ -247,6 +304,8 @@ class MosaicDesignerApp:
         self.canvas_id: str | None = None
         self.project: DesignerProjectShell | None = None
         self.artwork: DesignerArtwork | None = None
+        self.generated_artwork: DesignerGeneratedArtwork | None = None
+        self.artwork_edit_mode = True
         self.document_title = "Untitled"
         self.document_dirty = False
 
@@ -265,6 +324,7 @@ class MosaicDesignerApp:
                 self.canvas_id = canvas_id
                 self.project = None
                 self.artwork = None
+                self.generated_artwork = None
                 self.document_dirty = False
                 return self._json(start_response, "200 OK", self.payload())
             if method == "POST" and path == "/api/designer/tile":
@@ -273,21 +333,32 @@ class MosaicDesignerApp:
                 tile_id = self._request_json(environ).get("tile_id")
                 self.project = DesignerProjectShell.create(self.canvas_id, tile_id)
                 self.artwork = None
+                self.generated_artwork = None
                 self.document_dirty = False
                 return self._json(start_response, "200 OK", self.payload())
             if method == "POST" and path == "/api/designer/border":
                 if self.project is None:
                     raise ValueError("Create a Designer project before selecting a border.")
+                previous_project = self.project.to_dict(self.generated_artwork)
                 preset_id = self._request_json(environ).get("preset_id")
                 changed = preset_id != self.project.border_preset_id
                 self.project = self.project.with_border(preset_id)
+                if changed:
+                    self.generated_artwork = mark_generated_stale(
+                        self.generated_artwork, "Border changed",
+                    )
                 self.document_dirty = self.document_dirty or changed
-                return self._json(start_response, "200 OK", self.payload())
+                return self._json(
+                    start_response, "200 OK",
+                    self._design_state_payload(previous_project),
+                )
             if method == "POST" and path in {
                 "/api/designer/artwork/upload",
                 "/api/designer/artwork/replace",
             }:
                 project = self._require_project()
+                previous_project = project.to_dict(self.generated_artwork)
+                had_generated = self.generated_artwork is not None
                 if path.endswith("/replace"):
                     self._require_artwork()
                 body = self._request_json(environ)
@@ -301,23 +372,36 @@ class MosaicDesignerApp:
                 self.artwork = create_artwork(
                     filename, svg_content, project.geometry, border,
                 )
+                self.generated_artwork = None
+                self.artwork_edit_mode = True
                 self.document_dirty = True
+                if not path.endswith("/replace") and not had_generated:
+                    return self._json(
+                        start_response, "200 OK", self._artwork_state_payload(),
+                    )
                 return self._json(
-                    start_response, "200 OK", self._artwork_payload(),
+                    start_response, "200 OK",
+                    self._design_state_payload(previous_project),
                 )
             if method == "POST" and path == "/api/designer/artwork/transform":
                 self._require_artwork()
                 body = self._request_json(environ)
-                self.artwork = update_artwork_transform(
+                updated = update_artwork_transform(
                     self.artwork,
                     x_in=body.get("x_in"),
                     y_in=body.get("y_in"),
                     width_in=body.get("width_in"),
                     height_in=body.get("height_in"),
                 )
+                if updated.transform != self.artwork.transform:
+                    self.generated_artwork = mark_generated_stale(
+                        self.generated_artwork, "Artwork placement changed",
+                    )
+                self.artwork = updated
+                self.artwork_edit_mode = True
                 self.document_dirty = True
                 return self._json(
-                    start_response, "200 OK", self._artwork_payload(),
+                    start_response, "200 OK", self._artwork_state_payload(),
                 )
             if method == "POST" and path == "/api/designer/artwork/selection":
                 artwork = self._require_artwork()
@@ -326,7 +410,7 @@ class MosaicDesignerApp:
                     raise ValueError("Artwork selected state must be boolean.")
                 self.artwork = replace(artwork, selected=selected)
                 return self._json(
-                    start_response, "200 OK", self._artwork_payload(),
+                    start_response, "200 OK", self._artwork_state_payload(),
                 )
             if method == "POST" and path == "/api/designer/artwork/reset":
                 project = self._require_project()
@@ -335,34 +419,85 @@ class MosaicDesignerApp:
                     project.geometry, project.border_preset_id,
                 )
                 self.artwork = reset_artwork(artwork, project.geometry, border)
+                self.generated_artwork = mark_generated_stale(
+                    self.generated_artwork, "Artwork placement reset",
+                )
+                self.artwork_edit_mode = True
                 self.document_dirty = True
                 return self._json(
-                    start_response, "200 OK", self._artwork_payload(),
+                    start_response, "200 OK", self._artwork_state_payload(),
                 )
             if method == "POST" and path == "/api/designer/artwork/remove":
                 self._require_artwork()
+                previous_project = self._require_project().to_dict(
+                    self.generated_artwork
+                )
                 self.artwork = None
+                self.generated_artwork = None
+                self.artwork_edit_mode = True
                 self.document_dirty = True
                 return self._json(
-                    start_response, "200 OK", self._artwork_payload(),
+                    start_response, "200 OK",
+                    self._design_state_payload(previous_project),
+                )
+            if method == "POST" and path == "/api/designer/artwork/edit":
+                artwork = self._require_artwork()
+                self.artwork = replace(artwork, selected=True)
+                self.artwork_edit_mode = True
+                return self._json(
+                    start_response, "200 OK", self._artwork_state_payload(),
+                )
+            if method == "POST" and path == "/api/designer/artwork/generate":
+                project = self._require_project()
+                artwork = self._require_artwork()
+                previous_project = project.to_dict(self.generated_artwork)
+                border = build_border_layer(
+                    project.geometry, project.border_preset_id,
+                )
+                revision = (
+                    self.generated_artwork.revision + 1
+                    if self.generated_artwork is not None else 1
+                )
+                # Compute completely before replacing session state so every
+                # validation/rendering failure is atomic.
+                generated = generate_designer_artwork(
+                    artwork, project.geometry, border,
+                    DEFAULT_DESIGNER_COLORS, revision,
+                )
+                self.generated_artwork = generated
+                self.artwork = replace(artwork, selected=False)
+                self.artwork_edit_mode = False
+                self.document_dirty = True
+                return self._json(
+                    start_response, "200 OK",
+                    self._design_state_payload(previous_project),
                 )
             if method == "POST" and path == "/api/designer/back":
                 if self.project is not None:
                     self.project = None
                     self.artwork = None
+                    self.generated_artwork = None
+                    self.artwork_edit_mode = True
                     self.document_dirty = False
                 else:
                     self.canvas_id = None
                 return self._json(start_response, "200 OK", self.payload())
             return self._json(start_response, "404 Not Found", {"error": "Not found."})
-        except (KeyError, TypeError, ValueError) as exc:
+        except (KeyError, TypeError, ValueError, RuntimeError) as exc:
             return self._json(start_response, "400 Bad Request", {"error": str(exc)})
 
     def payload(self) -> dict:
-        project_payload = self.project.to_dict() if self.project is not None else None
+        project_payload = (
+            self.project.to_dict(self.generated_artwork)
+            if self.project is not None else None
+        )
         if project_payload is not None:
             project_payload["artwork"] = (
-                self.artwork.to_dict() if self.artwork is not None else None
+                {
+                    **self.artwork.to_dict(),
+                    "edit_mode": self.artwork_edit_mode,
+                }
+                if self.artwork is not None else None
             )
         return {
             "stage": (
@@ -392,13 +527,81 @@ class MosaicDesignerApp:
             raise ValueError("No SVG artwork is loaded.")
         return self.artwork
 
-    def _artwork_payload(self) -> dict:
+    def _artwork_state_payload(self) -> dict:
+        """Authoritative compact state for mutations that cannot alter tiles."""
+
         return {
-            "artwork": self.artwork.to_dict() if self.artwork is not None else None,
+            "payload_kind": "artwork_state",
+            "stage": "workspace",
             "document": {
                 "title": self.document_title,
                 "dirty": self.document_dirty,
             },
+            "artwork": (
+                {**self.artwork.to_dict(), "edit_mode": self.artwork_edit_mode}
+                if self.artwork is not None else None
+            ),
+            "generated_artwork": (
+                self._generated_artwork_summary(
+                    self.generated_artwork.to_dict()
+                )
+                if self.generated_artwork is not None else None
+            ),
+        }
+
+    def _design_state_payload(self, previous_project: dict) -> dict:
+        """Return changed visual state without immutable physical geometry."""
+
+        project = self._require_project().to_dict(self.generated_artwork)
+        previous_tiles = {
+            value["id"]: value for value in previous_project["geometry"]["tiles"]
+        }
+        dynamic_fields = (
+            "color_role",
+            "color_id",
+            "display_color",
+            "border_owned",
+            "protected",
+            "artwork_available",
+            "generated_artwork",
+        )
+        tile_updates = []
+        for tile in project["geometry"]["tiles"]:
+            previous = previous_tiles.get(tile["id"])
+            update = {"id": tile["id"]}
+            update.update({key: tile[key] for key in dynamic_fields})
+            if previous is None or any(
+                previous.get(key) != update[key] for key in dynamic_fields
+            ):
+                tile_updates.append(update)
+
+        generated = project["generated_artwork"]
+        generated_summary = self._generated_artwork_summary(generated)
+        return {
+            "payload_kind": "design_state",
+            "stage": "workspace",
+            "document": {
+                "title": self.document_title,
+                "dirty": self.document_dirty,
+            },
+            "artwork": (
+                {**self.artwork.to_dict(), "edit_mode": self.artwork_edit_mode}
+                if self.artwork is not None else None
+            ),
+            "generated_artwork": generated_summary,
+            "border": project["border"],
+            "color_system": project["color_system"],
+            "color_counts": project["color_counts"],
+            "tile_updates": tile_updates,
+        }
+
+    @staticmethod
+    def _generated_artwork_summary(generated: dict | None) -> dict | None:
+        if generated is None:
+            return None
+        return {
+            key: value for key, value in generated.items()
+            if key != "assignments"
         }
 
     @staticmethod
@@ -425,6 +628,7 @@ class MosaicDesignerApp:
         body = files("mosaic_engine").joinpath("web", filename).read_bytes()
         start_response("200 OK", [
             ("Content-Type", content_type),
+            ("Cache-Control", "no-store"),
             ("Content-Length", str(len(body))),
         ])
         return [body]

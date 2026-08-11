@@ -69,11 +69,25 @@ class DesignerColorResolution:
     ) -> tuple[PhysicalColorCount, ...]:
         """Count visible pieces by resolved physical color, never by role."""
 
+        return self.count_visible_color_ids(
+            (piece_type, self.resolve(role).color_id)
+            for piece_type, role in placements
+        )
+
+    def count_visible_color_ids(
+        self,
+        placements: Iterable[tuple[str, str]],
+    ) -> tuple[PhysicalColorCount, ...]:
+        """Count the authoritative effective physical IDs for visible pieces."""
+
         counts = {value.color_id: 0 for value in self.colors}
-        for piece_type, role in placements:
+        for piece_type, color_id in placements:
             if piece_type == "outside":
                 continue
-            counts[self.resolve(role).color_id] += 1
+            try:
+                counts[color_id] += 1
+            except KeyError as exc:
+                raise ValueError(f"Unknown Designer physical color ID: {color_id}") from exc
         return tuple(
             PhysicalColorCount(
                 color_id=color.color_id,
@@ -85,6 +99,18 @@ class DesignerColorResolution:
             for color in sorted(self.colors, key=lambda value: value.order)
             if counts[color.color_id] > 0
         )
+
+    def with_physical_colors(
+        self,
+        colors: tuple[PhysicalColor, ...],
+    ) -> DesignerColorResolution:
+        """Replace slot metadata while preserving stable IDs and role mappings."""
+
+        if {value.color_id for value in colors} != {
+            value.color_id for value in self.colors
+        }:
+            raise ValueError("Designer physical-color replacements must preserve IDs.")
+        return DesignerColorResolution(colors, dict(self.role_to_color_id))
 
     def to_dict(self) -> dict:
         return {
