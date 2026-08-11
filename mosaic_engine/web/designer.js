@@ -76,6 +76,9 @@
       polygon.id = tile.id;
       polygon.classList.add("designer-tile");
       if (tile.piece_type !== "full") polygon.classList.add("cut");
+      if (tile.border_owned) polygon.classList.add("border-owned");
+      if (tile.artwork_available) polygon.classList.add("artwork-available");
+      polygon.style.fill = project.color_system.roles[tile.color_role].preview_hex;
       polygon.setAttribute("points", tile.vertices_in.map((point) => point.join(",")).join(" "));
       polygon.setAttribute("aria-label", `${tile.piece_type} tile, row ${tile.row + 1}, column ${tile.column + 1}`);
       svg.appendChild(polygon);
@@ -97,11 +100,35 @@
       `${geometry.clipped_piece_count.toLocaleString()} clipped`,
       `${geometry.visible_piece_count.toLocaleString()} pieces`,
       `Est. minimum: ${plateEstimate.estimated_minimum_plates} plates`,
+      `Border: ${borderPresetName(project.border.preset_id)} · ${project.border.counts.protected.toLocaleString()} protected`,
     ];
     byId("workspace-status").innerHTML = stats.map((value, index) => (
       `${index ? '<span class="status-separator">·</span>' : ''}<strong>${value}</strong>`
     )).join("");
     requestAnimationFrame(fitToWorkspace);
+  }
+
+  function borderPresetName(presetId) {
+    return state.border_presets.find((value) => value.id === presetId)?.name || presetId;
+  }
+
+  function renderBorderInspector() {
+    if (!state.project) return;
+    const selected = state.project.border.preset_id;
+    const container = byId("border-presets");
+    container.replaceChildren();
+    for (const preset of state.border_presets) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "border-preset";
+      button.setAttribute("aria-pressed", String(preset.id === selected));
+      button.innerHTML = `<span class="border-preview ${preset.preview_kind}" aria-hidden="true"></span><span>${preset.name}</span>`;
+      button.addEventListener("click", () => chooseBorder(preset.id));
+      container.appendChild(button);
+    }
+    byId("border-lock-state").textContent = (
+      `${state.project.border.counts.protected.toLocaleString()} tiles locked`
+    );
   }
 
   function calculateFitSize(
@@ -145,6 +172,7 @@
     renderCanvasPresets();
     renderTilePresets();
     renderWorkspace();
+    renderBorderInspector();
     if (state.stage === "workspace" && !viewportObserver && "ResizeObserver" in window) {
       viewportObserver = new ResizeObserver(() => fitToWorkspace());
       viewportObserver.observe(byId("canvas-viewport"));
@@ -159,6 +187,15 @@
   async function chooseTile(tileId) {
     try { state = await request("/api/designer/tile", { tile_id: tileId }); render(); }
     catch (error) { byId("status").textContent = error.message; }
+  }
+
+  async function chooseBorder(presetId) {
+    try {
+      state = await request("/api/designer/border", { preset_id: presetId });
+      render();
+    } catch (error) {
+      byId("status").textContent = error.message;
+    }
   }
 
   byId("back").addEventListener("click", async () => {

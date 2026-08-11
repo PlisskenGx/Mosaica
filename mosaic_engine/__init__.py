@@ -59,6 +59,18 @@ from .designer import (
     TilePreset,
     run_designer,
 )
+from .border import (
+    BORDER_PRESETS,
+    MAX_PROJECT_COLORS,
+    PROJECT_COLOR_ROLES,
+    BorderAssignment,
+    BorderLayerState,
+    BorderPreset,
+    border_preset,
+    build_border_layer,
+    perimeter_order,
+    physical_perimeter_rings,
+)
 
 from .model import (
     MosaicConfig,
@@ -158,6 +170,16 @@ __all__ = [
     "MosaicDesignerApp",
     "TilePreset",
     "run_designer",
+    "BORDER_PRESETS",
+    "MAX_PROJECT_COLORS",
+    "PROJECT_COLOR_ROLES",
+    "BorderAssignment",
+    "BorderLayerState",
+    "BorderPreset",
+    "border_preset",
+    "build_border_layer",
+    "perimeter_order",
+    "physical_perimeter_rings",
 
     "MosaicConfig",
     "MosaicResult",
