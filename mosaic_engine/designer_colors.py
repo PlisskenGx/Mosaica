@@ -178,8 +178,8 @@ class DesignerColorResolution:
 DEFAULT_DESIGNER_COLORS = DesignerColorResolution(
     colors=(
         DesignColor("project-color-1", "#FAF9F6", "Ivory", 0, "semantic"),
-        DesignColor("project-color-2", "#34373D", "Charcoal", 1, "semantic"),
-        DesignColor("project-color-3", "#A87655", "Clay", 2, "semantic"),
+        DesignColor("project-color-2", "#000000", "Black", 1, "semantic"),
+        DesignColor("project-color-3", "#808080", "Gray", 2, "semantic"),
     ),
     role_to_color_id={
         "background": "project-color-1",

@@ -101,11 +101,12 @@ def test_canvas_previews_share_one_physical_scale_and_preserve_aspect():
     ("landscape", "m"),
     ("panoramic", "l"),
 ])
-def test_representative_presets_create_exact_panel_geometry(canvas_id, tile_id):
+def test_representative_presets_create_nearest_vertex_constrained_geometry(canvas_id, tile_id):
     shell = DesignerProjectShell.create(canvas_id, tile_id)
-    assert shell.geometry.width_in == shell.canvas.width_in
-    assert shell.geometry.height_in == shell.canvas.height_in
+    assert abs(shell.geometry.width_in - shell.canvas.width_in) < 1.0
+    assert abs(shell.geometry.height_in - shell.canvas.height_in) < 1.0
     assert shell.geometry.shape == "hex"
+    assert shell.geometry.orientation == "point_top"
     full = next(value for value in shell.geometry.placements if value.piece_type == "full")
     across_flats = max(x for x, _ in full.full_vertices_in) - min(
         x for x, _ in full.full_vertices_in
@@ -154,8 +155,9 @@ def test_preset_selection_api_state_flow():
     assert payload["stage"] == "workspace"
     assert payload["project"]["canvas_preset"]["width_in"] == 60
     assert payload["project"]["canvas_preset"]["height_in"] == 30
-    assert payload["project"]["geometry"]["width_in"] == 60
-    assert payload["project"]["geometry"]["height_in"] == 30
+    assert abs(payload["project"]["geometry"]["width_in"] - 60) < 1
+    assert abs(payload["project"]["geometry"]["height_in"] - 30) < 1
+    assert payload["project"]["tile_orientation"] == "point_top"
     assert payload["project"]["tile_preset"]["flat_to_flat_mm"] == 24
     assert payload["document"] == {"title": "Untitled", "dirty": False}
 
@@ -208,7 +210,13 @@ def test_designer_assets_use_backend_polygons_and_responsive_regions():
     assert '<button id="back" class="back-navigation" hidden>‹ Back</button>' in html
     assert html.index('class="brand"') < html.index('id="back"')
     assert html.index('id="back"') < html.index('id="document-title"')
-    assert "Paint / Edit" in html
+    assert 'id="paint-heading">Paint<' in html
+    assert "Physical canvas" not in html
+    assert 'id="workspace-title"' not in html
+    assert "Paint / Edit" not in html
+    assert "Enter Paint" not in html
+    assert "Colors" not in html
+    assert "Coming later" not in html
     assert '<span class="brand-mark" aria-hidden="true"></span>' in html
     assert '<span class="brand-copy">' in html
     assert '<span class="brand-attribution">by Veradura Design</span>' in html
@@ -223,6 +231,42 @@ def test_designer_assets_use_backend_polygons_and_responsive_regions():
     assert "/api/designer/canvas" in script
     assert "/api/designer/tile" in script
     assert "/api/mosaica" not in script
+
+
+def test_orientation_frontend_uses_scoped_label_helper_and_wires_both_choices():
+    app = MosaicDesignerApp()
+    _, script = _request(app, "GET", "/designer.js")
+    assert 'const orientationLabel = (orientation)' in script
+    assert 'orientation === "flat_top" ? "Flat Top" : "Point Top"' in script
+    assert 'data-orientation="flat_top"' in script
+    assert 'data-orientation="point_top"' in script
+    assert 'chooseTile(preset.id, selectedOrientation)' in script
+    assert 'chooseTile(tileId, orientation = "point_top")' in script
+    assert script.count("const orientationName = orientationLabel(") == 1
+    assert 'pointerenter' in script
+    assert 'pointerleave' in script
+    assert '"--preview-rotation"' in script
+
+
+def test_workspace_and_sidebar_polish_is_structurally_scoped():
+    app = MosaicDesignerApp()
+    _, html = _request(app, "GET", "/")
+    _, script = _request(app, "GET", "/designer.js")
+    _, stylesheet = _request(app, "GET", "/designer.css")
+    assert html.index('id="artwork-heading"') < html.index('id="paint-heading"')
+    assert html.index('id="paint-heading"') < html.index('id="border-heading"')
+    for removed in (
+        "Physical canvas", "Paint / Edit", "Enter Paint", "Restore",
+        "Clear Paint Edits", "Coming later",
+    ):
+        assert removed not in html
+    assert '>Erase</button>' in html
+    assert '>Clear Edits</button>' in html
+    assert " in actual`" not in script
+    assert ".back-navigation" in stylesheet
+    assert "font-size: .85rem" in stylesheet
+    assert "font-weight: 400" in stylesheet
+    assert "prefers-reduced-motion" in stylesheet
     assert "calculateFitSize" in script
     assert "fitToWorkspace" in script
     assert 'addEventListener("click", fitToWorkspace)' not in script

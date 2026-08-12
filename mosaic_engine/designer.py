@@ -15,7 +15,7 @@ from wsgiref.simple_server import (
     make_server,
 )
 
-from .geometry import GridGeometry, build_panel_geometry
+from .geometry import GridGeometry, vertex_constrained_panel_hex_geometry
 from .model import MosaicConfig
 from .border import (
     BORDER_PRESETS,
@@ -149,8 +149,14 @@ class DesignerProjectShell:
     color_system: DesignerColorResolution = DEFAULT_DESIGNER_COLORS
     border_preset_id: str = "none"
 
+    @property
+    def tile_orientation(self) -> str:
+        return self.geometry.orientation or "point_top"
+
     @classmethod
-    def create(cls, canvas_id: str, tile_id: str) -> DesignerProjectShell:
+    def create(
+        cls, canvas_id: str, tile_id: str, orientation: str = "point_top",
+    ) -> DesignerProjectShell:
         try:
             canvas = _CANVASES[canvas_id]
         except KeyError as exc:
@@ -164,11 +170,13 @@ class DesignerProjectShell:
             tile_width_in=tile.flat_to_flat_in,
             tile_height_in=tile.flat_to_flat_in,
             grout_width_in=DESIGNER_GROUT_MM / MM_PER_INCH,
-            hex_orientation="pointy",
+            hex_orientation=orientation,
             target_width_in=canvas.width_in,
             target_height_in=canvas.height_in,
         )
-        geometry = build_panel_geometry(config, canvas.width_in, canvas.height_in)
+        geometry = vertex_constrained_panel_hex_geometry(
+            config, canvas.width_in, canvas.height_in,
+        )
         return cls(canvas, tile, DESIGNER_GROUT_MM, geometry)
 
     def with_border(self, preset_id: str) -> DesignerProjectShell:
@@ -236,6 +244,8 @@ class DesignerProjectShell:
         return {
             "canvas_preset": self.canvas.to_dict(),
             "tile_preset": self.tile.to_dict(),
+            "tile_shape": "hexagon",
+            "tile_orientation": self.tile_orientation,
             "grout_mm": self.grout_mm,
             "color_system": effective_resolution.to_dict(),
             "color_counts": [value.to_dict() for value in color_counts],
@@ -252,12 +262,14 @@ class DesignerProjectShell:
                 if generated_artwork is not None else None
             ),
             "print_plate_estimate": estimate_minimum_print_plates(
-                self.canvas.width_in,
-                self.canvas.height_in,
+                self.geometry.width_in,
+                self.geometry.height_in,
             ),
             "geometry": {
                 "shape": self.geometry.shape,
-                "orientation": "pointy",
+                "orientation": self.tile_orientation,
+                "target_width_in": self.canvas.width_in,
+                "target_height_in": self.canvas.height_in,
                 "width_in": self.geometry.width_in,
                 "height_in": self.geometry.height_in,
                 "columns": self.geometry.columns,
@@ -366,8 +378,12 @@ class MosaicDesignerApp:
             if method == "POST" and path == "/api/designer/tile":
                 if self.canvas_id is None:
                     raise ValueError("Select a canvas preset before a tile preset.")
-                tile_id = self._request_json(environ).get("tile_id")
-                self.project = DesignerProjectShell.create(self.canvas_id, tile_id)
+                body = self._request_json(environ)
+                tile_id = body.get("tile_id")
+                orientation = body.get("orientation", "point_top")
+                self.project = DesignerProjectShell.create(
+                    self.canvas_id, tile_id, orientation,
+                )
                 self.artwork = None
                 self.generated_artwork = None
                 self.paint_overrides = {}

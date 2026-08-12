@@ -118,7 +118,10 @@ def _physical_neighbors(
 ) -> tuple[Coordinate, ...]:
     config = MosaicConfig(
         tile_shape=geometry.shape,
-        hex_orientation="pointy",
+        hex_orientation=(
+            "pointy" if geometry.orientation in {None, "point_top"}
+            else "flat"
+        ),
     )
     return tuple(tile_neighbors(
         coordinate[0], coordinate[1],

@@ -201,10 +201,13 @@ def test_paint_ui_uses_one_stroke_batch_with_rollback_and_no_geometry_math():
     app = MosaicDesignerApp()
     _, html = _request(app, "GET", "/")
     _, script = _request(app, "GET", "/designer.js")
-    assert 'id="paint-toggle"' in html
-    assert 'id="paint-mode-color"' in html
+    assert 'id="paint-toggle"' not in html
+    assert 'id="paint-mode-color"' not in html
     assert 'id="paint-mode-restore"' in html
+    assert '>Erase</button>' in html
     assert 'id="paint-clear"' in html
+    assert '>Clear Edits</button>' in html
+    assert "window.confirm" not in script
     assert 'new Set()' in script
     assert '"/api/designer/paint"' in script
     assert "originalFills" in script

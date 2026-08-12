@@ -214,7 +214,7 @@ def test_32_color_safety_limit_is_not_a_manufacturing_limit():
         (index + 1, (index * 37 + 11) % 256, (index * 71 + 19) % 256)
         for index in range(30)
     )
-    colors = ((250, 249, 246), (52, 55, 61), (168, 118, 85), *new_colors[:29])
+    colors = ((250, 249, 246), (0, 0, 0), (128, 128, 128), *new_colors[:29])
     mapping, resolution = generation_module._allocate_colors(
         colors, DEFAULT_DESIGNER_COLORS,
     )
@@ -348,7 +348,7 @@ def test_alternating_border_and_multicolor_artwork_have_independent_ids():
         "edge": "project-color-1",
     }
     assert [value["display_color"] for value in colors[:3]] == [
-        "#FAF9F6", "#34373D", "#A87655",
+        "#FAF9F6", "#000000", "#808080",
     ]
 
 
@@ -658,8 +658,8 @@ def test_semantic_color_identities_are_immutable_when_generating_under_solid():
         for value in payload["project"]["color_system"]["design_colors"]
     }
     assert colors["project-color-1"]["display_color"] == "#FAF9F6"
-    assert colors["project-color-2"]["display_color"] == "#34373D"
-    assert colors["project-color-3"]["display_color"] == "#A87655"
+    assert colors["project-color-2"]["display_color"] == "#000000"
+    assert colors["project-color-3"]["display_color"] == "#808080"
     assert colors["project-color-4"]["display_color"] == BLUE
     assert {
         value.color_id for value in app.generated_artwork.assignments

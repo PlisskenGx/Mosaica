@@ -6,12 +6,14 @@
   let artworkUploadPath = "/api/designer/artwork/upload";
   let generationInFlight = false;
   let mutationQueue = Promise.resolve();
-  let paintModeActive = false;
-  let paintTool = "paint";
+  let paintTool = null;
   let activePaintColorId = null;
   let paintStroke = null;
   const byId = (id) => document.getElementById(id);
   const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
+  const orientationLabel = (orientation) => (
+    orientation === "flat_top" ? "Flat Top" : "Point Top"
+  );
 
   class DesignerResponseReadError extends Error {
     constructor(message, response, cause) {
@@ -132,7 +134,7 @@
       card.innerHTML = `
         <span class="canvas-preview-wrap"><span class="canvas-preview" style="--aspect:${preset.aspect_ratio};--preview-width:${preset.preview_width_rem}rem;--preview-height:${preset.preview_height_rem}rem"></span></span>
         <strong class="choice-title">${preset.name}</strong>
-        <span class="choice-meta">${preset.width_in} × ${preset.height_in} in</span>`;
+        <span class="choice-meta">≈ ${preset.width_in} × ${preset.height_in} in</span>`;
       card.addEventListener("click", () => chooseCanvas(preset.id));
       container.appendChild(card);
     }
@@ -142,18 +144,45 @@
     const container = byId("tile-presets");
     container.replaceChildren();
     for (const preset of state.tile_presets) {
-      const card = document.createElement("button");
+      const card = document.createElement("article");
       card.className = "choice-card tile-card";
-      card.type = "button";
       card.setAttribute("aria-label", `${preset.id.toUpperCase()}, ${preset.flat_to_flat_mm} millimeters flat to flat`);
       const relativeSize = 3.2 * preset.flat_to_flat_mm / 24;
       card.innerHTML = `
         ${preset.recommended ? '<span class="recommended-badge">Recommended</span>' : ''}
-        <span class="hex-preview-wrap"><span class="hex-preview" style="--hex-size:${relativeSize}rem"></span></span>
+        <span class="hex-preview-wrap"><span class="hex-preview point-top" style="--hex-size:${relativeSize}rem"></span></span>
         <span class="tile-size"><strong>${preset.id.toUpperCase()}</strong><span>${preset.flat_to_flat_mm} mm</span></span>
         <h2>${preset.title}</h2>
-        <p>${preset.summary}</p>`;
-      card.addEventListener("click", () => chooseTile(preset.id));
+        <p>${preset.summary}</p>
+        <span class="orientation-choices" role="group" aria-label="Hex orientation">
+          <button type="button" data-orientation="flat_top" aria-pressed="false"><span class="mini-hex flat-top"></span>Flat Top</button>
+          <button type="button" data-orientation="point_top" aria-pressed="true"><span class="mini-hex point-top"></span>Point Top</button>
+        </span>`;
+      const preview = card.querySelector(".hex-preview");
+      const orientationButtons = [
+        card.querySelector("[data-orientation=flat_top]"),
+        card.querySelector("[data-orientation=point_top]"),
+      ];
+      let selectedOrientation = "point_top";
+      const showOrientation = (orientation) => {
+        preview.style.setProperty(
+          "--preview-rotation", orientation === "flat_top" ? "30deg" : "0deg",
+        );
+      };
+      for (const button of orientationButtons) {
+        button.addEventListener("pointerenter", () => showOrientation(button.dataset.orientation));
+        button.addEventListener("focus", () => showOrientation(button.dataset.orientation));
+        button.addEventListener("pointerleave", () => showOrientation(selectedOrientation));
+        button.addEventListener("blur", () => showOrientation(selectedOrientation));
+        button.addEventListener("click", () => {
+          selectedOrientation = button.dataset.orientation;
+          for (const choice of orientationButtons) {
+            choice.setAttribute("aria-pressed", String(choice === button));
+          }
+          showOrientation(selectedOrientation);
+          chooseTile(preset.id, selectedOrientation);
+        });
+      }
       container.appendChild(card);
     }
   }
@@ -162,7 +191,6 @@
     if (!state.project) return;
     const project = state.project;
     const geometry = project.geometry;
-    byId("workspace-title").textContent = `${project.canvas_preset.name} · ${project.tile_preset.id.toUpperCase()} tile`;
     const svg = byId("mosaic-canvas");
     svg.replaceChildren();
     svg.setAttribute("viewBox", `0 0 ${geometry.width_in} ${geometry.height_in}`);
@@ -208,12 +236,14 @@
   function renderWorkspaceStatus(project) {
     const geometry = project.geometry;
     const plateEstimate = project.print_plate_estimate;
+    const orientationName = orientationLabel(project.tile_orientation);
     const statusBar = byId("workspace-status");
     statusBar.replaceChildren(
       createStatusGroup("status-physical-setup", [
-        `${geometry.width_in} × ${geometry.height_in} in`,
+        `${geometry.width_in.toFixed(2)} × ${geometry.height_in.toFixed(2)} in`,
         project.tile_preset.id.toUpperCase(),
         `${project.tile_preset.flat_to_flat_mm} mm`,
+        orientationName,
         `${project.grout_mm} mm grout`,
       ]),
       createStatusGroup("status-production", [
@@ -423,6 +453,14 @@
       button.type = "button";
       button.className = "border-preset";
       button.setAttribute("aria-pressed", String(preset.id === selected));
+      const primary = state.project.color_system.design_colors.find(
+        (color) => color.color_id === state.project.color_system.role_to_color_id.border_primary,
+      );
+      const secondary = state.project.color_system.design_colors.find(
+        (color) => color.color_id === state.project.color_system.role_to_color_id.border_secondary,
+      );
+      button.style.setProperty("--border-primary", primary.display_color);
+      button.style.setProperty("--border-secondary", secondary.display_color);
       button.innerHTML = `<span class="border-preview ${preset.preview_kind}" aria-hidden="true"></span><span>${preset.name}</span>`;
       button.addEventListener("click", () => chooseBorder(preset.id));
       container.appendChild(button);
@@ -459,12 +497,8 @@
     if (!colors.some((color) => color.color_id === activePaintColorId)) {
       activePaintColorId = colors[0]?.color_id || null;
     }
-    byId("paint-toggle").textContent = paintModeActive ? "Done" : "Enter Paint";
-    byId("paint-toggle").setAttribute("aria-pressed", String(paintModeActive));
-    byId("paint-tools").hidden = !paintModeActive;
-    byId("mosaic-canvas").classList.toggle("paint-active", paintModeActive);
-    byId("paint-mode-color").setAttribute("aria-pressed", String(paintTool === "paint"));
     byId("paint-mode-restore").setAttribute("aria-pressed", String(paintTool === "restore"));
+    byId("mosaic-canvas").classList.toggle("paint-active", paintTool !== null);
     byId("paint-clear").disabled = !state.project.paint?.override_count;
     const palette = byId("paint-colors");
     palette.replaceChildren();
@@ -708,7 +742,7 @@
   }
 
   function beginArtworkInteraction(event) {
-    if (paintModeActive || !state?.project?.artwork || event.button > 0) return;
+    if (paintTool !== null || !state?.project?.artwork || event.button > 0) return;
     const handle = event.target.closest?.(".artwork-handle-target");
     const object = event.target.closest?.(".artwork-object");
     if (!handle && !object) {
@@ -841,7 +875,7 @@
   }
 
   function beginPaintStroke(event) {
-    if (!paintModeActive || event.button > 0) return;
+    if (paintTool === null || event.button > 0) return;
     const tile = event.target.closest?.(".designer-tile.editable");
     if (!tile) return;
     event.preventDefault();
@@ -876,7 +910,7 @@
         color_id: stroke.mode === "paint" ? stroke.colorId : null,
         placement_ids: [...stroke.ids],
       },
-      { name: stroke.mode === "paint" ? "Paint tiles" : "Restore tiles" },
+      { name: stroke.mode === "paint" ? "Paint tiles" : "Erase paint" },
     );
     if (!response) {
       for (const [id, fill] of stroke.originalFills) byId(id).style.fill = fill;
@@ -937,8 +971,10 @@
     await performDesignerMutation("/api/designer/canvas", { canvas_id: canvasId }, { name: "Choose canvas" });
   }
 
-  async function chooseTile(tileId) {
-    await performDesignerMutation("/api/designer/tile", { tile_id: tileId }, { name: "Choose tile" });
+  async function chooseTile(tileId, orientation = "point_top") {
+    await performDesignerMutation(
+      "/api/designer/tile", { tile_id: tileId, orientation }, { name: "Choose tile" },
+    );
   }
 
   async function chooseBorder(presetId) {
@@ -957,23 +993,14 @@
   byId("artwork-reset").addEventListener("click", () => artworkAction("/api/designer/artwork/reset", {}, "Reset artwork"));
   byId("artwork-generate").addEventListener("click", generateArtwork);
   byId("artwork-edit").addEventListener("click", () => artworkAction("/api/designer/artwork/edit", {}, "Edit artwork"));
-  byId("paint-toggle").addEventListener("click", () => {
-    paintModeActive = !paintModeActive;
-    renderPaintInspector();
-  });
-  byId("paint-mode-color").addEventListener("click", () => {
-    paintTool = "paint";
-    renderPaintInspector();
-  });
   byId("paint-mode-restore").addEventListener("click", () => {
     paintTool = "restore";
     renderPaintInspector();
   });
   byId("paint-clear").addEventListener("click", async () => {
     if (!state.project.paint?.override_count) return;
-    if (!window.confirm("Clear all manual paint edits?")) return;
     await performDesignerMutation(
-      "/api/designer/paint/clear", {}, { name: "Clear Paint Edits" },
+      "/api/designer/paint/clear", {}, { name: "Clear Edits" },
     );
   });
   byId("mosaic-canvas").addEventListener("pointerdown", beginArtworkInteraction);

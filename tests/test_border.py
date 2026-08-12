@@ -243,7 +243,7 @@ def test_border_inspector_and_frontend_use_backend_membership():
     assert status == "200 OK"
     assert 'id="border-presets"' in html
     assert 'id="border-lock-state"' in html
-    assert "Coming later</span></div>" in html
+    assert "Coming later</span></div>" not in html
     _, script = _request(app, "GET", "/designer.js")
     assert 'performDesignerMutation("/api/designer/border"' in script
     assert "tile.border_owned" in script
@@ -257,6 +257,10 @@ def test_border_inspector_and_frontend_use_backend_membership():
     assert ".border-preview.solid" in stylesheet
     assert ".border-preview.double" in stylesheet
     assert ".border-preview.alternating" in stylesheet
+    assert "var(--border-primary)" in stylesheet
+    assert "var(--border-secondary)" in stylesheet
+    assert 'role_to_color_id.border_primary' in script
+    assert 'role_to_color_id.border_secondary' in script
     assert ".border-control { container-type: inline-size" in stylesheet
     assert "@container (max-width: 16.5rem)" in stylesheet
     assert ".border-presets { grid-template-columns: minmax(0, 1fr); }" in stylesheet

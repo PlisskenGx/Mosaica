@@ -411,6 +411,7 @@ def _source_path_from_metadata(
 def _geometry_to_dict(geometry: GridGeometry) -> dict:
     return {
         "shape": geometry.shape,
+        "orientation": geometry.orientation,
         "columns": geometry.columns,
         "rows": geometry.rows,
         "width_in": geometry.width_in,
@@ -479,4 +480,5 @@ def _geometry_from_dict(data: dict) -> GridGeometry:
         ),
         panel_bounds=_rect_from_dict(data["panel_bounds"]),
         artwork_bounds=_rect_from_dict(data["artwork_bounds"]),
+        orientation=data.get("orientation"),
     )

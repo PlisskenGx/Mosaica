@@ -82,15 +82,22 @@ def test_default_background_and_edge_share_one_project_color():
     assert DEFAULT_DESIGNER_COLORS.role_to_color_id["background"] != "background"
 
 
+def test_default_border_roles_are_black_and_gray_project_colors():
+    primary = DEFAULT_DESIGNER_COLORS.resolve("border_primary")
+    secondary = DEFAULT_DESIGNER_COLORS.resolve("border_secondary")
+    assert (primary.name, primary.display_color) == ("Black", "#000000")
+    assert (secondary.name, secondary.display_color) == ("Gray", "#808080")
+
+
 def test_equivalent_colors_reuse_ids_and_new_colors_append():
     updated = DEFAULT_DESIGNER_COLORS.with_artwork_colors((
         (250, 249, 246),
-        (52, 55, 61),
+        (0, 0, 0),
         (0, 102, 204),
     ))
     assert len(updated.colors) == 4
     assert updated.color_id_for_rgb((250, 249, 246)) == "project-color-1"
-    assert updated.color_id_for_rgb((52, 55, 61)) == "project-color-2"
+    assert updated.color_id_for_rgb((0, 0, 0)) == "project-color-2"
     assert updated.color_id_for_rgb((0, 102, 204)) == "project-color-4"
 
 

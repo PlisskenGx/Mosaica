@@ -27,7 +27,7 @@
     <section id="canvas-screen" class="setup-screen">
       <div class="setup-heading">
         <h1>Choose your canvas</h1>
-        <p>The finished dimensions establish the exact physical boundary of your mosaic.</p>
+        <p>Choose an approximate physical target for your finished mosaic.</p>
       </div>
       <div id="canvas-presets" class="canvas-presets" aria-label="Canvas presets"></div>
     </section>
@@ -35,16 +35,13 @@
     <section id="tile-screen" class="setup-screen" hidden>
       <div class="setup-heading">
         <h1>Choose your tile size</h1>
-        <p>Every option uses pointy-top hexagons with a fixed 1.8 mm grout gap.</p>
+        <p>Choose a hex size and orientation. Every option uses a fixed 1.8 mm grout gap.</p>
       </div>
       <div id="tile-presets" class="tile-presets" aria-label="Tile presets"></div>
     </section>
 
     <section id="workspace" class="workspace" hidden>
       <div class="canvas-region">
-        <div class="canvas-toolbar">
-          <div><p class="eyebrow">Physical canvas</p><h1 id="workspace-title">Blank mosaic</h1></div>
-        </div>
         <div id="canvas-viewport" class="canvas-viewport">
           <svg id="mosaic-canvas" xmlns="http://www.w3.org/2000/svg" aria-label="Blank physical mosaic lattice"></svg>
         </div>
@@ -77,27 +74,24 @@
             </div>
           </div>
         </section>
+        <section class="paint-control" aria-labelledby="paint-heading">
+          <div class="paint-control-heading">
+            <strong id="paint-heading">Paint</strong>
+          </div>
+          <div id="paint-tools">
+            <div id="paint-colors" class="paint-colors" aria-label="Project paint colors"></div>
+            <div class="paint-modes" aria-label="Paint mode">
+              <button id="paint-mode-restore" class="inspector-action" type="button" aria-pressed="false">Erase</button>
+            </div>
+            <button id="paint-clear" class="inspector-action danger-text" type="button">Clear Edits</button>
+          </div>
+        </section>
         <section class="border-control" aria-labelledby="border-heading">
           <div class="border-control-heading">
             <strong id="border-heading">Border</strong>
             <span id="border-lock-state"></span>
           </div>
           <div id="border-presets" class="border-presets"></div>
-        </section>
-        <div class="unavailable-section"><strong>Colors</strong><span>Coming later</span></div>
-        <section class="paint-control" aria-labelledby="paint-heading">
-          <div class="paint-control-heading">
-            <strong id="paint-heading">Paint / Edit</strong>
-            <button id="paint-toggle" class="inspector-action" type="button" aria-pressed="false">Enter Paint</button>
-          </div>
-          <div id="paint-tools" hidden>
-            <div id="paint-colors" class="paint-colors" aria-label="Project paint colors"></div>
-            <div class="paint-modes" aria-label="Paint mode">
-              <button id="paint-mode-color" class="inspector-action" type="button" aria-pressed="true">Paint</button>
-              <button id="paint-mode-restore" class="inspector-action" type="button" aria-pressed="false">Restore</button>
-            </div>
-            <button id="paint-clear" class="inspector-action danger-text" type="button">Clear Paint Edits</button>
-          </div>
         </section>
       </aside>
       <footer id="workspace-status" class="workspace-status" aria-label="Project physical status"></footer>

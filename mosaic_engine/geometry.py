@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from math import (
     cos,
     floor,
+    hypot,
     pi,
     sin,
     sqrt,
@@ -86,6 +87,8 @@ class GridGeometry:
     panel_bounds: Rect
 
     artwork_bounds: Rect
+
+    orientation: str | None = None
 
     def placement(
         self,
@@ -289,6 +292,7 @@ def square_geometry(
 
     return GridGeometry(
         shape="square",
+        orientation=None,
 
         columns=columns,
         rows=rows,
@@ -558,6 +562,10 @@ def hex_geometry(
 
     return GridGeometry(
         shape="hex",
+        orientation=(
+            "point_top" if config.hex_orientation in {"pointy", "point_top"}
+            else "flat_top"
+        ),
 
         columns=columns,
         rows=rows,
@@ -913,6 +921,10 @@ def panel_hex_geometry(
 
     return GridGeometry(
         shape="hex",
+        orientation=(
+            "point_top" if config.hex_orientation in {"pointy", "point_top"}
+            else "flat_top"
+        ),
 
         columns=columns,
         rows=rows,
@@ -933,6 +945,139 @@ def panel_hex_geometry(
                 config.artwork_inset_in,
             )
         ),
+    )
+
+
+def vertex_constrained_panel_hex_geometry(
+    config: MosaicConfig,
+    target_width_in: float,
+    target_height_in: float,
+) -> GridGeometry:
+    """Nearest rectangular hex panel whose cuts terminate at hex vertices.
+
+    The two boundary phases are deliberately assigned to opposite lattice
+    parities. This keeps corner tiles from being cut by two perpendicular
+    boundaries and yields a finite, repeatable perimeter-piece catalog.
+    """
+    if target_width_in <= 0 or target_height_in <= 0:
+        raise ValueError("Panel dimensions must be positive.")
+    orientation = config.hex_orientation
+    if orientation not in {"point_top", "flat_top"}:
+        raise ValueError(f"Unsupported canonical hex orientation: {orientation}")
+    across_flats = config.tile_width_in
+    grout = config.grout_width_in
+    pitch = across_flats + grout
+    radius = across_flats / sqrt(3.0)
+    stagger_step = sqrt(3.0) / 2.0 * pitch
+
+    def nearest_count(
+        target: float, step: float, *, offset: float = 0.0, even: bool = False,
+    ) -> int:
+        raw = max(1, round((target - offset) / step))
+        candidates = range(max(1, raw - 3), raw + 4)
+        valid = [value for value in candidates if not even or value % 2 == 0]
+        return min(
+            valid,
+            key=lambda value: (abs(value * step + offset - target), value),
+        )
+
+    if orientation == "point_top":
+        horizontal_intervals = nearest_count(target_width_in, pitch)
+        vertical_intervals = nearest_count(
+            target_height_in, stagger_step, offset=-radius, even=True,
+        )
+        width = horizontal_intervals * pitch
+        height = vertical_intervals * stagger_step - radius
+        columns = horizontal_intervals + 1
+        rows = vertical_intervals + 1
+        world_left = pitch / 2.0
+        world_top = radius / 2.0
+
+        def center(row: int, column: int) -> Point:
+            return (
+                column * pitch + (pitch / 2.0 if row % 2 else 0.0) - world_left,
+                row * stagger_step - world_top,
+            )
+
+        start_deg = 30.0
+    else:
+        horizontal_intervals = nearest_count(
+            target_width_in, stagger_step, offset=-radius, even=True,
+        )
+        vertical_intervals = nearest_count(target_height_in, pitch)
+        width = horizontal_intervals * stagger_step - radius
+        height = vertical_intervals * pitch
+        columns = horizontal_intervals + 1
+        rows = vertical_intervals + 1
+        world_left = radius / 2.0
+        world_top = pitch / 2.0
+
+        def center(row: int, column: int) -> Point:
+            return (
+                column * stagger_step - world_left,
+                row * pitch + (pitch / 2.0 if column % 2 else 0.0) - world_top,
+            )
+
+        start_deg = 0.0
+
+    panel = Rect(0.0, 0.0, width, height)
+    placements = []
+
+    def clean_polygon(points: tuple[Point, ...]) -> tuple[Point, ...]:
+        cleaned = []
+        for point in points:
+            normalized = (
+                0.0 if abs(point[0]) <= 1e-10 else width if abs(point[0] - width) <= 1e-10 else point[0],
+                0.0 if abs(point[1]) <= 1e-10 else height if abs(point[1] - height) <= 1e-10 else point[1],
+            )
+            if not cleaned or hypot(
+                normalized[0] - cleaned[-1][0],
+                normalized[1] - cleaned[-1][1],
+            ) > 1e-10:
+                cleaned.append(normalized)
+        if len(cleaned) > 1 and hypot(
+            cleaned[0][0] - cleaned[-1][0],
+            cleaned[0][1] - cleaned[-1][1],
+        ) <= 1e-10:
+            cleaned.pop()
+        return tuple(cleaned)
+
+    for row in range(rows):
+        for column in range(columns):
+            cx, cy = center(row, column)
+            full = _polygon(cx, cy, radius, start_deg)
+            clipped = clean_polygon(clip_polygon_to_rect(full, panel))
+            piece_type, fraction = _piece_type(full, clipped)
+            if piece_type not in {"full", "outside"}:
+                for point in clipped:
+                    if not any(
+                        abs(point[0] - vertex[0]) <= 1e-8
+                        and abs(point[1] - vertex[1]) <= 1e-8
+                        for vertex in full
+                    ):
+                        raise RuntimeError(
+                            "Vertex-constrained panel produced a non-vertex cut."
+                        )
+            placements.append(TilePlacement(
+                row=row,
+                column=column,
+                center_x_in=cx,
+                center_y_in=cy,
+                full_vertices_in=full,
+                vertices_in=clipped,
+                piece_type=piece_type,
+                piece_fraction=fraction,
+            ))
+    return GridGeometry(
+        shape="hex",
+        orientation=orientation,
+        columns=columns,
+        rows=rows,
+        width_in=width,
+        height_in=height,
+        placements=tuple(placements),
+        panel_bounds=panel,
+        artwork_bounds=_artwork_bounds(width, height, config.artwork_inset_in),
     )
 
 

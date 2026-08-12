@@ -289,7 +289,8 @@ def test_frontend_uses_vector_pointer_interaction_and_four_corner_handles():
     assert '"top", "right", "bottom", "left"' in script
     assert 'preserveAspectRatio", "none"' in script
     assert "data-corner" not in script
-    assert "rotation" not in script.lower()
+    artwork_interaction = script[script.index("function renderArtwork("):]
+    assert "artwork-rotation" not in artwork_interaction.lower()
     assert '"/api/designer/artwork/transform"' in script
     assert 'byId("artwork-replace")' not in script
     assert "clientX" in script and "matrixTransform" in script
@@ -436,4 +437,4 @@ def test_direct_transform_model_is_viewport_independent():
     )
     assert moved.transform.width_in == before.width_in
     assert moved.transform.height_in == before.height_in
-    assert shell.geometry.width_in == 48.0
+    assert abs(shell.geometry.width_in - 48.0) < 1.0
