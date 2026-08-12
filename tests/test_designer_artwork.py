@@ -328,6 +328,39 @@ def test_side_resize_math_has_independent_axes_anchors_and_minimums():
     assert "sideResizedArtworkTransform" in interaction
 
 
+def test_artwork_interaction_precedes_paint_without_disabling_paint_state():
+    app = MosaicDesignerApp()
+    _, script = _asset_request(app, "/designer.js")
+    _, css = _asset_request(app, "/designer.css")
+    artwork_start = script.index("function beginArtworkInteraction")
+    artwork_end = script.index("function moveArtworkInteraction", artwork_start)
+    artwork_route = script[artwork_start:artwork_end]
+    paint_start = script.index("function beginPaintStroke")
+    paint_end = script.index("function movePaintStroke", paint_start)
+    paint_route = script[paint_start:paint_end]
+    assert "paintTool !== null" not in artwork_route
+    assert 'const handle = event.target.closest?.(".artwork-handle-target")' in artwork_route
+    assert 'const object = event.target.closest?.(".artwork-object")' in artwork_route
+    assert '".artwork-handle-target, .artwork-selection-layer, .artwork-object"' in paint_route
+    assert "paint-active .artwork-object" not in css
+    assert "paint-active .artwork-handle-target" not in css
+
+
+def test_artwork_layers_render_above_partial_paint_aids():
+    app = MosaicDesignerApp()
+    _, script = _asset_request(app, "/designer.js")
+    render = script[
+        script.index("function renderWorkspace()"):
+        script.index("function renderWorkspaceStatus")
+    ]
+    assert render.index("svg.appendChild(partialAidLayer)") < render.index(
+        "renderArtwork(svg, project.artwork)"
+    )
+    assert render.index("renderArtwork(svg, project.artwork)") < render.index(
+        "renderArtworkSelection(svg, project.artwork)"
+    )
+
+
 def test_corner_resize_captures_current_gesture_aspect_ratio():
     app = MosaicDesignerApp()
     _, script = _asset_request(app, "/designer.js")

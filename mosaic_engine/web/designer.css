@@ -130,7 +130,7 @@ h1, h2, h3, p { margin-top: 0; }
 }
 .canvas-region { display: grid; grid-template-rows: minmax(0, 1fr); min-width: 0; min-height: 0; padding: clamp(1rem, 2vw, 1.75rem); overflow: hidden; }
 .canvas-viewport { display: grid; min-width: 0; min-height: 0; padding: clamp(1rem, 3vw, 2.5rem); overflow: auto; place-items: center; border: 1px solid #dddde1; border-radius: 1.1rem; background: #e8e8eb; }
-#mosaic-canvas { display: block; flex: none; max-width: none; max-height: none; background: #f7f6f2; filter: drop-shadow(0 12px 24px rgba(0, 0, 0, .12)); }
+#mosaic-canvas { display: block; flex: none; max-width: none; max-height: none; overflow: visible; background: #f7f6f2; filter: drop-shadow(0 12px 24px rgba(0, 0, 0, .12)); }
 .designer-tile { fill: #faf9f6; stroke: #a8a8ad; stroke-width: .65px; vector-effect: non-scaling-stroke; }
 .designer-tile.border-owned { stroke: #53545a; stroke-width: .8px; }
 .designer-tile.cut { stroke: #6e6e73; stroke-width: 1.15px; stroke-dasharray: 2px 1px; }
@@ -147,6 +147,12 @@ h1, h2, h3, p { margin-top: 0; }
 .artwork-handle-target[data-handle="left"], .artwork-handle-target[data-handle="right"] { cursor: ew-resize; }
 .artwork-handle-target[data-handle="top"], .artwork-handle-target[data-handle="bottom"] { cursor: ns-resize; }
 .protected-layer { pointer-events: none; }
+.partial-aid-layer { pointer-events: none; }
+.partial-parent-ghost { fill: none; stroke: #1778d4; stroke-width: 1px; stroke-dasharray: 3px 2px; opacity: 0; vector-effect: non-scaling-stroke; pointer-events: none; }
+.partial-parent-ghost.visible { opacity: 0; }
+#mosaic-canvas.paint-active .partial-parent-ghost.visible { opacity: .72; }
+.partial-parent-hit { fill: transparent; stroke: none; pointer-events: none; }
+.designer-tile.cut { pointer-events: all; }
 .inspector { min-height: 0; padding: 1.5rem; overflow: auto; border-left: 1px solid #dddde1; background: #fbfbfc; }
 .inspector-heading { margin-bottom: 1.5rem; }
 .inspector-heading h2 { margin-bottom: 0; font-size: 1.2rem; }
@@ -160,11 +166,10 @@ h1, h2, h3, p { margin-top: 0; }
 .paint-modes [aria-pressed="true"] { border-color: #68686e; background: #ededf0; }
 #mosaic-canvas.paint-active { cursor: crosshair; }
 #mosaic-canvas.paint-active .designer-tile.editable { pointer-events: all; }
+#mosaic-canvas.paint-active .protected-layer,
+#mosaic-canvas.paint-active .partial-aid-layer,
+#mosaic-canvas.paint-active .partial-parent-hit { pointer-events: all; }
 #mosaic-canvas.paint-active .designer-tile.editable:hover { stroke: #1778d4; stroke-width: 1.5px; }
-#mosaic-canvas.paint-active .artwork-object,
-#mosaic-canvas.paint-active .artwork-selection-layer,
-#mosaic-canvas.paint-active .artwork-handle,
-#mosaic-canvas.paint-active .artwork-handle-target { pointer-events: none; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .artwork-control { padding: 1rem .1rem 1.2rem; border-top: 1px solid #e4e4e7; }
 .artwork-control-heading { display: flex; align-items: center; justify-content: space-between; padding: 0 .8rem .75rem; }

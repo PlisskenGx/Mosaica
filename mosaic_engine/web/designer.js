@@ -9,6 +9,7 @@
   let paintTool = null;
   let activePaintColorId = null;
   let paintStroke = null;
+  let activePartialPreviewId = null;
   const byId = (id) => document.getElementById(id);
   const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
   const orientationLabel = (orientation) => (
@@ -199,6 +200,8 @@
     baseLayer.classList.add("base-tile-layer");
     const protectedLayer = document.createElementNS(SVG_NS, "g");
     protectedLayer.classList.add("protected-layer");
+    const partialAidLayer = document.createElementNS(SVG_NS, "g");
+    partialAidLayer.classList.add("partial-aid-layer");
     for (const tile of geometry.tiles) {
       const polygon = document.createElementNS(SVG_NS, "polygon");
       polygon.id = tile.id;
@@ -212,11 +215,24 @@
       polygon.setAttribute("points", tile.vertices_in.map((point) => point.join(",")).join(" "));
       polygon.setAttribute("aria-label", `${tile.piece_type} tile, row ${tile.row + 1}, column ${tile.column + 1}`);
       (tile.protected ? protectedLayer : baseLayer).appendChild(polygon);
+      if (tile.piece_type !== "full" && tile.full_vertices_in) {
+        const ghost = document.createElementNS(SVG_NS, "polygon");
+        ghost.classList.add("partial-parent-ghost");
+        ghost.dataset.tileId = tile.id;
+        ghost.setAttribute("points", tile.full_vertices_in.map((point) => point.join(",")).join(" "));
+        const hit = document.createElementNS(SVG_NS, "polygon");
+        hit.classList.add("partial-parent-hit", "editable");
+        hit.dataset.tileId = tile.id;
+        [hit.dataset.centerX, hit.dataset.centerY] = tile.parent_center_in;
+        hit.setAttribute("points", ghost.getAttribute("points"));
+        hit.setAttribute("aria-label", `Paint ${tile.piece_type} tile, row ${tile.row + 1}, column ${tile.column + 1}`);
+        polygon.setAttribute("tabindex", "0");
+        polygon.addEventListener("focus", () => showPartialPreview(tile.id));
+        polygon.addEventListener("blur", hidePartialPreview);
+        partialAidLayer.append(ghost, hit);
+      }
     }
     svg.appendChild(baseLayer);
-    if (project.artwork?.edit_mode || !project.generated_artwork) {
-      renderArtwork(svg, project.artwork);
-    }
     svg.appendChild(protectedLayer);
     const boundary = document.createElementNS(SVG_NS, "rect");
     boundary.classList.add("panel-boundary");
@@ -225,7 +241,13 @@
     boundary.setAttribute("width", geometry.width_in);
     boundary.setAttribute("height", geometry.height_in);
     svg.appendChild(boundary);
+    // Interaction aids intentionally sit above tiles and the panel
+    // boundary, and may render beyond the physical panel viewport. Source
+    // artwork and its controls are appended afterward so they retain input
+    // priority wherever the layers overlap.
+    svg.appendChild(partialAidLayer);
     if (project.artwork?.edit_mode || !project.generated_artwork) {
+      renderArtwork(svg, project.artwork);
       renderArtworkSelection(svg, project.artwork);
     }
 
@@ -261,9 +283,6 @@
     const artwork = state.project.artwork;
     if (!(artwork?.edit_mode || !state.project.generated_artwork)) return;
     renderArtwork(svg, artwork);
-    const object = svg.querySelector(".artwork-object");
-    const protectedLayer = svg.querySelector(".protected-layer");
-    if (object && protectedLayer) svg.insertBefore(object, protectedLayer);
     renderArtworkSelection(svg, artwork);
   }
 
@@ -466,7 +485,7 @@
       container.appendChild(button);
     }
     byId("border-lock-state").textContent = (
-      `${state.project.border.counts.protected.toLocaleString()} tiles locked`
+      `${state.project.border.counts.border_owned.toLocaleString()} border pieces`
     );
   }
 
@@ -742,7 +761,7 @@
   }
 
   function beginArtworkInteraction(event) {
-    if (paintTool !== null || !state?.project?.artwork || event.button > 0) return;
+    if (!state?.project?.artwork || event.button > 0) return;
     const handle = event.target.closest?.(".artwork-handle-target");
     const object = event.target.closest?.(".artwork-object");
     if (!handle && !object) {
@@ -858,12 +877,78 @@
     );
   }
 
+  function resolvePartialTarget(event, initialTarget = null) {
+    let target = initialTarget || event.target.closest?.(
+      ".designer-tile.editable, .partial-parent-hit.editable",
+    );
+    if (target?.classList.contains("partial-parent-hit") && event.clientX !== undefined) {
+      const svg = byId("mosaic-canvas");
+      const point = svg.createSVGPoint();
+      point.x = event.clientX;
+      point.y = event.clientY;
+      const physical = point.matrixTransform(svg.getScreenCTM().inverse());
+      const actual = document.elementsFromPoint(event.clientX, event.clientY).find(
+        (element) => element.classList?.contains("designer-tile")
+          && element.classList.contains("cut"),
+      );
+      if (actual) {
+        target = actual;
+      } else {
+        const candidates = document.elementsFromPoint(event.clientX, event.clientY).filter(
+          (element) => element.classList?.contains("partial-parent-hit"),
+        );
+        target = candidates.sort((left, right) => {
+          const leftDistance = Math.hypot(
+            Number(left.dataset.centerX) - physical.x,
+            Number(left.dataset.centerY) - physical.y,
+          );
+          const rightDistance = Math.hypot(
+            Number(right.dataset.centerX) - physical.x,
+            Number(right.dataset.centerY) - physical.y,
+          );
+          return leftDistance - rightDistance
+            || left.dataset.tileId.localeCompare(right.dataset.tileId);
+        })[0] || target;
+      }
+    }
+    return target;
+  }
+
+  function showPartialPreview(tileId) {
+    if (paintTool === null || !tileId) return;
+    if (activePartialPreviewId === tileId) return;
+    hidePartialPreview();
+    document.querySelector(
+      `.partial-parent-ghost[data-tile-id="${tileId}"]`,
+    )?.classList.add("visible");
+    activePartialPreviewId = tileId;
+  }
+
+  function hidePartialPreview() {
+    if (!activePartialPreviewId) return;
+    document.querySelector(
+      `.partial-parent-ghost[data-tile-id="${activePartialPreviewId}"]`,
+    )?.classList.remove("visible");
+    activePartialPreviewId = null;
+  }
+
+  function updatePartialPreview(event) {
+    if (paintTool === null) return hidePartialPreview();
+    const target = resolvePartialTarget(event);
+    const tileId = target?.dataset.tileId || target?.id;
+    const stateTile = state.project.geometry.tiles.find((value) => value.id === tileId);
+    if (stateTile?.piece_type !== "full") showPartialPreview(tileId);
+    else hidePartialPreview();
+  }
+
   function paintTileFromEvent(event) {
-    const tile = event.target.closest?.(".designer-tile.editable");
-    if (!paintStroke || !tile || paintStroke.ids.has(tile.id)) return;
-    paintStroke.ids.add(tile.id);
-    const stateTile = state.project.geometry.tiles.find((value) => value.id === tile.id);
-    paintStroke.originalFills.set(tile.id, stateTile.display_color);
+    const target = resolvePartialTarget(event);
+    const tileId = target?.dataset.tileId || target?.id;
+    const tile = tileId ? byId(tileId) : null;
+    if (!paintStroke || !tile || paintStroke.ids.has(tileId)) return;
+    paintStroke.ids.add(tileId);
+    const stateTile = state.project.geometry.tiles.find((value) => value.id === tileId);
+    paintStroke.originalFills.set(tileId, stateTile.display_color);
     if (paintStroke.mode === "paint") {
       const color = state.project.color_system.design_colors.find(
         (value) => value.color_id === paintStroke.colorId,
@@ -876,7 +961,10 @@
 
   function beginPaintStroke(event) {
     if (paintTool === null || event.button > 0) return;
-    const tile = event.target.closest?.(".designer-tile.editable");
+    if (event.target.closest?.(
+      ".artwork-handle-target, .artwork-selection-layer, .artwork-object",
+    )) return;
+    const tile = event.target.closest?.(".designer-tile.editable, .partial-parent-hit.editable");
     if (!tile) return;
     event.preventDefault();
     paintStroke = {
@@ -1006,7 +1094,9 @@
   byId("mosaic-canvas").addEventListener("pointerdown", beginArtworkInteraction);
   byId("mosaic-canvas").addEventListener("pointerdown", beginPaintStroke);
   byId("mosaic-canvas").addEventListener("pointermove", moveArtworkInteraction);
+  byId("mosaic-canvas").addEventListener("pointermove", updatePartialPreview);
   byId("mosaic-canvas").addEventListener("pointermove", movePaintStroke);
+  byId("mosaic-canvas").addEventListener("pointerleave", hidePartialPreview);
   byId("mosaic-canvas").addEventListener("pointerup", finishArtworkInteraction);
   byId("mosaic-canvas").addEventListener("pointerup", finishPaintStroke);
   byId("mosaic-canvas").addEventListener("pointercancel", finishArtworkInteraction);

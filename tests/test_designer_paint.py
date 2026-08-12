@@ -36,7 +36,10 @@ def _app():
 
 
 def _full(payload):
-    return next(tile for tile in payload["project"]["geometry"]["tiles"] if tile["editable"])
+    return next(
+        tile for tile in payload["project"]["geometry"]["tiles"]
+        if tile["piece_type"] == "full" and tile["editable"]
+    )
 
 
 def _tile(payload, tile_id):
@@ -96,7 +99,7 @@ def test_restore_and_clear_reveal_lower_assignment_and_mark_dirty_only_on_change
     assert cleared["document"]["dirty"] is False
 
 
-def test_protected_or_unknown_tiles_make_batch_paint_atomic():
+def test_every_visible_piece_is_editable_but_unknown_batch_is_atomic():
     app = _app()
     _, initial = _request(app, "GET", "/api/designer")
     valid = _full(initial)["id"]
@@ -105,23 +108,26 @@ def test_protected_or_unknown_tiles_make_batch_paint_atomic():
         if tile["piece_type"] != "full"
     )
 
-    status, error = _request(app, "POST", "/api/designer/paint", {
+    status, painted = _request(app, "POST", "/api/designer/paint", {
         "placement_ids": [valid, protected], "mode": "paint",
         "color_id": "project-color-2",
     })
-    assert status == "400 Bad Request"
-    assert "editable full placements" in error["error"]
-    assert app.paint_overrides == {}
-    assert app.document_dirty is False
+    assert status == "200 OK"
+    assert app.paint_overrides == {
+        valid: "project-color-2", protected: "project-color-2",
+    }
+    assert painted["paint"]["override_count"] == 2
 
     status, _ = _request(app, "POST", "/api/designer/paint", {
         "placement_ids": [valid, "missing"], "mode": "restore",
     })
     assert status == "400 Bad Request"
-    assert app.paint_overrides == {}
+    assert app.paint_overrides == {
+        valid: "project-color-2", protected: "project-color-2",
+    }
 
 
-def test_border_precedence_masks_paint_then_none_reveals_it():
+def test_manual_paint_has_precedence_across_every_border_change():
     app = _app()
     _request(app, "POST", "/api/designer/border", {"preset_id": "solid"})
     _, solid = _request(app, "GET", "/api/designer")
@@ -136,15 +142,25 @@ def test_border_precedence_masks_paint_then_none_reveals_it():
     })
 
     _request(app, "POST", "/api/designer/border", {"preset_id": "solid"})
+    for preset in ("solid", "double", "alternating", "none"):
+        _request(app, "POST", "/api/designer/border", {"preset_id": preset})
+        _, masked = _request(app, "GET", "/api/designer")
+        tile = _tile(masked, border_tile["id"])
+        assert tile["manual_override"] == "project-color-3"
+        assert tile["color_id"] == "project-color-3"
+        assert tile["editable"] is True
+
+    _request(app, "POST", "/api/designer/border", {"preset_id": "solid"})
     _, masked = _request(app, "GET", "/api/designer")
     tile = _tile(masked, border_tile["id"])
     assert tile["manual_override"] == "project-color-3"
-    assert tile["color_id"] == "project-color-2"
-    assert tile["editable"] is False
+    assert tile["color_id"] == "project-color-3"
 
-    _request(app, "POST", "/api/designer/border", {"preset_id": "none"})
-    _, revealed = _request(app, "GET", "/api/designer")
-    assert _tile(revealed, border_tile["id"])["color_id"] == "project-color-3"
+    _request(app, "POST", "/api/designer/paint", {
+        "placement_ids": [border_tile["id"]], "mode": "restore",
+    })
+    _, restored = _request(app, "GET", "/api/designer")
+    assert _tile(restored, border_tile["id"])["color_id"] == "project-color-2"
 
 
 def test_artwork_removal_retains_paint_but_geometry_rebuild_clears_it():
@@ -162,6 +178,49 @@ def test_artwork_removal_retains_paint_but_geometry_rebuild_clears_it():
     assert app.paint_overrides == {tile_id: "project-color-2"}
 
     _request(app, "POST", "/api/designer/tile", {"tile_id": "l"})
+    assert app.paint_overrides == {}
+
+
+@pytest.mark.parametrize("orientation", ("flat_top", "point_top"))
+def test_half_and_triangle_perimeter_pieces_paint_erase_and_clear(orientation):
+    app = MosaicDesignerApp()
+    _request(app, "POST", "/api/designer/canvas", {"canvas_id": "square-s"})
+    _request(app, "POST", "/api/designer/tile", {
+        "tile_id": "m", "orientation": orientation,
+    })
+    _, initial = _request(app, "GET", "/api/designer")
+    partials = initial["project"]["geometry"]["tiles"]
+    half = next(tile for tile in partials if tile["piece_type"] == "half")
+    triangle = next(
+        tile for tile in partials
+        if tile["piece_type"] == "edge_cut"
+        and tile["piece_fraction"] == pytest.approx(1 / 6)
+    )
+    polygons = {tile["id"]: tile["vertices_in"] for tile in (half, triangle)}
+    assert all(tile["editable"] for tile in (half, triangle))
+    assert all(tile["full_vertices_in"] for tile in (half, triangle))
+
+    status, _ = _request(app, "POST", "/api/designer/paint", {
+        "placement_ids": [half["id"], triangle["id"]],
+        "mode": "paint", "color_id": "project-color-2",
+    })
+    assert status == "200 OK"
+    _, painted = _request(app, "GET", "/api/designer")
+    for original in (half, triangle):
+        current = _tile(painted, original["id"])
+        assert current["color_id"] == "project-color-2"
+        assert current["vertices_in"] == polygons[original["id"]]
+    assert sum(value["count"] for value in painted["project"]["color_counts"]) == (
+        painted["project"]["geometry"]["visible_piece_count"]
+    )
+
+    _request(app, "POST", "/api/designer/paint", {
+        "placement_ids": [half["id"]], "mode": "restore",
+    })
+    _, erased = _request(app, "GET", "/api/designer")
+    assert _tile(erased, half["id"])["manual_override"] is None
+    assert _tile(erased, triangle["id"])["manual_override"] == "project-color-2"
+    _request(app, "POST", "/api/designer/paint/clear", {})
     assert app.paint_overrides == {}
 
 
@@ -211,5 +270,29 @@ def test_paint_ui_uses_one_stroke_batch_with_rollback_and_no_geometry_math():
     assert 'new Set()' in script
     assert '"/api/designer/paint"' in script
     assert "originalFills" in script
+    assert "partial-parent-ghost" in script
+    assert "partial-parent-hit" in script
+    assert "full_vertices_in" in script
+    assert "elementsFromPoint" in script
+    assert "localeCompare" in script
+    assert "resolvePartialTarget" in script
+    assert "updatePartialPreview" in script
+    assert "showPartialPreview" in script
+    assert "hidePartialPreview" in script
+    assert 'addEventListener("pointerleave", hidePartialPreview)' in script
     assert "pointerup" in script
     assert "hex_geometry" not in script
+
+
+def test_parent_preview_is_topmost_unclipped_and_paint_gated():
+    app = MosaicDesignerApp()
+    _, script = _request(app, "GET", "/designer.js")
+    _, stylesheet = _request(app, "GET", "/designer.css")
+    assert script.index("svg.appendChild(boundary)") < script.index(
+        "svg.appendChild(partialAidLayer)"
+    )
+    assert "overflow: visible" in stylesheet
+    assert ".partial-parent-ghost { fill: none" in stylesheet
+    assert "#mosaic-canvas.paint-active .partial-parent-ghost.visible" in stylesheet
+    assert "if (paintTool === null || !tileId) return" in script
+    assert "if (paintTool === null) return hidePartialPreview()" in script

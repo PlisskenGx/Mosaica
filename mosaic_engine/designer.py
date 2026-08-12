@@ -228,7 +228,7 @@ class DesignerProjectShell:
         effective_color_ids = {
             tile_id: (
                 paint_overrides[tile_id]
-                if tile_id in paint_overrides and tile_id in available
+                if tile_id in paint_overrides
                 else lower_color_ids[tile_id]
             )
             for tile_id in effective_roles
@@ -289,6 +289,14 @@ class DesignerProjectShell:
                         "piece_type": placement.piece_type,
                         "piece_fraction": placement.piece_fraction,
                         "vertices_in": [list(point) for point in placement.vertices_in],
+                        "full_vertices_in": (
+                            [list(point) for point in placement.full_vertices_in]
+                            if placement.piece_type != "full" else None
+                        ),
+                        "parent_center_in": (
+                            [placement.center_x_in, placement.center_y_in]
+                            if placement.piece_type != "full" else None
+                        ),
                         "border_owned": f"placement-{index:06d}" in assignments,
                         "protected": f"placement-{index:06d}" in assignments,
                         "artwork_available": f"placement-{index:06d}" in available,
@@ -316,10 +324,7 @@ class DesignerProjectShell:
                         "manual_override": paint_overrides.get(
                             f"placement-{index:06d}"
                         ),
-                        "editable": (
-                            placement.piece_type == "full"
-                            and f"placement-{index:06d}" in available
-                        ),
+                        "editable": True,
                     }
                     for index, placement in enumerate(self.geometry.placements)
                     if placement.piece_type != "outside"
@@ -425,11 +430,15 @@ class MosaicDesignerApp:
                 border = build_border_layer(
                     project.geometry, project.border_preset_id,
                 )
-                editable = set(border.available_artwork_placement_ids)
-                invalid = [value for value in unique_ids if value not in editable]
+                visible = {
+                    f"placement-{index:06d}"
+                    for index, placement in enumerate(project.geometry.placements)
+                    if placement.piece_type != "outside"
+                }
+                invalid = [value for value in unique_ids if value not in visible]
                 if invalid:
                     raise ValueError(
-                        "Paint tiles must be editable full placements: "
+                        "Paint tiles must be visible physical placements: "
                         + ", ".join(invalid)
                     )
                 color_id = body.get("color_id")
