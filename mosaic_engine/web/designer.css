@@ -130,9 +130,13 @@ h1, h2, h3, p { margin-top: 0; }
 .artwork-hit { fill: transparent; pointer-events: all; }
 .artwork-selection { fill: none; stroke: #1778d4; stroke-width: 1.5px; stroke-dasharray: 4px 3px; vector-effect: non-scaling-stroke; pointer-events: none; }
 .artwork-handle { fill: #fff; stroke: #1778d4; stroke-width: 2px; vector-effect: non-scaling-stroke; cursor: nwse-resize; touch-action: none; }
-.artwork-handle[data-corner="ne"], .artwork-handle[data-corner="sw"] { cursor: nesw-resize; }
+.artwork-handle[data-handle="ne"], .artwork-handle[data-handle="sw"] { cursor: nesw-resize; }
+.artwork-handle[data-handle="left"], .artwork-handle[data-handle="right"] { cursor: ew-resize; }
+.artwork-handle[data-handle="top"], .artwork-handle[data-handle="bottom"] { cursor: ns-resize; }
 .artwork-handle-target { fill: transparent; stroke: transparent; stroke-width: 18px; vector-effect: non-scaling-stroke; cursor: nwse-resize; touch-action: none; }
-.artwork-handle-target[data-corner="ne"], .artwork-handle-target[data-corner="sw"] { cursor: nesw-resize; }
+.artwork-handle-target[data-handle="ne"], .artwork-handle-target[data-handle="sw"] { cursor: nesw-resize; }
+.artwork-handle-target[data-handle="left"], .artwork-handle-target[data-handle="right"] { cursor: ew-resize; }
+.artwork-handle-target[data-handle="top"], .artwork-handle-target[data-handle="bottom"] { cursor: ns-resize; }
 .protected-layer { pointer-events: none; }
 .inspector { min-height: 0; padding: 1.5rem; overflow: auto; border-left: 1px solid #dddde1; background: #fbfbfc; }
 .inspector-heading { margin-bottom: 1.5rem; }

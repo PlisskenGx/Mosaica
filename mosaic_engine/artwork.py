@@ -228,8 +228,6 @@ def update_artwork_transform(
         raise ValueError(
             f"Artwork width and height must each be at least {MIN_ARTWORK_SIZE_IN:g} in."
         )
-    if abs(width_in / height_in - artwork.source_aspect_ratio) > 1e-6:
-        raise ValueError("Artwork scaling must preserve the source aspect ratio.")
     return replace(artwork, transform=ArtworkTransform(
         float(x_in), float(y_in), float(width_in), float(height_in),
     ))

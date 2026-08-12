@@ -420,6 +420,75 @@ def test_proportional_scaling_changes_generated_region_without_viewport_input():
     assert "viewport" not in app.artwork.transform.to_dict()
 
 
+def test_nonproportional_width_and_height_change_generated_coverage():
+    app = _app()
+    _upload(app, _svg(f'<circle cx="50" cy="50" r="45" fill="{BLUE}"/>'))
+    initial = app.artwork.transform
+    _, baseline = _generate(app)
+    baseline_tiles = {
+        (value["row"], value["column"])
+        for value in baseline["project"]["generated_artwork"]["assignments"]
+    }
+
+    _request(app, "POST", "/api/designer/artwork/edit", {})
+    _request(app, "POST", "/api/designer/artwork/transform", {
+        "x_in": initial.x_in - initial.width_in / 2,
+        "y_in": initial.y_in,
+        "width_in": initial.width_in * 2,
+        "height_in": initial.height_in,
+    })
+    assert app.generated_artwork.stale is True
+    stale = app.payload()["project"]
+    assert any(value["generated_artwork"] for value in stale["geometry"]["tiles"])
+    _, horizontal = _generate(app)
+    horizontal_tiles = {
+        (value["row"], value["column"])
+        for value in horizontal["project"]["generated_artwork"]["assignments"]
+    }
+    assert len(horizontal_tiles) > len(baseline_tiles)
+    assert len({column for _, column in horizontal_tiles}) > len({column for _, column in baseline_tiles})
+
+    _request(app, "POST", "/api/designer/artwork/edit", {})
+    _request(app, "POST", "/api/designer/artwork/transform", {
+        "x_in": initial.x_in,
+        "y_in": initial.y_in - initial.height_in / 2,
+        "width_in": initial.width_in,
+        "height_in": initial.height_in * 2,
+    })
+    _, vertical = _generate(app)
+    vertical_tiles = {
+        (value["row"], value["column"])
+        for value in vertical["project"]["generated_artwork"]["assignments"]
+    }
+    assert len(vertical_tiles) > len(baseline_tiles)
+    assert len({row for row, _ in vertical_tiles}) > len({row for row, _ in baseline_tiles})
+
+
+def test_distorted_transform_compact_reconciliation_and_border_protection():
+    app = _app("double")
+    frontend = app.payload()
+    _, response = _upload(app, _svg(f'<rect width="100" height="100" fill="{BLUE}"/>'))
+    frontend = _apply_frontend_state(frontend, response)
+    distorted = {
+        "x_in": -4.25, "y_in": 2.75, "width_in": 31.5, "height_in": 7.125,
+    }
+    status, response = _request(
+        app, "POST", "/api/designer/artwork/transform", distorted,
+    )
+    assert status == "200 OK" and response["payload_kind"] == "artwork_state"
+    frontend = _apply_frontend_state(frontend, response)
+    assert frontend["project"]["artwork"]["transform"] == distorted
+    status, response = _generate_result(app)
+    frontend = _apply_frontend_state(frontend, response)
+    assert frontend["project"]["artwork"]["transform"] == distorted
+    protected = set(frontend["project"]["border"]["protected_placement_ids"])
+    assert all(
+        not tile["generated_artwork"]
+        for tile in frontend["project"]["geometry"]["tiles"]
+        if tile["id"] in protected
+    )
+
+
 def test_stale_state_edit_mode_border_filtering_and_atomic_regeneration():
     app = _app()
     _upload(app, _svg(

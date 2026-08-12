@@ -133,23 +133,42 @@ def test_artwork_api_uses_physical_state_and_artwork_only_transform_response():
     assert app.project.to_dict() == design_before
 
 
-def test_scale_is_proportional_can_exceed_canvas_and_rejects_invalid_sizes():
+def test_transform_can_resize_nonproportionally_and_rejects_invalid_sizes():
     app = _workspace()
     _, uploaded = _upload(app)
     current = uploaded["artwork"]["transform"]
-    oversized = {"x_in": -20.0, "y_in": -10.0, "width_in": 60.0, "height_in": 30.0}
+    oversized = {"x_in": -20.0, "y_in": -10.0, "width_in": 60.0, "height_in": 17.0}
     status, response = _request(
         app, "POST", "/api/designer/artwork/transform", oversized,
     )
     assert status == "200 OK"
     assert response["artwork"]["transform"] == oversized
 
-    for width, height in ((0, 0), (-1, -0.5), (5, 5)):
+    for width, height in ((0, 0), (-1, -.5), (.049, 5), (5, .049)):
         status, _ = _request(app, "POST", "/api/designer/artwork/transform", {
             **current, "width_in": width, "height_in": height,
         })
         assert status == "400 Bad Request"
     assert app.artwork.transform.width_in == 60.0
+    assert app.artwork.transform.height_in == 17.0
+
+
+def test_reset_restores_initial_proportional_fit_after_distortion():
+    app = _workspace()
+    _, uploaded = _upload(app)
+    initial = uploaded["artwork"]["transform"]
+    source = uploaded["artwork"]["sanitized_svg"]
+    status, resized = _request(app, "POST", "/api/designer/artwork/transform", {
+        **initial,
+        "width_in": initial["width_in"] * 1.8,
+        "height_in": initial["height_in"] * .7,
+    })
+    assert status == "200 OK"
+    assert resized["artwork"]["transform"]["width_in"] / resized["artwork"]["transform"]["height_in"] != pytest.approx(2)
+    _, reset = _request(app, "POST", "/api/designer/artwork/reset", {})
+    assert reset["artwork"]["transform"] == initial
+    assert reset["artwork"]["sanitized_svg"] == source
+    assert reset["artwork"]["transform"]["width_in"] / reset["artwork"]["transform"]["height_in"] == pytest.approx(2)
 
 
 def test_selection_changes_only_session_selection_state():
@@ -250,8 +269,10 @@ def test_frontend_uses_vector_pointer_interaction_and_four_corner_handles():
     app = MosaicDesignerApp()
     _, html = _asset_request(app, "/")
     assert 'accept=".svg,image/svg+xml"' in html
-    for action in ("Upload SVG", "Replace", "Remove", "Reset"):
+    for action in ("Upload SVG", "Remove", "Reset"):
         assert action in html
+    assert 'id="artwork-replace"' not in html
+    assert ">Replace<" not in html
     _, script = _asset_request(app, "/designer.js")
     assert "DOMParser" in script
     assert "artwork.sanitized_svg" in script
@@ -260,15 +281,128 @@ def test_frontend_uses_vector_pointer_interaction_and_four_corner_handles():
     assert 'addEventListener("pointerup"' in script
     assert "setPointerCapture" in script
     assert "scaledArtworkTransform" in script
+    assert "sideResizedArtworkTransform" in script
+    assert "artworkHandles" in script
     assert '["nw"' in script and '["ne"' in script and '["se"' in script and '["sw"' in script
+    for side in ("top", "right", "bottom", "left"):
+        assert f'["{side}"' in script
+    assert '"top", "right", "bottom", "left"' in script
+    assert 'preserveAspectRatio", "none"' in script
+    assert "data-corner" not in script
     assert "rotation" not in script.lower()
     assert '"/api/designer/artwork/transform"' in script
-    assert '"/api/designer/artwork/replace"' in script
+    assert 'byId("artwork-replace")' not in script
     assert "clientX" in script and "matrixTransform" in script
     _, css = _asset_request(app, "/designer.css")
     assert ".artwork-selection" in css
     assert ".artwork-handle-target" in css
+    assert 'data-handle="left"' in css and "ew-resize" in css
+    assert 'data-handle="top"' in css and "ns-resize" in css
     assert "touch-action: none" in css
+
+
+def test_side_resize_math_has_independent_axes_anchors_and_minimums():
+    app = MosaicDesignerApp()
+    _, script = _asset_request(app, "/designer.js")
+    start = script.index("function sideResizedArtworkTransform")
+    end = script.index("async function finishArtworkInteraction", start)
+    resize = script[start:end]
+    assert 'side === "right"' in resize
+    assert "point.x - transform.x_in" in resize
+    assert 'side === "left"' in resize
+    assert "x_in: right - width" in resize
+    assert 'side === "bottom"' in resize
+    assert "point.y - transform.y_in" in resize
+    assert "y_in: bottom - height" in resize
+    assert "Math.max(minimum" in resize
+    assert "aspectRatio" not in resize
+    assert "width_in" in resize and "height_in" in resize
+
+    interaction = script[
+        script.index("function beginArtworkInteraction"):
+        script.index("function calculateFitSize")
+    ]
+    assert 'mode: handle ? handle.dataset.kind : "move"' in interaction
+    assert 'artworkInteraction.mode === "corner"' in interaction
+    assert "sideResizedArtworkTransform" in interaction
+
+
+def test_corner_resize_captures_current_gesture_aspect_ratio():
+    app = MosaicDesignerApp()
+    _, script = _asset_request(app, "/designer.js")
+    interaction = script[
+        script.index("function beginArtworkInteraction"):
+        script.index("function calculateFitSize")
+    ]
+    assert 'handle?.dataset.kind === "corner"' in interaction
+    assert "transform.width_in / transform.height_in" in interaction
+    assert "aspectRatio: handle?.dataset.kind" in interaction
+    assert "artworkInteraction.aspectRatio" in interaction
+    corner_move = interaction[
+        interaction.index('artworkInteraction.mode === "corner"'):
+        interaction.index("sideResizedArtworkTransform")
+    ]
+    assert "state.project.artwork.source_aspect_ratio" not in corner_move
+    assert "artworkInteraction.aspectRatio" in corner_move
+
+
+def test_corner_projection_preserves_custom_ratio_and_opposite_anchors():
+    # The frontend's deterministic projection is mirrored here to regression
+    # test all anchors with side-distorted gesture-start rectangles.
+    def scale(transform, corner, point, ratio):
+        right = transform["x_in"] + transform["width_in"]
+        bottom = transform["y_in"] + transform["height_in"]
+        anchors = {
+            "nw": (right, bottom, -1, -1),
+            "ne": (transform["x_in"], bottom, 1, -1),
+            "se": (transform["x_in"], transform["y_in"], 1, 1),
+            "sw": (right, transform["y_in"], -1, 1),
+        }
+        anchor_x, anchor_y, sx, sy = anchors[corner]
+        projected_width = (
+            sx * (point[0] - anchor_x)
+            + (sy / ratio) * (point[1] - anchor_y)
+        ) / (1 + 1 / ratio ** 2)
+        width = max(.05, projected_width)
+        height = width / ratio
+        return {
+            "x_in": anchor_x if sx > 0 else anchor_x - width,
+            "y_in": anchor_y if sy > 0 else anchor_y - height,
+            "width_in": width,
+            "height_in": height,
+        }
+
+    distorted = {"x_in": 2, "y_in": 3, "width_in": 12, "height_in": 4}
+    for corner, point, opposite in (
+        ("nw", (-4, 1), (14, 7)),
+        ("ne", (20, 1), (2, 7)),
+        ("se", (20, 9), (2, 3)),
+        ("sw", (-4, 9), (14, 3)),
+    ):
+        result = scale(distorted, corner, point, 3)
+        assert result["width_in"] / result["height_in"] == pytest.approx(3)
+        result_right = result["x_in"] + result["width_in"]
+        result_bottom = result["y_in"] + result["height_in"]
+        anchored = {
+            "nw": (result_right, result_bottom),
+            "ne": (result["x_in"], result_bottom),
+            "se": (result["x_in"], result["y_in"]),
+            "sw": (result_right, result["y_in"]),
+        }[corner]
+        assert anchored == pytest.approx(opposite)
+
+
+def test_successive_corner_gestures_preserve_each_current_ratio():
+    transforms = [
+        {"width_in": 12, "height_in": 4},  # horizontal side stretch: 3:1
+        {"width_in": 18, "height_in": 6},  # corner enlarge
+        {"width_in": 9, "height_in": 3},   # corner shrink
+        {"width_in": 9, "height_in": 9},   # vertical side stretch: 1:1
+        {"width_in": 15, "height_in": 15}, # next corner enlarge
+    ]
+    assert [value["width_in"] / value["height_in"] for value in transforms] == [
+        3, 3, 3, 1, 1,
+    ]
 
 
 def _asset_request(app, path):

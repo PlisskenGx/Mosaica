@@ -270,7 +270,7 @@
     imported.setAttribute("y", transform.y_in);
     imported.setAttribute("width", transform.width_in);
     imported.setAttribute("height", transform.height_in);
-    imported.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    imported.setAttribute("preserveAspectRatio", "none");
     const group = document.createElementNS(SVG_NS, "g");
     group.classList.add("artwork-object");
     group.setAttribute("aria-label", `${artwork.source_filename} artwork`);
@@ -291,17 +291,19 @@
     outline.classList.add("artwork-selection");
     setRectTransform(outline, transform);
     selection.appendChild(outline);
-    for (const [corner, x, y] of artworkCorners(transform)) {
+    for (const [name, x, y, kind] of artworkHandles(transform)) {
       const target = document.createElementNS(SVG_NS, "circle");
       target.classList.add("artwork-handle-target");
-      target.dataset.corner = corner;
+      target.dataset.handle = name;
+      target.dataset.kind = kind;
       target.setAttribute("cx", x);
       target.setAttribute("cy", y);
       target.setAttribute("r", ".16");
-      target.setAttribute("aria-label", `Scale artwork from ${corner} corner`);
+      target.setAttribute("aria-label", `Resize artwork from ${name} handle`);
       const visible = document.createElementNS(SVG_NS, "circle");
       visible.classList.add("artwork-handle");
-      visible.dataset.corner = corner;
+      visible.dataset.handle = name;
+      visible.dataset.kind = kind;
       visible.setAttribute("cx", x);
       visible.setAttribute("cy", y);
       visible.setAttribute("r", ".16");
@@ -317,6 +319,18 @@
       ["ne", transform.x_in + transform.width_in, transform.y_in],
       ["se", transform.x_in + transform.width_in, transform.y_in + transform.height_in],
       ["sw", transform.x_in, transform.y_in + transform.height_in],
+    ];
+  }
+
+  function artworkHandles(transform) {
+    const centerX = transform.x_in + transform.width_in / 2;
+    const centerY = transform.y_in + transform.height_in / 2;
+    return [
+      ...artworkCorners(transform).map(([name, x, y]) => [name, x, y, "corner"]),
+      ["top", centerX, transform.y_in, "side"],
+      ["right", transform.x_in + transform.width_in, centerY, "side"],
+      ["bottom", centerX, transform.y_in + transform.height_in, "side"],
+      ["left", transform.x_in, centerY, "side"],
     ];
   }
 
@@ -340,15 +354,15 @@
     const outline = svg.querySelector(".artwork-selection");
     if (hit) setRectTransform(hit, transform);
     if (outline) setRectTransform(outline, transform);
-    const corners = new Map(artworkCorners(transform).map((value) => [value[0], value]));
-    for (const name of ["nw", "ne", "se", "sw"]) {
-      const corner = corners.get(name);
-      const target = svg.querySelector(`.artwork-handle-target[data-corner="${name}"]`);
-      const visible = svg.querySelector(`.artwork-handle[data-corner="${name}"]`);
+    const handles = new Map(artworkHandles(transform).map((value) => [value[0], value]));
+    for (const name of ["nw", "ne", "se", "sw", "top", "right", "bottom", "left"]) {
+      const handlePosition = handles.get(name);
+      const target = svg.querySelector(`.artwork-handle-target[data-handle="${name}"]`);
+      const visible = svg.querySelector(`.artwork-handle[data-handle="${name}"]`);
       for (const handle of [target, visible]) {
         if (!handle) continue;
-        handle.setAttribute("cx", corner[1]);
-        handle.setAttribute("cy", corner[2]);
+        handle.setAttribute("cx", handlePosition[1]);
+        handle.setAttribute("cy", handlePosition[2]);
       }
     }
   }
@@ -671,8 +685,11 @@
     const transform = { ...state.project.artwork.transform };
     artworkInteraction = {
       pointerId: event.pointerId,
-      mode: handle ? "scale" : "move",
-      corner: handle?.dataset.corner,
+      mode: handle ? handle.dataset.kind : "move",
+      handle: handle?.dataset.handle,
+      aspectRatio: handle?.dataset.kind === "corner"
+        ? transform.width_in / transform.height_in
+        : null,
       start,
       transform,
       previewTransform: transform,
@@ -691,12 +708,18 @@
         x_in: artworkInteraction.transform.x_in + point.x - artworkInteraction.start.x,
         y_in: artworkInteraction.transform.y_in + point.y - artworkInteraction.start.y,
       };
-    } else {
+    } else if (artworkInteraction.mode === "corner") {
       transform = scaledArtworkTransform(
         artworkInteraction.transform,
-        artworkInteraction.corner,
+        artworkInteraction.handle,
         point,
-        state.project.artwork.source_aspect_ratio,
+        artworkInteraction.aspectRatio,
+      );
+    } else {
+      transform = sideResizedArtworkTransform(
+        artworkInteraction.transform,
+        artworkInteraction.handle,
+        point,
       );
     }
     artworkInteraction.previewTransform = transform;
@@ -726,6 +749,24 @@
       width_in: width,
       height_in: height,
     };
+  }
+
+  function sideResizedArtworkTransform(transform, side, point) {
+    const minimum = .05;
+    const right = transform.x_in + transform.width_in;
+    const bottom = transform.y_in + transform.height_in;
+    if (side === "right") {
+      return { ...transform, width_in: Math.max(minimum, point.x - transform.x_in) };
+    }
+    if (side === "left") {
+      const width = Math.max(minimum, right - point.x);
+      return { ...transform, x_in: right - width, width_in: width };
+    }
+    if (side === "bottom") {
+      return { ...transform, height_in: Math.max(minimum, point.y - transform.y_in) };
+    }
+    const height = Math.max(minimum, bottom - point.y);
+    return { ...transform, y_in: bottom - height, height_in: height };
   }
 
   async function finishArtworkInteraction(event) {
@@ -807,10 +848,6 @@
   });
   byId("artwork-upload").addEventListener("click", () => {
     artworkUploadPath = "/api/designer/artwork/upload";
-    byId("artwork-file").click();
-  });
-  byId("artwork-replace").addEventListener("click", () => {
-    artworkUploadPath = "/api/designer/artwork/replace";
     byId("artwork-file").click();
   });
   byId("artwork-file").addEventListener("change", (event) => uploadArtwork(event.target.files[0]));
