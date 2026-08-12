@@ -144,6 +144,20 @@ h1, h2, h3, p { margin-top: 0; }
 .unavailable-section { display: flex; align-items: center; justify-content: space-between; min-height: 3.25rem; padding: 0 .9rem; border-top: 1px solid #e4e4e7; color: #85858a; }
 .unavailable-section strong { color: #66666b; font-size: .9rem; }
 .unavailable-section span { font-size: .72rem; }
+.paint-control { padding: 1rem 0; border-top: 1px solid #e4e4e7; }
+.paint-control-heading { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+.paint-colors { display: flex; flex-wrap: wrap; gap: .45rem; margin: .8rem 0; }
+.paint-swatch { width: 2rem; height: 2rem; flex: none; border: 2px solid transparent; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .25); }
+.paint-swatch[aria-pressed="true"] { border-color: #1778d4; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #1778d4; }
+.paint-modes { display: flex; gap: .45rem; margin-bottom: .7rem; }
+.paint-modes [aria-pressed="true"] { border-color: #68686e; background: #ededf0; }
+#mosaic-canvas.paint-active { cursor: crosshair; }
+#mosaic-canvas.paint-active .designer-tile.editable { pointer-events: all; }
+#mosaic-canvas.paint-active .designer-tile.editable:hover { stroke: #1778d4; stroke-width: 1.5px; }
+#mosaic-canvas.paint-active .artwork-object,
+#mosaic-canvas.paint-active .artwork-selection-layer,
+#mosaic-canvas.paint-active .artwork-handle,
+#mosaic-canvas.paint-active .artwork-handle-target { pointer-events: none; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .artwork-control { padding: 1rem .1rem 1.2rem; border-top: 1px solid #e4e4e7; }
 .artwork-control-heading { display: flex; align-items: center; justify-content: space-between; padding: 0 .8rem .75rem; }

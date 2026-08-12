@@ -85,7 +85,20 @@
           <div id="border-presets" class="border-presets"></div>
         </section>
         <div class="unavailable-section"><strong>Colors</strong><span>Coming later</span></div>
-        <div class="unavailable-section"><strong>Paint / Edit</strong><span>Coming later</span></div>
+        <section class="paint-control" aria-labelledby="paint-heading">
+          <div class="paint-control-heading">
+            <strong id="paint-heading">Paint / Edit</strong>
+            <button id="paint-toggle" class="inspector-action" type="button" aria-pressed="false">Enter Paint</button>
+          </div>
+          <div id="paint-tools" hidden>
+            <div id="paint-colors" class="paint-colors" aria-label="Project paint colors"></div>
+            <div class="paint-modes" aria-label="Paint mode">
+              <button id="paint-mode-color" class="inspector-action" type="button" aria-pressed="true">Paint</button>
+              <button id="paint-mode-restore" class="inspector-action" type="button" aria-pressed="false">Restore</button>
+            </div>
+            <button id="paint-clear" class="inspector-action danger-text" type="button">Clear Paint Edits</button>
+          </div>
+        </section>
       </aside>
       <footer id="workspace-status" class="workspace-status" aria-label="Project physical status"></footer>
     </section>

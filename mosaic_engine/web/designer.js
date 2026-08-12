@@ -6,6 +6,10 @@
   let artworkUploadPath = "/api/designer/artwork/upload";
   let generationInFlight = false;
   let mutationQueue = Promise.resolve();
+  let paintModeActive = false;
+  let paintTool = "paint";
+  let activePaintColorId = null;
+  let paintStroke = null;
   const byId = (id) => document.getElementById(id);
   const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
 
@@ -174,7 +178,9 @@
       if (tile.piece_type !== "full") polygon.classList.add("cut");
       if (tile.border_owned) polygon.classList.add("border-owned");
       if (tile.artwork_available) polygon.classList.add("artwork-available");
+      if (tile.editable) polygon.classList.add("editable");
       polygon.style.fill = tile.display_color;
+      polygon.dataset.colorId = tile.color_id;
       polygon.setAttribute("points", tile.vertices_in.map((point) => point.join(",")).join(" "));
       polygon.setAttribute("aria-label", `${tile.piece_type} tile, row ${tile.row + 1}, column ${tile.column + 1}`);
       (tile.protected ? protectedLayer : baseLayer).appendChild(polygon);
@@ -244,6 +250,8 @@
       polygon.style.fill = tile.display_color;
       polygon.classList.toggle("border-owned", tile.border_owned);
       polygon.classList.toggle("artwork-available", tile.artwork_available);
+      polygon.classList.toggle("editable", tile.editable);
+      polygon.dataset.colorId = tile.color_id;
       (tile.protected ? protectedLayer : baseLayer).appendChild(polygon);
     }
   }
@@ -255,6 +263,7 @@
     renderWorkspaceStatus(state.project);
     renderBorderInspector();
     renderArtworkInspector();
+    renderPaintInspector();
     requestAnimationFrame(fitToWorkspace);
   }
 
@@ -444,6 +453,37 @@
     }
   }
 
+  function renderPaintInspector() {
+    if (!state.project) return;
+    const colors = state.project.color_system.design_colors;
+    if (!colors.some((color) => color.color_id === activePaintColorId)) {
+      activePaintColorId = colors[0]?.color_id || null;
+    }
+    byId("paint-toggle").textContent = paintModeActive ? "Done" : "Enter Paint";
+    byId("paint-toggle").setAttribute("aria-pressed", String(paintModeActive));
+    byId("paint-tools").hidden = !paintModeActive;
+    byId("mosaic-canvas").classList.toggle("paint-active", paintModeActive);
+    byId("paint-mode-color").setAttribute("aria-pressed", String(paintTool === "paint"));
+    byId("paint-mode-restore").setAttribute("aria-pressed", String(paintTool === "restore"));
+    byId("paint-clear").disabled = !state.project.paint?.override_count;
+    const palette = byId("paint-colors");
+    palette.replaceChildren();
+    for (const color of colors) {
+      const swatch = document.createElement("button");
+      swatch.type = "button";
+      swatch.className = "paint-swatch";
+      swatch.style.backgroundColor = color.display_color;
+      swatch.setAttribute("aria-label", `Paint with ${color.name}`);
+      swatch.setAttribute("aria-pressed", String(color.color_id === activePaintColorId));
+      swatch.addEventListener("click", () => {
+        activePaintColorId = color.color_id;
+        paintTool = "paint";
+        renderPaintInspector();
+      });
+      palette.appendChild(swatch);
+    }
+  }
+
   function validateDesignerState(payload, requireGenerated = false) {
     if (payload?.payload_kind === "artwork_state") {
       if (
@@ -466,6 +506,7 @@
         || !payload.color_system
         || !Array.isArray(payload.color_counts)
         || !Array.isArray(payload.tile_updates)
+        || !payload.paint
         || (requireGenerated && !payload.generated_artwork)
       ) {
         throw new Error("Mosaica returned incomplete design state.");
@@ -544,6 +585,7 @@
           border: payload.border,
           color_system: payload.color_system,
           color_counts: payload.color_counts,
+          paint: payload.paint,
           geometry: { ...state.project.geometry, tiles },
         },
       };
@@ -666,7 +708,7 @@
   }
 
   function beginArtworkInteraction(event) {
-    if (!state?.project?.artwork || event.button > 0) return;
+    if (paintModeActive || !state?.project?.artwork || event.button > 0) return;
     const handle = event.target.closest?.(".artwork-handle-target");
     const object = event.target.closest?.(".artwork-object");
     if (!handle && !object) {
@@ -782,6 +824,65 @@
     );
   }
 
+  function paintTileFromEvent(event) {
+    const tile = event.target.closest?.(".designer-tile.editable");
+    if (!paintStroke || !tile || paintStroke.ids.has(tile.id)) return;
+    paintStroke.ids.add(tile.id);
+    const stateTile = state.project.geometry.tiles.find((value) => value.id === tile.id);
+    paintStroke.originalFills.set(tile.id, stateTile.display_color);
+    if (paintStroke.mode === "paint") {
+      const color = state.project.color_system.design_colors.find(
+        (value) => value.color_id === paintStroke.colorId,
+      );
+      if (color) tile.style.fill = color.display_color;
+    } else {
+      tile.style.fill = stateTile.lower_display_color;
+    }
+  }
+
+  function beginPaintStroke(event) {
+    if (!paintModeActive || event.button > 0) return;
+    const tile = event.target.closest?.(".designer-tile.editable");
+    if (!tile) return;
+    event.preventDefault();
+    paintStroke = {
+      pointerId: event.pointerId,
+      ids: new Set(),
+      originalFills: new Map(),
+      mode: paintTool,
+      colorId: activePaintColorId,
+    };
+    byId("mosaic-canvas").setPointerCapture(event.pointerId);
+    paintTileFromEvent(event);
+  }
+
+  function movePaintStroke(event) {
+    if (!paintStroke || event.pointerId !== paintStroke.pointerId) return;
+    const element = document.elementFromPoint(event.clientX, event.clientY);
+    paintTileFromEvent({ target: element });
+  }
+
+  async function finishPaintStroke(event) {
+    if (!paintStroke || event.pointerId !== paintStroke.pointerId) return;
+    const svg = byId("mosaic-canvas");
+    if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
+    const stroke = paintStroke;
+    paintStroke = null;
+    if (!stroke.ids.size) return;
+    const response = await performDesignerMutation(
+      "/api/designer/paint",
+      {
+        mode: stroke.mode,
+        color_id: stroke.mode === "paint" ? stroke.colorId : null,
+        placement_ids: [...stroke.ids],
+      },
+      { name: stroke.mode === "paint" ? "Paint tiles" : "Restore tiles" },
+    );
+    if (!response) {
+      for (const [id, fill] of stroke.originalFills) byId(id).style.fill = fill;
+    }
+  }
+
   function calculateFitSize(
     viewportWidth, viewportHeight, canvasWidth, canvasHeight,
     horizontalPadding = 0, verticalPadding = horizontalPadding,
@@ -825,6 +926,7 @@
     renderWorkspace();
     renderBorderInspector();
     renderArtworkInspector();
+    renderPaintInspector();
     if (state.stage === "workspace" && !viewportObserver && "ResizeObserver" in window) {
       viewportObserver = new ResizeObserver(() => fitToWorkspace());
       viewportObserver.observe(byId("canvas-viewport"));
@@ -855,10 +957,33 @@
   byId("artwork-reset").addEventListener("click", () => artworkAction("/api/designer/artwork/reset", {}, "Reset artwork"));
   byId("artwork-generate").addEventListener("click", generateArtwork);
   byId("artwork-edit").addEventListener("click", () => artworkAction("/api/designer/artwork/edit", {}, "Edit artwork"));
+  byId("paint-toggle").addEventListener("click", () => {
+    paintModeActive = !paintModeActive;
+    renderPaintInspector();
+  });
+  byId("paint-mode-color").addEventListener("click", () => {
+    paintTool = "paint";
+    renderPaintInspector();
+  });
+  byId("paint-mode-restore").addEventListener("click", () => {
+    paintTool = "restore";
+    renderPaintInspector();
+  });
+  byId("paint-clear").addEventListener("click", async () => {
+    if (!state.project.paint?.override_count) return;
+    if (!window.confirm("Clear all manual paint edits?")) return;
+    await performDesignerMutation(
+      "/api/designer/paint/clear", {}, { name: "Clear Paint Edits" },
+    );
+  });
   byId("mosaic-canvas").addEventListener("pointerdown", beginArtworkInteraction);
+  byId("mosaic-canvas").addEventListener("pointerdown", beginPaintStroke);
   byId("mosaic-canvas").addEventListener("pointermove", moveArtworkInteraction);
+  byId("mosaic-canvas").addEventListener("pointermove", movePaintStroke);
   byId("mosaic-canvas").addEventListener("pointerup", finishArtworkInteraction);
+  byId("mosaic-canvas").addEventListener("pointerup", finishPaintStroke);
   byId("mosaic-canvas").addEventListener("pointercancel", finishArtworkInteraction);
+  byId("mosaic-canvas").addEventListener("pointercancel", finishPaintStroke);
   byId("mosaic-canvas").addEventListener("dragstart", (event) => event.preventDefault());
   window.addEventListener("resize", fitToWorkspace);
 

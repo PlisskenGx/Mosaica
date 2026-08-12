@@ -183,7 +183,9 @@ class DesignerProjectShell:
     def to_dict(
         self,
         generated_artwork: DesignerGeneratedArtwork | None = None,
+        paint_overrides: dict[str, str] | None = None,
     ) -> dict:
+        paint_overrides = paint_overrides or {}
         visible = tuple(
             value for value in self.geometry.placements
             if value.piece_type != "outside"
@@ -207,13 +209,21 @@ class DesignerProjectShell:
             value.tile_id: value
             for value in generated_artwork.assignments
         } if generated_artwork is not None else {}
-        effective_color_ids = {
+        lower_color_ids = {
             tile_id: (
                 generated_assignments[tile_id].color_id
                 if tile_id in generated_assignments and tile_id in available
                 else self.color_system.resolve(role).color_id
             )
             for tile_id, role in effective_roles.items()
+        }
+        effective_color_ids = {
+            tile_id: (
+                paint_overrides[tile_id]
+                if tile_id in paint_overrides and tile_id in available
+                else lower_color_ids[tile_id]
+            )
+            for tile_id in effective_roles
         }
         effective_resolution = self.color_system
         color_counts = effective_resolution.count_visible_color_ids(
@@ -229,6 +239,10 @@ class DesignerProjectShell:
             "grout_mm": self.grout_mm,
             "color_system": effective_resolution.to_dict(),
             "color_counts": [value.to_dict() for value in color_counts],
+            "paint": {
+                "overrides": dict(sorted(paint_overrides.items())),
+                "override_count": len(paint_overrides),
+            },
             "border": border.to_dict(),
             "generated_artwork": (
                 {
@@ -274,8 +288,24 @@ class DesignerProjectShell:
                                 f"placement-{index:06d}"
                             ]
                         ),
+                        "lower_color_id": lower_color_ids[
+                            f"placement-{index:06d}"
+                        ],
+                        "lower_display_color": next(
+                            color.display_color for color in effective_resolution.colors
+                            if color.color_id == lower_color_ids[
+                                f"placement-{index:06d}"
+                            ]
+                        ),
                         "generated_artwork": (
                             f"placement-{index:06d}" in generated_assignments
+                            and f"placement-{index:06d}" in available
+                        ),
+                        "manual_override": paint_overrides.get(
+                            f"placement-{index:06d}"
+                        ),
+                        "editable": (
+                            placement.piece_type == "full"
                             and f"placement-{index:06d}" in available
                         ),
                     }
@@ -302,6 +332,7 @@ class MosaicDesignerApp:
         self.project: DesignerProjectShell | None = None
         self.artwork: DesignerArtwork | None = None
         self.generated_artwork: DesignerGeneratedArtwork | None = None
+        self.paint_overrides: dict[str, str] = {}
         self.artwork_edit_mode = True
         self.document_title = "Untitled"
         self.document_dirty = False
@@ -329,6 +360,7 @@ class MosaicDesignerApp:
                 self.project = None
                 self.artwork = None
                 self.generated_artwork = None
+                self.paint_overrides = {}
                 self.document_dirty = False
                 return self._json(start_response, "200 OK", self.payload())
             if method == "POST" and path == "/api/designer/tile":
@@ -338,12 +370,15 @@ class MosaicDesignerApp:
                 self.project = DesignerProjectShell.create(self.canvas_id, tile_id)
                 self.artwork = None
                 self.generated_artwork = None
+                self.paint_overrides = {}
                 self.document_dirty = False
                 return self._json(start_response, "200 OK", self.payload())
             if method == "POST" and path == "/api/designer/border":
                 if self.project is None:
                     raise ValueError("Create a Designer project before selecting a border.")
-                previous_project = self.project.to_dict(self.generated_artwork)
+                previous_project = self.project.to_dict(
+                    self.generated_artwork, self.paint_overrides,
+                )
                 preset_id = self._request_json(environ).get("preset_id")
                 changed = preset_id != self.project.border_preset_id
                 self.project = self.project.with_border(preset_id)
@@ -356,12 +391,67 @@ class MosaicDesignerApp:
                     start_response, "200 OK",
                     self._design_state_payload(previous_project),
                 )
+            if method == "POST" and path == "/api/designer/paint":
+                project = self._require_project()
+                previous_project = project.to_dict(
+                    self.generated_artwork, self.paint_overrides,
+                )
+                body = self._request_json(environ)
+                placement_ids = body.get("placement_ids")
+                mode = body.get("mode", "paint")
+                if not isinstance(placement_ids, list) or not all(
+                    isinstance(value, str) for value in placement_ids
+                ):
+                    raise ValueError("Paint requires a list of placement IDs.")
+                if mode not in {"paint", "restore"}:
+                    raise ValueError("Paint mode must be paint or restore.")
+                unique_ids = tuple(dict.fromkeys(placement_ids))
+                border = build_border_layer(
+                    project.geometry, project.border_preset_id,
+                )
+                editable = set(border.available_artwork_placement_ids)
+                invalid = [value for value in unique_ids if value not in editable]
+                if invalid:
+                    raise ValueError(
+                        "Paint tiles must be editable full placements: "
+                        + ", ".join(invalid)
+                    )
+                color_id = body.get("color_id")
+                if mode == "paint":
+                    project.color_system.by_id(color_id)
+                updated = dict(self.paint_overrides)
+                if mode == "paint":
+                    updated.update({value: color_id for value in unique_ids})
+                else:
+                    for value in unique_ids:
+                        updated.pop(value, None)
+                changed = updated != self.paint_overrides
+                self.paint_overrides = updated
+                self.document_dirty = self.document_dirty or changed
+                return self._json(
+                    start_response, "200 OK",
+                    self._design_state_payload(previous_project),
+                )
+            if method == "POST" and path == "/api/designer/paint/clear":
+                project = self._require_project()
+                previous_project = project.to_dict(
+                    self.generated_artwork, self.paint_overrides,
+                )
+                changed = bool(self.paint_overrides)
+                self.paint_overrides = {}
+                self.document_dirty = self.document_dirty or changed
+                return self._json(
+                    start_response, "200 OK",
+                    self._design_state_payload(previous_project),
+                )
             if method == "POST" and path in {
                 "/api/designer/artwork/upload",
                 "/api/designer/artwork/replace",
             }:
                 project = self._require_project()
-                previous_project = project.to_dict(self.generated_artwork)
+                previous_project = project.to_dict(
+                    self.generated_artwork, self.paint_overrides,
+                )
                 had_generated = self.generated_artwork is not None
                 if path.endswith("/replace"):
                     self._require_artwork()
@@ -434,7 +524,7 @@ class MosaicDesignerApp:
             if method == "POST" and path == "/api/designer/artwork/remove":
                 self._require_artwork()
                 previous_project = self._require_project().to_dict(
-                    self.generated_artwork
+                    self.generated_artwork, self.paint_overrides,
                 )
                 self.artwork = None
                 self.generated_artwork = None
@@ -454,7 +544,9 @@ class MosaicDesignerApp:
             if method == "POST" and path == "/api/designer/artwork/generate":
                 project = self._require_project()
                 artwork = self._require_artwork()
-                previous_project = project.to_dict(self.generated_artwork)
+                previous_project = project.to_dict(
+                    self.generated_artwork, self.paint_overrides,
+                )
                 border = build_border_layer(
                     project.geometry, project.border_preset_id,
                 )
@@ -487,6 +579,7 @@ class MosaicDesignerApp:
                     self.project = None
                     self.artwork = None
                     self.generated_artwork = None
+                    self.paint_overrides = {}
                     self.artwork_edit_mode = True
                     self.document_dirty = False
                 else:
@@ -498,7 +591,7 @@ class MosaicDesignerApp:
 
     def payload(self) -> dict:
         project_payload = (
-            self.project.to_dict(self.generated_artwork)
+            self.project.to_dict(self.generated_artwork, self.paint_overrides)
             if self.project is not None else None
         )
         if project_payload is not None:
@@ -562,7 +655,9 @@ class MosaicDesignerApp:
     def _design_state_payload(self, previous_project: dict) -> dict:
         """Return changed visual state without immutable physical geometry."""
 
-        project = self._require_project().to_dict(self.generated_artwork)
+        project = self._require_project().to_dict(
+            self.generated_artwork, self.paint_overrides,
+        )
         previous_tiles = {
             value["id"]: value for value in previous_project["geometry"]["tiles"]
         }
@@ -574,6 +669,10 @@ class MosaicDesignerApp:
             "protected",
             "artwork_available",
             "generated_artwork",
+            "lower_color_id",
+            "lower_display_color",
+            "manual_override",
+            "editable",
         )
         tile_updates = []
         for tile in project["geometry"]["tiles"]:
@@ -602,6 +701,7 @@ class MosaicDesignerApp:
             "border": project["border"],
             "color_system": project["color_system"],
             "color_counts": project["color_counts"],
+            "paint": project["paint"],
             "tile_updates": tile_updates,
         }
 
