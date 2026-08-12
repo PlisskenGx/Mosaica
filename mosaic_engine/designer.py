@@ -3,9 +3,17 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from importlib.resources import files
 import json
+import logging
 from math import ceil, sqrt
+from socketserver import ThreadingMixIn
+from threading import RLock
 import webbrowser
-from wsgiref.simple_server import make_server
+from wsgiref.handlers import SimpleHandler
+from wsgiref.simple_server import (
+    WSGIRequestHandler,
+    WSGIServer,
+    make_server,
+)
 
 from .geometry import GridGeometry, build_panel_geometry
 from .model import MosaicConfig
@@ -14,7 +22,7 @@ from .border import (
     build_border_layer,
     border_preset,
 )
-from .designer_colors import DEFAULT_DESIGNER_COLORS
+from .designer_colors import DEFAULT_DESIGNER_COLORS, DesignerColorResolution
 from .artwork import (
     DesignerArtwork,
     create_artwork,
@@ -32,6 +40,12 @@ MM_PER_INCH = 25.4
 DESIGNER_GROUT_MM = 1.8
 P1S_BUILD_AREA_MM = 256.0
 CANVAS_PREVIEW_REM_PER_INCH = 0.10
+_TRANSPORT_LOG = logging.getLogger("mosaic_engine.designer.transport")
+if not _TRANSPORT_LOG.handlers:
+    _transport_handler = logging.StreamHandler()
+    _transport_handler.setFormatter(logging.Formatter("%(levelname)s %(message)s"))
+    _TRANSPORT_LOG.addHandler(_transport_handler)
+_TRANSPORT_LOG.setLevel(logging.INFO)
 
 
 def estimate_minimum_print_plates(
@@ -132,6 +146,7 @@ class DesignerProjectShell:
     tile: TilePreset
     grout_mm: float
     geometry: GridGeometry
+    color_system: DesignerColorResolution = DEFAULT_DESIGNER_COLORS
     border_preset_id: str = "none"
 
     @classmethod
@@ -160,6 +175,11 @@ class DesignerProjectShell:
         border_preset(preset_id)
         return replace(self, border_preset_id=preset_id)
 
+    def with_color_system(
+        self, color_system: DesignerColorResolution,
+    ) -> DesignerProjectShell:
+        return replace(self, color_system=color_system)
+
     def to_dict(
         self,
         generated_artwork: DesignerGeneratedArtwork | None = None,
@@ -187,39 +207,15 @@ class DesignerProjectShell:
             value.tile_id: value
             for value in generated_artwork.assignments
         } if generated_artwork is not None else {}
-        active_role_color_ids = {
-            DEFAULT_DESIGNER_COLORS.resolve(role).color_id
-            for role in set(effective_roles.values())
-        }
-        generated_replacements = {
-            value.color_id: value
-            for value in generated_artwork.physical_colors
-            if value != next(
-                base for base in DEFAULT_DESIGNER_COLORS.colors
-                if base.color_id == value.color_id
-            )
-        } if generated_artwork is not None else {}
-        generated_display_active = not any(
-            color_id in active_role_color_ids
-            for color_id in generated_replacements
-        )
-        if not generated_display_active:
-            generated_assignments = {}
         effective_color_ids = {
             tile_id: (
-                generated_assignments[tile_id].physical_color_id
+                generated_assignments[tile_id].color_id
                 if tile_id in generated_assignments and tile_id in available
-                else DEFAULT_DESIGNER_COLORS.resolve(role).color_id
+                else self.color_system.resolve(role).color_id
             )
             for tile_id, role in effective_roles.items()
         }
-        effective_resolution = (
-            DEFAULT_DESIGNER_COLORS.with_physical_colors(
-                generated_artwork.physical_colors
-            )
-            if generated_artwork is not None and generated_display_active
-            else DEFAULT_DESIGNER_COLORS
-        )
+        effective_resolution = self.color_system
         color_counts = effective_resolution.count_visible_color_ids(
             (
                 placement.piece_type,
@@ -237,7 +233,7 @@ class DesignerProjectShell:
             "generated_artwork": (
                 {
                     **generated_artwork.to_dict(),
-                    "display_active": generated_display_active,
+                    "display_active": True,
                 }
                 if generated_artwork is not None else None
             ),
@@ -301,6 +297,7 @@ class MosaicDesignerApp:
     """Product-facing preset flow backed by the physical geometry engine."""
 
     def __init__(self) -> None:
+        self._state_lock = RLock()
         self.canvas_id: str | None = None
         self.project: DesignerProjectShell | None = None
         self.artwork: DesignerArtwork | None = None
@@ -310,6 +307,13 @@ class MosaicDesignerApp:
         self.document_dirty = False
 
     def __call__(self, environ, start_response):
+        path = environ.get("PATH_INFO", "/")
+        if path.startswith("/api/designer"):
+            with self._state_lock:
+                return self._dispatch(environ, start_response)
+        return self._dispatch(environ, start_response)
+
+    def _dispatch(self, environ, start_response):
         method = environ.get("REQUEST_METHOD", "GET").upper()
         path = environ.get("PATH_INFO", "/")
         try:
@@ -462,7 +466,13 @@ class MosaicDesignerApp:
                 # validation/rendering failure is atomic.
                 generated = generate_designer_artwork(
                     artwork, project.geometry, border,
-                    DEFAULT_DESIGNER_COLORS, revision,
+                    project.color_system, revision,
+                )
+                self.project = project.with_color_system(
+                    DesignerColorResolution(
+                        generated.design_colors,
+                        dict(project.color_system.role_to_color_id),
+                    )
                 )
                 self.generated_artwork = generated
                 self.artwork = replace(artwork, selected=False)
@@ -634,6 +644,81 @@ class MosaicDesignerApp:
         return [body]
 
 
+class ThreadingWSGIServer(ThreadingMixIn, WSGIServer):
+    """Thread-per-request localhost server with bounded process lifetime."""
+
+    daemon_threads = True
+
+
+class DesignerServerHandler(SimpleHandler):
+    """WSGI handler that records whether the complete response was flushed."""
+
+    def cleanup_headers(self):
+        super().cleanup_headers()
+        # Connection is a hop-by-hop header and therefore must be added by
+        # the HTTP handler rather than the WSGI application.
+        self.headers["Connection"] = "close"
+
+    def finish_response(self):
+        completed = False
+        error = None
+        try:
+            if not self.result_is_file() or not self.sendfile():
+                for data in self.result:
+                    self.write(data)
+                self.finish_content()
+            self.stdout.flush()
+            completed = True
+        except Exception as exc:
+            error = exc
+            if hasattr(self.result, "close"):
+                self.result.close()
+            raise
+        finally:
+            headers = dict(self.headers.items()) if self.headers is not None else {}
+            _TRANSPORT_LOG.info(
+                "designer_response endpoint=%s status=%s bytes=%s "
+                "content_type=%s content_length=%s connection=%s "
+                "transfer_encoding=%s write_completed=%s error=%r",
+                self.environ.get("PATH_INFO") if self.environ else None,
+                self.status,
+                self.bytes_sent,
+                headers.get("Content-Type"),
+                headers.get("Content-Length"),
+                headers.get("Connection"),
+                headers.get("Transfer-Encoding"),
+                completed,
+                error,
+            )
+        if completed:
+            self.close()
+
+
+class DesignerRequestHandler(WSGIRequestHandler):
+    protocol_version = "HTTP/1.1"
+
+    def handle(self):
+        self.raw_requestline = self.rfile.readline(65537)
+        if len(self.raw_requestline) > 65536:
+            self.requestline = ""
+            self.request_version = ""
+            self.command = ""
+            self.send_error(414)
+            return
+        if not self.parse_request():
+            return
+        handler = DesignerServerHandler(
+            self.rfile,
+            self.wfile,
+            self.get_stderr(),
+            self.get_environ(),
+            multithread=True,
+        )
+        handler.http_version = "1.1"
+        handler.request_handler = self
+        handler.run(self.server.get_app())
+
+
 def run_designer(
     host: str = "127.0.0.1",
     port: int = 8765,
@@ -644,7 +729,13 @@ def run_designer(
     app = MosaicDesignerApp()
     url = f"http://127.0.0.1:{port}/"
     try:
-        server = make_server("127.0.0.1", port, app)
+        server = make_server(
+            "127.0.0.1",
+            port,
+            app,
+            server_class=ThreadingWSGIServer,
+            handler_class=DesignerRequestHandler,
+        )
     except OSError as exc:
         raise RuntimeError(
             f"Cannot start Mosaica on 127.0.0.1:{port}; "

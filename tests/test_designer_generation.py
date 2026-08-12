@@ -3,10 +3,12 @@ import json
 
 import pytest
 
+import mosaic_engine.designer as designer_module
 import mosaic_engine.designer_generation as generation_module
 from mosaic_engine.artwork import ArtworkTransform
 from mosaic_engine.border import build_border_layer
 from mosaic_engine.designer import MosaicDesignerApp
+from mosaic_engine.designer_colors import DEFAULT_DESIGNER_COLORS
 
 
 BLUE = "#0066CC"
@@ -45,6 +47,22 @@ def _app(border="none"):
 
 def _svg(body, view_box="0 0 100 100"):
     return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{view_box}">{body}</svg>'
+
+
+def _stripe_svg(count, width=100, reuse_semantic=False):
+    generated = [
+        f"#{index + 1:02X}{(index * 37 + 11) % 256:02X}{(index * 71 + 19) % 256:02X}"
+        for index in range(count)
+    ]
+    colors = (
+        ["#FAF9F6", "#34373D", "#A87655", *generated[:count - 3]]
+        if reuse_semantic and count >= 3 else generated
+    )
+    return _svg("".join(
+        f'<rect x="{index * width / count}" width="{width / count + .01}" '
+        f'height="100" fill="{color}"/>'
+        for index, color in enumerate(colors)
+    ), view_box=f"0 0 {width} 100")
 
 
 def _upload(app, svg):
@@ -115,7 +133,7 @@ def test_generation_honors_physical_transform_and_is_deterministic():
 
 def test_only_available_full_tiles_receive_generated_assignments():
     app = _app("double")
-    _upload(app, _svg(f'<rect width="100" height="100" fill="{BLUE}"/>'))
+    _upload(app, _svg('<rect width="100" height="100" fill="#A87655"/>'))
     _request(app, "POST", "/api/designer/artwork/transform", {
         "x_in": -20, "y_in": -20, "width_in": 64, "height_in": 64,
     })
@@ -145,16 +163,16 @@ def test_only_available_full_tiles_receive_generated_assignments():
     ('<rect width="34" height="100" fill="#faf9f6"/><rect x="34" width="33" height="100" fill="#0066cc"/><rect x="67" width="33" height="100" fill="#cc0000"/>', 3),
     ('<rect width="25" height="100" fill="#faf9f6"/><rect x="25" width="25" height="100" fill="#d8d6cf"/><rect x="50" width="25" height="100" fill="#34373d"/><rect x="75" width="25" height="100" fill="#a87655"/>', 4),
 ])
-def test_one_to_four_effective_colors_are_accepted_when_budget_allows(body, expected):
+def test_discrete_effective_colors_are_added_to_project_palette(body, expected):
     app = _app()
     _upload(app, _svg(body))
     status, payload = _generate(app)
     assert status == "200 OK"
     assert payload["project"]["generated_artwork"]["source_color_count"] == expected
-    assert len(payload["project"]["color_system"]["physical_colors"]) == 4
+    assert len(payload["project"]["color_system"]["design_colors"]) >= 3
 
 
-def test_more_than_four_effective_colors_is_rejected_atomically():
+def test_five_effective_colors_generate_without_manufacturing_limit():
     colors = ["#ff0000", "#00ff00", "#0000ff", "#ffff00", "#ff00ff"]
     stripes = "".join(
         f'<rect x="{index * 20}" width="20" height="100" fill="{color}"/>'
@@ -162,14 +180,131 @@ def test_more_than_four_effective_colors_is_rejected_atomically():
     )
     app = _app()
     _upload(app, _svg(stripes))
-    geometry = app.project.geometry
-    border = app.project.border_preset_id
     status, payload = _generate(app)
+    assert status == "200 OK"
+    assert payload["project"]["generated_artwork"]["source_color_count"] == 5
+    assert len(payload["project"]["color_system"]["design_colors"]) > 4
+    counts = payload["project"]["color_counts"]
+    assert len(counts) > 4
+    assert sum(value["count"] for value in counts) == (
+        payload["project"]["geometry"]["visible_piece_count"]
+    )
+
+
+def test_eight_color_artwork_generates_with_stable_project_ids():
+    app = _app("double")
+    _upload(app, _stripe_svg(8))
+    status, payload = _generate(app)
+    assert status == "200 OK"
+    generated = payload["project"]["generated_artwork"]
+    assert generated["source_color_count"] == 8
+    artwork_ids = {
+        value["color_id"] for value in generated["assignments"]
+    }
+    assert len(artwork_ids) == 8
+    assert all(value.startswith("project-color-") for value in artwork_ids)
+    assert len(payload["project"]["color_system"]["design_colors"]) == 11
+    assert sum(
+        value["count"] for value in payload["project"]["color_counts"]
+    ) == payload["project"]["geometry"]["visible_piece_count"]
+
+
+def test_32_color_safety_limit_is_not_a_manufacturing_limit():
+    new_colors = tuple(
+        (index + 1, (index * 37 + 11) % 256, (index * 71 + 19) % 256)
+        for index in range(30)
+    )
+    colors = ((250, 249, 246), (52, 55, 61), (168, 118, 85), *new_colors[:29])
+    mapping, resolution = generation_module._allocate_colors(
+        colors, DEFAULT_DESIGNER_COLORS,
+    )
+    assert len(mapping) == 32
+    assert len(resolution.colors) == 32
+    with pytest.raises(ValueError, match="more than 32 distinct colors"):
+        generation_module._allocate_colors(
+            (*colors, new_colors[29]), DEFAULT_DESIGNER_COLORS,
+        )
+
+
+def test_project_color_ids_reuse_equivalents_and_append_on_regeneration():
+    app = _app()
+    _upload(app, _svg(
+        '<rect width="50" height="100" fill="#ff0000"/>'
+        '<rect x="50" width="50" height="100" fill="#0066cc"/>'
+    ))
+    _generate(app)
+    first_colors = app.project.color_system.colors
+    first_by_hex = {value.display_color: value.color_id for value in first_colors}
+
+    _request(app, "POST", "/api/designer/artwork/replace", {
+        "filename": "replacement.svg",
+        "svg_content": _svg(
+            '<rect width="50" height="100" fill="rgb(255, 0, 0)"/>'
+            '<rect x="50" width="50" height="100" fill="#00ff00"/>'
+        ),
+    })
+    _generate(app)
+    second = app.project.color_system
+    second_by_hex = {value.display_color: value.color_id for value in second.colors}
+    assert second_by_hex["#FF0000"] == first_by_hex["#FF0000"]
+    assert second_by_hex["#0066CC"] == first_by_hex["#0066CC"]
+    assert second_by_hex["#00FF00"] == f"project-color-{len(first_colors) + 1}"
+    assert [value.color_id for value in second.colors[:len(first_colors)]] == [
+        value.color_id for value in first_colors
+    ]
+    counts = app.payload()["project"]["color_counts"]
+    assert first_by_hex["#0066CC"] not in {
+        value["color_id"] for value in counts
+    }
+
+
+def test_failed_regeneration_does_not_mutate_palette_or_previous_result(
+    monkeypatch,
+):
+    app = _app()
+    _upload(app, _svg(f'<rect width="100" height="100" fill="{BLUE}"/>'))
+    _generate(app)
+    previous_palette = app.project.color_system
+    previous_generated = app.generated_artwork
+    _request(app, "POST", "/api/designer/artwork/edit", {})
+    transform = app.artwork.transform
+    _request(app, "POST", "/api/designer/artwork/transform", {
+        **transform.to_dict(), "x_in": transform.x_in + 1,
+    })
+    stale_generated = app.generated_artwork
+
+    def fail_generation(*args, **kwargs):
+        raise ValueError("Synthetic deterministic generation failure.")
+
+    monkeypatch.setattr(designer_module, "generate_designer_artwork", fail_generation)
+    status, payload = _generate_result(app)
     assert status == "400 Bad Request"
-    assert "uses 5 colors" in payload["error"]
-    assert app.generated_artwork is None
-    assert app.project.geometry is geometry
-    assert app.project.border_preset_id == border
+    assert "Synthetic deterministic" in payload["error"]
+    assert app.project.color_system is previous_palette
+    assert app.generated_artwork is stale_generated
+    assert app.generated_artwork.assignments == previous_generated.assignments
+
+
+def test_source_color_without_generated_tiles_does_not_enter_palette():
+    app = _app("solid")
+    _upload(app, _svg(f'<rect width="100" height="100" fill="{BLUE}"/>'))
+    protected_id = app.payload()["project"]["border"][
+        "protected_placement_ids"
+    ][0]
+    protected = next(
+        value for index, value in enumerate(app.project.geometry.placements)
+        if f"placement-{index:06d}" == protected_id
+    )
+    x, y = protected.visible_centroid_in
+    _request(app, "POST", "/api/designer/artwork/transform", {
+        "x_in": x - .025, "y_in": y - .025,
+        "width_in": .05, "height_in": .05,
+    })
+    status, payload = _generate(app)
+    assert status == "200 OK"
+    assert payload["project"]["generated_artwork"]["assignment_count"] == 0
+    assert payload["project"]["generated_artwork"]["source_color_count"] == 0
+    assert len(payload["project"]["color_system"]["design_colors"]) == 3
 
 
 def test_transparency_and_equivalent_color_syntax_are_normalized():
@@ -196,28 +331,25 @@ def test_active_gradient_is_rejected_without_quantization():
     assert app.generated_artwork is None
 
 
-def test_shared_four_color_budget_reserves_border_and_never_creates_fifth():
+def test_alternating_border_and_multicolor_artwork_have_independent_ids():
     app = _app("alternating")
     _upload(app, _svg(
         '<rect width="50" height="100" fill="#0066cc"/>'
         '<rect x="50" width="50" height="100" fill="#cc0000"/>'
     ))
     status, payload = _generate(app)
-    assert status == "400 Bad Request"
-    assert "shared four-color limit" in payload["error"]
-    assert app.generated_artwork is None
-
-    app = _app("alternating")
-    _upload(app, _svg('<rect width="100" height="100" fill="#0066cc"/>'))
-    status, payload = _generate(app)
     assert status == "200 OK"
-    colors = payload["project"]["color_system"]["physical_colors"]
-    assert len(colors) == 4
+    colors = payload["project"]["color_system"]["design_colors"]
+    assert len(colors) == 5
     assert payload["project"]["color_system"]["role_to_color_id"] == {
-        "background": "color-1", "border_primary": "color-3",
-        "border_secondary": "color-4", "edge": "color-2",
+        "background": "project-color-1",
+        "border_primary": "project-color-2",
+        "border_secondary": "project-color-3",
+        "edge": "project-color-1",
     }
-    assert next(value for value in colors if value["color_id"] == "color-2")["display_color"] == BLUE
+    assert [value["display_color"] for value in colors[:3]] == [
+        "#FAF9F6", "#34373D", "#A87655",
+    ]
 
 
 def test_strongest_qualifying_source_color_wins_one_tile_deterministically():
@@ -317,11 +449,195 @@ def test_stale_state_edit_mode_border_filtering_and_atomic_regeneration():
         for tile in stale_payload["geometry"]["tiles"]
         if tile["id"] in protected
     )
-    status, error = _generate(app)
-    assert status == "400 Bad Request"
-    assert "shared four-color limit" in error["error"]
-    assert app.generated_artwork.assignments == original.assignments
-    assert app.generated_artwork.stale is True
+    status, regenerated = _generate(app)
+    assert status == "200 OK"
+    assert regenerated["project"]["generated_artwork"]["current"] is True
+    assert app.generated_artwork.assignments != original.assignments
+
+
+def _assert_effective_generated_precedence(app, stored_ids):
+    project = app.payload()["project"]
+    available = set(project["border"]["available_artwork_placement_ids"])
+    protected = set(project["border"]["protected_placement_ids"])
+    tiles = {value["id"]: value for value in project["geometry"]["tiles"]}
+    expected_visible = stored_ids & available
+    assert {
+        tile_id for tile_id, tile in tiles.items()
+        if tile["generated_artwork"]
+    } == expected_visible
+    assert all(not tiles[tile_id]["generated_artwork"] for tile_id in protected)
+    assert project["generated_artwork"]["exists"] is True
+    assert project["generated_artwork"]["current"] is False
+    assert project["generated_artwork"]["display_active"] is True
+    assert sum(value["count"] for value in project["color_counts"]) == (
+        project["geometry"]["visible_piece_count"]
+    )
+    expected_counts = {}
+    for tile in tiles.values():
+        expected_counts[tile["color_id"]] = (
+            expected_counts.get(tile["color_id"], 0) + 1
+        )
+    assert {
+        value["color_id"]: value["count"]
+        for value in project["color_counts"]
+    } == expected_counts
+    return project
+
+
+def test_generated_none_to_solid_stays_visible_beneath_new_border():
+    app = _app()
+    _upload(app, _svg(f'<rect width="100" height="100" fill="{BLUE}"/>'))
+    _request(app, "POST", "/api/designer/artwork/transform", {
+        "x_in": -20, "y_in": -20, "width_in": 64, "height_in": 64,
+    })
+    _generate(app)
+    stored_ids = {value.tile_id for value in app.generated_artwork.assignments}
+    status, response = _request(
+        app, "POST", "/api/designer/border", {"preset_id": "solid"},
+    )
+    assert status == "200 OK" and response["payload_kind"] == "design_state"
+    project = _assert_effective_generated_precedence(app, stored_ids)
+    protected = set(project["border"]["protected_placement_ids"])
+    assert stored_ids & protected
+    assert stored_ids & set(project["border"]["available_artwork_placement_ids"])
+
+
+def test_generated_solid_to_none_keeps_stored_assignments_only():
+    app = _app("solid")
+    _upload(app, _svg(f'<rect width="100" height="100" fill="{BLUE}"/>'))
+    _request(app, "POST", "/api/designer/artwork/transform", {
+        "x_in": -20, "y_in": -20, "width_in": 64, "height_in": 64,
+    })
+    _generate(app)
+    stored_ids = {value.tile_id for value in app.generated_artwork.assignments}
+    old_available = set(
+        app.payload()["project"]["border"]["available_artwork_placement_ids"]
+    )
+    _request(app, "POST", "/api/designer/border", {"preset_id": "none"})
+    project = _assert_effective_generated_precedence(app, stored_ids)
+    newly_available = (
+        set(project["border"]["available_artwork_placement_ids"])
+        - old_available
+    )
+    tiles = {value["id"]: value for value in project["geometry"]["tiles"]}
+    assert newly_available
+    assert all(
+        not tiles[tile_id]["generated_artwork"]
+        and tiles[tile_id]["color_role"] == "background"
+        for tile_id in newly_available
+    )
+
+
+def test_stale_generated_layer_survives_every_border_switch_and_regenerates():
+    app = _app()
+    _upload(app, _svg(f'<circle cx="50" cy="50" r="43" fill="{BLUE}"/>'))
+    _generate(app)
+    stored_ids = {value.tile_id for value in app.generated_artwork.assignments}
+    assert stored_ids
+    for preset in ("solid", "double", "alternating", "none"):
+        status, response = _request(
+            app, "POST", "/api/designer/border", {"preset_id": preset},
+        )
+        assert status == "200 OK"
+        assert response["generated_artwork"]["exists"] is True
+        project = _assert_effective_generated_precedence(app, stored_ids)
+        assert project["border"]["preset_id"] == preset
+
+    status, _ = _generate(app)
+    assert status == "200 OK"
+    regenerated = app.payload()["project"]["generated_artwork"]
+    assert regenerated["exists"] is True
+    assert regenerated["current"] is True
+    assert regenerated["revision"] == 2
+
+
+def test_none_has_only_clipped_edge_ownership_with_edge_near_artwork():
+    app = _app()
+    _upload(app, _svg(f'<rect width="100" height="100" fill="{BLUE}"/>'))
+    _request(app, "POST", "/api/designer/artwork/transform", {
+        "x_in": -20, "y_in": -20, "width_in": 64, "height_in": 64,
+    })
+    _generate(app)
+    generated_ids = {value.tile_id for value in app.generated_artwork.assignments}
+    project = app.payload()["project"]
+    tiles = project["geometry"]["tiles"]
+    clipped = [value for value in tiles if value["piece_type"] != "full"]
+    full = [value for value in tiles if value["piece_type"] == "full"]
+
+    assert clipped and full
+    assert all(
+        value["protected"]
+        and not value["artwork_available"]
+        and value["color_role"] == "edge"
+        and not value["generated_artwork"]
+        for value in clipped
+    )
+    assert all(
+        not value["border_owned"] and value["artwork_available"]
+        for value in full
+    )
+    assert generated_ids == {value["id"] for value in full}
+
+
+def test_semantic_color_identities_are_immutable_when_generating_under_solid():
+    app = _app("solid")
+    _upload(app, _svg(f'<rect width="100" height="100" fill="{BLUE}"/>'))
+    status, payload = _generate(app)
+    assert status == "200 OK"
+    colors = {
+        value["color_id"]: value
+        for value in payload["project"]["color_system"]["design_colors"]
+    }
+    assert colors["project-color-1"]["display_color"] == "#FAF9F6"
+    assert colors["project-color-2"]["display_color"] == "#34373D"
+    assert colors["project-color-3"]["display_color"] == "#A87655"
+    assert colors["project-color-4"]["display_color"] == BLUE
+    assert {
+        value.color_id for value in app.generated_artwork.assignments
+    } == {"project-color-4"}
+
+    _request(app, "POST", "/api/designer/border", {"preset_id": "none"})
+    none = app.payload()["project"]
+    clipped = [
+        value for value in none["geometry"]["tiles"]
+        if value["piece_type"] != "full"
+    ]
+    assert all(
+        value["color_role"] == "edge"
+        and value["color_id"] == "project-color-1"
+        and value["display_color"] == "#FAF9F6"
+        for value in clipped
+    )
+
+
+@pytest.mark.parametrize("transform", [
+    {"x_in": 7, "y_in": 7, "width_in": 10, "height_in": 10},
+    {"x_in": 0, "y_in": 0, "width_in": 12, "height_in": 12},
+    {"x_in": -6, "y_in": -6, "width_in": 36, "height_in": 36},
+])
+def test_none_edge_invariants_survive_repeated_border_switches(transform):
+    app = _app()
+    _upload(app, _svg(f'<rect width="100" height="100" fill="{BLUE}"/>'))
+    _request(app, "POST", "/api/designer/artwork/transform", transform)
+    _generate(app)
+    stored_ids = {value.tile_id for value in app.generated_artwork.assignments}
+
+    for preset in ("solid", "none", "double", "none", "alternating", "none"):
+        _request(app, "POST", "/api/designer/border", {"preset_id": preset})
+        if preset != "none":
+            continue
+        project = _assert_effective_generated_precedence(app, stored_ids)
+        tiles = project["geometry"]["tiles"]
+        assert all(
+            value["protected"]
+            and value["color_role"] == "edge"
+            and not value["generated_artwork"]
+            for value in tiles if value["piece_type"] != "full"
+        )
+        assert all(
+            not value["border_owned"] and value["artwork_available"]
+            for value in tiles if value["piece_type"] == "full"
+        )
 
 
 def test_reset_replace_and_remove_generation_state_transitions():
@@ -350,7 +666,7 @@ def test_generated_counts_are_backend_authoritative_and_reconcile():
     assert sum(value["count"] for value in project["color_counts"]) == (
         project["geometry"]["visible_piece_count"]
     )
-    generated_id = project["generated_artwork"]["assignments"][0]["physical_color_id"]
+    generated_id = project["generated_artwork"]["assignments"][0]["color_id"]
     generated_count = sum(
         tile["generated_artwork"] for tile in project["geometry"]["tiles"]
     )
@@ -607,6 +923,27 @@ def test_frontend_has_one_canonical_serialized_mutation_pipeline():
     assert "const proposedTransform = artworkInteraction.previewTransform" in script
 
 
+def test_frontend_distinguishes_transport_failures_and_recovers_once():
+    app = _app()
+    _, script = _asset(app, "/designer.js")
+    assert "DesignerResponseReadError" in script
+    assert "DesignerResponseParseError" in script
+    assert "response body read exception" in script
+    assert "headers received" in script
+    assert "isRecoverableSuccessfulResponse" in script
+    assert '"/api/designer", undefined' in script
+    assert "successful mutation response was unreadable; reconciling once" in script
+    assert "authoritative state recovered" in script
+    assert "authoritative recovery failed" in script
+    assert "could not recover the updated state" in script
+    recovery = script[
+        script.index("if (isRecoverableSuccessfulResponse(error))"):
+        script.index("if (state !== previousState)")
+    ]
+    assert '"/api/designer", undefined' in recovery
+    assert "request(path, body" not in recovery
+
+
 def test_compact_transform_response_avoids_retransmitting_physical_geometry():
     app = _app()
     _, upload = _upload(
@@ -629,17 +966,21 @@ def test_compact_transform_response_avoids_retransmitting_physical_geometry():
 def test_failed_generation_is_followed_by_successful_mutation_without_reload():
     app = _app("alternating")
     _upload(app, _svg(
-        '<rect width="50" height="100" fill="#0066cc"/>'
-        '<rect x="50" width="50" height="100" fill="#cc0000"/>'
+        '<defs><linearGradient id="g"><stop stop-color="red"/></linearGradient></defs>'
+        '<rect width="100" height="100" fill="url(#g)"/>'
     ))
     failed_status, failed = _generate_result(app)
     assert failed_status == "400 Bad Request"
-    assert "shared four-color limit" in failed["error"]
+    assert "Gradient" in failed["error"]
     status, recovered = _request(
         app, "POST", "/api/designer/border", {"preset_id": "none"},
     )
     assert status == "200 OK"
     assert recovered["border"]["preset_id"] == "none"
+    _request(app, "POST", "/api/designer/artwork/replace", {
+        "filename": "valid.svg",
+        "svg_content": _svg(f'<rect width="100" height="100" fill="{BLUE}"/>'),
+    })
     status, generated = _generate_result(app)
     assert status == "200 OK"
     assert generated["generated_artwork"]["current"] is True

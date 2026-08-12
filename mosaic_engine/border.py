@@ -9,7 +9,6 @@ from .processing import tile_neighbors
 
 
 Coordinate = tuple[int, int]
-MAX_PROJECT_COLORS = 4
 
 
 @dataclass(frozen=True)
@@ -50,10 +49,6 @@ PROJECT_COLOR_ROLES = {
     "border_primary": {"preview_hex": "#34373D"},
     "border_secondary": {"preview_hex": "#A87655"},
 }
-
-if len(PROJECT_COLOR_ROLES) > MAX_PROJECT_COLORS:
-    raise RuntimeError("Designer project color roles exceed the four-color limit.")
-
 
 @dataclass(frozen=True)
 class BorderAssignment:

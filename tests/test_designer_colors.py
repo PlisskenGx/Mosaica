@@ -6,6 +6,7 @@ import pytest
 from mosaic_engine.designer import DesignerProjectShell, MosaicDesignerApp
 from mosaic_engine.designer_colors import (
     DEFAULT_DESIGNER_COLORS,
+    DesignColor,
     DesignerColorResolution,
     PhysicalColor,
 )
@@ -50,16 +51,17 @@ def _payload(preset="none"):
     return DesignerProjectShell.create("square-s", "m").with_border(preset).to_dict()
 
 
-def test_semantic_roles_resolve_to_stable_physical_color_metadata():
+def test_semantic_roles_resolve_to_stable_design_color_metadata():
     resolution = _resolution()
     assert resolution.resolve("edge").color_id == "black"
     assert resolution.resolve("border_primary").color_id == "black"
     assert resolution.resolve("background").display_color == "#FAF9F6"
     payload = resolution.to_dict()
-    assert [value["color_id"] for value in payload["physical_colors"]] == [
+    assert [value["color_id"] for value in payload["design_colors"]] == [
         "ivory", "black", "tan",
     ]
-    assert [value["order"] for value in payload["physical_colors"]] == [0, 1, 2]
+    assert [value["order"] for value in payload["design_colors"]] == [0, 1, 2]
+    assert payload["manufacturing_mapping"] is None
 
 
 def test_two_semantic_roles_mapping_to_one_physical_color_merge():
@@ -71,6 +73,25 @@ def test_two_semantic_roles_mapping_to_one_physical_color_merge():
     assert [(value.color_id, value.count) for value in counts] == [
         ("ivory", 1), ("black", 2),
     ]
+
+
+def test_default_background_and_edge_share_one_project_color():
+    assert DEFAULT_DESIGNER_COLORS.resolve("background").color_id == (
+        DEFAULT_DESIGNER_COLORS.resolve("edge").color_id
+    )
+    assert DEFAULT_DESIGNER_COLORS.role_to_color_id["background"] != "background"
+
+
+def test_equivalent_colors_reuse_ids_and_new_colors_append():
+    updated = DEFAULT_DESIGNER_COLORS.with_artwork_colors((
+        (250, 249, 246),
+        (52, 55, 61),
+        (0, 102, 204),
+    ))
+    assert len(updated.colors) == 4
+    assert updated.color_id_for_rgb((250, 249, 246)) == "project-color-1"
+    assert updated.color_id_for_rgb((52, 55, 61)) == "project-color-2"
+    assert updated.color_id_for_rgb((0, 102, 204)) == "project-color-4"
 
 
 def test_three_roles_merge_and_outside_placements_are_excluded():
@@ -109,7 +130,7 @@ def test_every_border_state_counts_all_visible_full_and_clipped_pieces(preset):
     assert geometry["visible_piece_count"] == (
         geometry["full_tile_count"] + geometry["clipped_piece_count"]
     )
-    assert len(counts) <= payload["color_system"]["maximum_project_colors"] == 4
+    assert payload["color_system"]["design_color_safety_limit"] == 32
     assert [value["order"] for value in counts] == sorted(
         value["order"] for value in counts
     )
@@ -118,11 +139,11 @@ def test_every_border_state_counts_all_visible_full_and_clipped_pieces(preset):
 def test_none_counts_clipped_as_edge_and_full_as_background():
     payload = _payload("none")
     by_id = {value["color_id"]: value["count"] for value in payload["color_counts"]}
-    assert by_id[DEFAULT_DESIGNER_COLORS.resolve("edge").color_id] == (
-        payload["geometry"]["clipped_piece_count"]
+    assert DEFAULT_DESIGNER_COLORS.resolve("edge").color_id == (
+        DEFAULT_DESIGNER_COLORS.resolve("background").color_id
     )
-    assert by_id[DEFAULT_DESIGNER_COLORS.resolve("background").color_id] == (
-        payload["geometry"]["full_tile_count"]
+    assert by_id[DEFAULT_DESIGNER_COLORS.resolve("edge").color_id] == (
+        payload["geometry"]["visible_piece_count"]
     )
 
 
@@ -182,13 +203,18 @@ def test_switching_refreshes_counts_without_stale_values_and_keeps_order():
     assert payloads[0]["project"]["color_counts"] == payloads[-1]["color_counts"]
 
 
-def test_fifth_physical_color_is_rejected():
+def test_more_than_four_distinct_design_colors_are_supported():
     colors = tuple(
-        PhysicalColor(f"color-{index}", "#000000", f"Color {index}", index)
-        for index in range(5)
+        DesignColor(
+            f"project-color-{index + 1}", f"#{index:02X}0000",
+            f"Color {index}", index,
+        )
+        for index in range(8)
     )
-    with pytest.raises(ValueError, match="at most 4"):
-        DesignerColorResolution(colors, {"background": "color-0"})
+    resolution = DesignerColorResolution(
+        colors, {"background": "project-color-1"},
+    )
+    assert len(resolution.colors) == 8
 
 
 def test_api_and_status_ui_render_backend_counts_without_inference():
@@ -203,7 +229,7 @@ def test_api_and_status_ui_render_backend_counts_without_inference():
     assert "project.color_counts" in script
     assert "renderColorCounts" in script
     assert "physical-color-swatch" in script
-    assert "Visible pieces by physical color" in script
+    assert "Visible pieces by design color" in script
     assert "color.name" in script
     assert "color.count" in script
     assert "querySelectorAll" not in script
@@ -229,6 +255,8 @@ def test_api_and_status_ui_render_backend_counts_without_inference():
     assert ".physical-color-counts" in stylesheet
     assert ".physical-color-count" in stylesheet
     assert ".physical-color-swatch" in stylesheet
+    assert "flex-wrap: wrap" in stylesheet
+    assert "flex: 1 1 auto" in stylesheet
     assert ".workspace-status" in stylesheet
     assert ".status-group" in stylesheet
     assert "flex-wrap: wrap" in stylesheet

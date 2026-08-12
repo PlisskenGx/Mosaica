@@ -5,7 +5,6 @@ import pytest
 
 from mosaic_engine.border import (
     BORDER_PRESETS,
-    MAX_PROJECT_COLORS,
     PROJECT_COLOR_ROLES,
     build_border_layer,
     physical_perimeter_rings,
@@ -194,12 +193,10 @@ def test_representative_geometries_are_deterministic_and_exclude_outside(
         assert tuple(value.vertices_in for value in shell.geometry.placements) == polygons
 
 
-def test_border_roles_use_shared_four_color_project_budget():
-    assert MAX_PROJECT_COLORS == 4
+def test_border_roles_are_semantic_and_not_a_manufacturing_palette():
     assert set(PROJECT_COLOR_ROLES) == {
         "background", "edge", "border_primary", "border_secondary",
     }
-    assert len(PROJECT_COLOR_ROLES) <= MAX_PROJECT_COLORS
     assert all(not hasattr(value, "palette") for value in BORDER_PRESETS)
 
 

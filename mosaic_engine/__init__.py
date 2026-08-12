@@ -61,7 +61,6 @@ from .designer import (
 )
 from .border import (
     BORDER_PRESETS,
-    MAX_PROJECT_COLORS,
     PROJECT_COLOR_ROLES,
     BorderAssignment,
     BorderLayerState,
@@ -73,6 +72,10 @@ from .border import (
 )
 from .designer_colors import (
     DEFAULT_DESIGNER_COLORS,
+    MAX_ARTWORK_DESIGN_COLORS,
+    MAX_DESIGN_COLORS,
+    DesignColor,
+    DesignColorCount,
     DesignerColorResolution,
     PhysicalColor,
     PhysicalColorCount,
@@ -195,7 +198,6 @@ __all__ = [
     "TilePreset",
     "run_designer",
     "BORDER_PRESETS",
-    "MAX_PROJECT_COLORS",
     "PROJECT_COLOR_ROLES",
     "BorderAssignment",
     "BorderLayerState",
@@ -208,6 +210,10 @@ __all__ = [
     "DesignerColorResolution",
     "PhysicalColor",
     "PhysicalColorCount",
+    "DesignColor",
+    "DesignColorCount",
+    "MAX_ARTWORK_DESIGN_COLORS",
+    "MAX_DESIGN_COLORS",
     "ArtworkTransform",
     "DesignerArtwork",
     "available_artwork_bounds",

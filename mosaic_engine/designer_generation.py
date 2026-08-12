@@ -12,8 +12,8 @@ from xml.etree import ElementTree as ET
 from PIL import Image, ImageColor
 
 from .artwork import DesignerArtwork
-from .border import BorderLayerState, MAX_PROJECT_COLORS
-from .designer_colors import DesignerColorResolution, PhysicalColor
+from .border import BorderLayerState
+from .designer_colors import DesignColor, DesignerColorResolution
 from .engine import _point_in_polygon
 from .geometry import GridGeometry
 
@@ -31,8 +31,14 @@ class GeneratedArtworkAssignment:
     row: int
     column: int
     source_rgb: tuple[int, int, int]
-    physical_color_id: str
+    color_id: str
     coverage: float
+
+    @property
+    def physical_color_id(self) -> str:
+        """Compatibility alias for pre-v1.4.1 integrations."""
+
+        return self.color_id
 
     def to_dict(self) -> dict:
         value = asdict(self)
@@ -45,7 +51,7 @@ class DesignerGeneratedArtwork:
     revision: int
     assignments: tuple[GeneratedArtworkAssignment, ...]
     source_colors: tuple[tuple[int, int, int], ...]
-    physical_colors: tuple[PhysicalColor, ...]
+    design_colors: tuple[DesignColor, ...]
     source_signature: str
     border_preset_id: str
     coverage_threshold: float = DESIGNER_COVERAGE_THRESHOLD
@@ -55,12 +61,13 @@ class DesignerGeneratedArtwork:
 
     def to_dict(self) -> dict:
         return {
+            "exists": True,
             "revision": self.revision,
             "assignments": [value.to_dict() for value in self.assignments],
             "assignment_count": len(self.assignments),
             "source_colors": [list(value) for value in self.source_colors],
             "source_color_count": len(self.source_colors),
-            "physical_colors": [value.to_dict() for value in self.physical_colors],
+            "design_colors": [value.to_dict() for value in self.design_colors],
             "source_signature": self.source_signature,
             "border_preset_id": self.border_preset_id,
             "coverage_threshold": self.coverage_threshold,
@@ -69,6 +76,12 @@ class DesignerGeneratedArtwork:
             "needs_regeneration": self.stale,
             "stale_reason": self.stale_reason,
         }
+
+    @property
+    def physical_colors(self) -> tuple[DesignColor, ...]:
+        """Compatibility alias for pre-v1.4.1 integrations."""
+
+        return self.design_colors
 
 
 def mark_generated_stale(
@@ -222,48 +235,13 @@ def _effective_source_colors(
 
 def _allocate_colors(
     source_colors: tuple[tuple[int, int, int], ...],
-    border: BorderLayerState,
     resolution: DesignerColorResolution,
-) -> tuple[dict[tuple[int, int, int], str], tuple[PhysicalColor, ...]]:
-    if len(source_colors) > MAX_PROJECT_COLORS:
-        raise ValueError(
-            f"This artwork uses {len(source_colors)} colors. "
-            f"Mosaica currently supports up to {MAX_PROJECT_COLORS}."
-        )
-    active_roles = {"background", *(value.color_role for value in border.assignments)}
-    active_ids = {resolution.resolve(role).color_id for role in active_roles}
-    default_by_rgb = {
-        ImageColor.getrgb(value.display_color): value.color_id
-        for value in resolution.colors
-    }
-    unused_ids = [
-        value.color_id for value in sorted(resolution.colors, key=lambda item: item.order)
-        if value.color_id not in active_ids
-    ]
-    mapping: dict[tuple[int, int, int], str] = {}
-    replacements: dict[str, PhysicalColor] = {}
-    claimed = set()
-    for source in source_colors:
-        if source in default_by_rgb:
-            color_id = default_by_rgb[source]
-        else:
-            available = [value for value in unused_ids if value not in claimed]
-            if not available:
-                used = len(active_ids | claimed)
-                raise ValueError(
-                    "This Border/background setup and artwork exceed Mosaica's "
-                    f"shared four-color limit ({used} physical colors are already allocated)."
-                )
-            color_id = available[0]
-            base = next(value for value in resolution.colors if value.color_id == color_id)
-            replacements[color_id] = PhysicalColor(
-                color_id, "#%02X%02X%02X" % source,
-                "Artwork #%02X%02X%02X" % source, base.order,
-            )
-        mapping[source] = color_id
-        claimed.add(color_id)
-    colors = tuple(replacements.get(value.color_id, value) for value in resolution.colors)
-    return mapping, colors
+) -> tuple[dict[tuple[int, int, int], str], DesignerColorResolution]:
+    updated = resolution.with_artwork_colors(source_colors)
+    return {
+        source: updated.color_id_for_rgb(source)
+        for source in source_colors
+    }, updated
 
 
 def _signature(artwork: DesignerArtwork, border: BorderLayerState) -> str:
@@ -285,11 +263,10 @@ def generate_designer_artwork(
     declared = _declared_source_colors(artwork.sanitized_svg)
     image = _rasterize_svg(artwork.sanitized_svg)
     source_colors = _effective_source_colors(image, declared)
-    mapping, physical_colors = _allocate_colors(source_colors, border, resolution)
     available = set(border.available_artwork_placement_ids)
     pixels = image.load()
     transform = artwork.transform
-    assignments = []
+    sampled_assignments = []
 
     for index, placement in enumerate(geometry.placements):
         tile_id = f"placement-{index:06d}"
@@ -332,16 +309,33 @@ def generate_designer_artwork(
         strongest = max(range(len(coverages)), key=lambda value: (coverages[value], -value))
         if coverages[strongest] >= DESIGNER_COVERAGE_THRESHOLD:
             source = source_colors[strongest]
-            assignments.append(GeneratedArtworkAssignment(
-                tile_id, placement.row, placement.column, source,
-                mapping[source], coverages[strongest],
+            sampled_assignments.append((
+                tile_id,
+                placement.row,
+                placement.column,
+                source,
+                coverages[strongest],
             ))
+
+    used_source_colors = tuple(
+        source for source in source_colors
+        if any(value[3] == source for value in sampled_assignments)
+    )
+    mapping, updated_resolution = _allocate_colors(
+        used_source_colors, resolution,
+    )
+    assignments = tuple(
+        GeneratedArtworkAssignment(
+            tile_id, row, column, source, mapping[source], coverage,
+        )
+        for tile_id, row, column, source, coverage in sampled_assignments
+    )
 
     return DesignerGeneratedArtwork(
         revision=revision,
-        assignments=tuple(assignments),
-        source_colors=source_colors,
-        physical_colors=physical_colors,
+        assignments=assignments,
+        source_colors=used_source_colors,
+        design_colors=updated_resolution.colors,
         source_signature=_signature(artwork, border),
         border_preset_id=border.preset_id,
     )

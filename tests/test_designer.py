@@ -1,7 +1,9 @@
-from io import BytesIO
+from concurrent.futures import ThreadPoolExecutor
+from io import BytesIO, StringIO
 import json
 from math import isclose, sqrt
 import sys
+from wsgiref.util import setup_testing_defaults
 
 import pytest
 
@@ -15,6 +17,8 @@ from mosaic_engine.designer import (
     P1S_BUILD_AREA_MM,
     TILE_PRESETS,
     DesignerProjectShell,
+    DesignerServerHandler,
+    ThreadingWSGIServer,
     MosaicDesignerApp,
     estimate_minimum_print_plates,
     run_designer,
@@ -313,6 +317,95 @@ def test_designer_localhost_and_occupied_port_errors(monkeypatch):
     monkeypatch.setattr(designer_module, "make_server", occupied)
     with pytest.raises(RuntimeError, match="requested port is unavailable"):
         run_designer(port=9876, open_browser=False)
+
+
+def test_json_response_framing_matches_body_exactly():
+    app = MosaicDesignerApp()
+    captured = {}
+
+    def start_response(status, headers):
+        captured["status"] = status
+        captured["headers"] = dict(headers)
+
+    body = b"".join(app({
+        "REQUEST_METHOD": "GET",
+        "PATH_INFO": "/api/designer",
+        "CONTENT_LENGTH": "0",
+        "wsgi.input": BytesIO(),
+    }, start_response))
+    assert captured["status"] == "200 OK"
+    assert captured["headers"]["Content-Type"] == (
+        "application/json; charset=utf-8"
+    )
+    assert int(captured["headers"]["Content-Length"]) == len(body)
+    assert "Transfer-Encoding" not in captured["headers"]
+    assert json.loads(body)["stage"] == "canvas"
+
+
+def test_threaded_http_server_writes_complete_framed_response(caplog):
+    app = MosaicDesignerApp()
+    environ = {}
+    setup_testing_defaults(environ)
+    environ.update({
+        "REQUEST_METHOD": "GET",
+        "PATH_INFO": "/api/designer",
+        "CONTENT_LENGTH": "0",
+        "wsgi.input": BytesIO(),
+    })
+    output = BytesIO()
+    handler = DesignerServerHandler(
+        BytesIO(), output, StringIO(), environ, multithread=True,
+    )
+    handler.http_version = "1.1"
+    with caplog.at_level("INFO", logger="mosaic_engine.designer.transport"):
+        handler.run(app)
+    headers, body = output.getvalue().split(b"\r\n\r\n", 1)
+    assert headers.startswith(b"HTTP/1.1 200 OK")
+    content_length = next(
+        int(line.split(b":", 1)[1])
+        for line in headers.split(b"\r\n")
+        if line.lower().startswith(b"content-length:")
+    )
+    assert content_length == len(body)
+    assert b"Connection: close" in headers
+    assert json.loads(body)["stage"] == "canvas"
+    assert "write_completed=True" in caplog.text
+    assert "transfer_encoding=None" in caplog.text
+    assert ThreadingWSGIServer.daemon_threads is True
+
+
+def test_concurrent_designer_reads_and_mutations_remain_atomic():
+    app = MosaicDesignerApp()
+    _request(app, "POST", "/api/designer/canvas", {"canvas_id": "square-s"})
+    _request(app, "POST", "/api/designer/tile", {"tile_id": "m"})
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        reads = list(executor.map(
+            lambda _: _request(app, "GET", "/api/designer")[1],
+            range(8),
+        ))
+        changes = list(executor.map(
+            lambda preset: (
+                preset,
+                _request(
+                    app, "POST", "/api/designer/border",
+                    {"preset_id": preset},
+                )[1],
+            ),
+            ("solid", "double", "alternating", "none"),
+        ))
+
+    assert all(value == reads[0] for value in reads)
+    for requested, response in changes:
+        assert response["border"]["preset_id"] == requested
+        assert response["payload_kind"] == "design_state"
+    final = app.payload()["project"]
+    assert final["border"]["preset_id"] in {
+        "solid", "double", "alternating", "none",
+    }
+    assert sum(value["count"] for value in final["color_counts"]) == (
+        final["geometry"]["visible_piece_count"]
+    )
 
 
 def test_cli_launches_designer_without_changing_editor_behavior(monkeypatch):

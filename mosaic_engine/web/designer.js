@@ -9,8 +9,28 @@
   const byId = (id) => document.getElementById(id);
   const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
 
+  class DesignerResponseReadError extends Error {
+    constructor(message, response, cause) {
+      super(message, { cause });
+      this.name = "DesignerResponseReadError";
+      this.responseStatus = response.status;
+      this.successfulResponse = response.ok;
+    }
+  }
+
+  class DesignerResponseParseError extends Error {
+    constructor(message, response, cause) {
+      super(message, { cause });
+      this.name = "DesignerResponseParseError";
+      this.responseStatus = response.status;
+      this.successfulResponse = response.ok;
+    }
+  }
+
   async function request(path, body, mutationName = "Designer load") {
     const method = body === undefined ? "GET" : "POST";
+    const startedAt = performance.now();
+    console.debug(`[Mosaica] ${mutationName}: ${method} ${path} fetch start`);
     let response;
     try {
       response = await fetch(path, body === undefined ? {} : {
@@ -22,6 +42,18 @@
       console.error(`[Mosaica] ${mutationName}: ${method} ${path} network failure`, error);
       throw new Error(`${mutationName} could not reach the local Mosaica server.`);
     }
+    console.debug(
+      `[Mosaica] ${mutationName}: ${method} ${path} headers received`,
+      {
+        status: response.status,
+        ok: response.ok,
+        contentType: response.headers.get("Content-Type"),
+        contentLength: response.headers.get("Content-Length"),
+        connection: response.headers.get("Connection"),
+        transferEncoding: response.headers.get("Transfer-Encoding"),
+        elapsedMs: Math.round(performance.now() - startedAt),
+      },
+    );
     let responseText;
     try {
       responseText = await response.text();
@@ -30,7 +62,16 @@
         `[Mosaica] ${mutationName}: ${method} ${path} returned ${response.status} but its body could not be read`,
         error,
       );
-      throw new Error(`${mutationName} could not read the local server response.`);
+      console.error("[Mosaica] response body read exception", {
+        name: error?.name,
+        message: error?.message,
+        elapsedMs: Math.round(performance.now() - startedAt),
+      });
+      throw new DesignerResponseReadError(
+        `${mutationName} could not read the local server response.`,
+        response,
+        error,
+      );
     }
     let payload;
     try {
@@ -40,7 +81,11 @@
         `[Mosaica] ${mutationName}: ${method} ${path} returned ${response.status} with invalid JSON`,
         responseText,
       );
-      throw new Error(`${mutationName} received an invalid server response.`);
+      throw new DesignerResponseParseError(
+        `${mutationName} received invalid JSON from the local server.`,
+        response,
+        error,
+      );
     }
     if (!response.ok) {
       console.error(
@@ -50,6 +95,16 @@
       throw new Error(payload.error || `${mutationName} failed.`);
     }
     return payload;
+  }
+
+  function isRecoverableSuccessfulResponse(error) {
+    return (
+      error?.successfulResponse === true
+      && (
+        error.name === "DesignerResponseReadError"
+        || error.name === "DesignerResponseParseError"
+      )
+    );
   }
 
   function showScreen(stage) {
@@ -318,7 +373,7 @@
   function renderColorCounts(statusBar, colorCounts) {
     const group = document.createElement("span");
     group.className = "status-group status-colors physical-color-counts";
-    group.setAttribute("aria-label", "Visible pieces by physical color");
+    group.setAttribute("aria-label", "Visible pieces by design color");
     for (const color of colorCounts) {
       const item = document.createElement("span");
       item.className = "physical-color-count";
@@ -496,6 +551,31 @@
         if (status) status.textContent = "";
         return payload;
       } catch (error) {
+        if (isRecoverableSuccessfulResponse(error)) {
+          console.warn(
+            `[Mosaica] ${options.name || path}: successful mutation response was unreadable; reconciling once`,
+          );
+          try {
+            const recovered = await request(
+              "/api/designer", undefined,
+              `${options.name || path} state recovery`,
+            );
+            applyDesignerState(recovered, options.requireGenerated === true);
+            const status = byId("status");
+            if (status) status.textContent = "";
+            console.info(`[Mosaica] ${options.name || path}: authoritative state recovered`);
+            return recovered;
+          } catch (recoveryError) {
+            console.error(
+              `[Mosaica] ${options.name || path}: authoritative recovery failed`,
+              recoveryError,
+            );
+            error = new Error(
+              `${options.name || path} completed, but Mosaica could not recover the updated state.`,
+              { cause: recoveryError },
+            );
+          }
+        }
         if (state !== previousState) {
           state = previousState;
           try {
