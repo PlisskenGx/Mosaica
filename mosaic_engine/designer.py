@@ -15,7 +15,10 @@ from wsgiref.simple_server import (
     make_server,
 )
 
-from .geometry import GridGeometry, vertex_constrained_panel_hex_geometry
+from .geometry import (
+    GridGeometry, vertex_constrained_panel_dimensions,
+    vertex_constrained_panel_hex_geometry,
+)
 from .model import MosaicConfig
 from .border import (
     BORDER_PRESETS,
@@ -39,6 +42,7 @@ from .designer_generation import (
 MM_PER_INCH = 25.4
 DESIGNER_GROUT_MM = 1.8
 P1S_BUILD_AREA_MM = 256.0
+CUSTOM_GRID_MAX = 200
 CANVAS_PREVIEW_REM_PER_INCH = 0.10
 _TRANSPORT_LOG = logging.getLogger("mosaic_engine.designer.transport")
 if not _TRANSPORT_LOG.handlers:
@@ -122,12 +126,11 @@ class TilePreset:
 
 
 CANVAS_PRESETS = (
-    CanvasPreset("square-s", "Square S", 24.0, 24.0),
-    CanvasPreset("square-m", "Square M", 36.0, 36.0),
-    CanvasPreset("square-l", "Square L", 48.0, 48.0),
+    CanvasPreset("square-s", "Small Square", 24.0, 24.0),
+    CanvasPreset("square-m", "Medium Square", 36.0, 36.0),
+    CanvasPreset("square-l", "Large Square", 48.0, 48.0),
     CanvasPreset("landscape", "Landscape", 48.0, 30.0),
     CanvasPreset("wide", "Wide", 60.0, 30.0),
-    CanvasPreset("panoramic", "Panoramic", 72.0, 30.0),
 )
 
 TILE_PRESETS = (
@@ -137,6 +140,11 @@ TILE_PRESETS = (
 )
 
 _CANVASES = {value.id: value for value in CANVAS_PRESETS}
+# Read-only construction compatibility for integrations that still reopen the
+# removed preset by ID. It is intentionally absent from setup/API choices.
+_LEGACY_CANVASES = {
+    "panoramic": CanvasPreset("panoramic", "Panoramic", 72.0, 30.0),
+}
 _TILES = {value.id: value for value in TILE_PRESETS}
 
 
@@ -148,6 +156,9 @@ class DesignerProjectShell:
     geometry: GridGeometry
     color_system: DesignerColorResolution = DEFAULT_DESIGNER_COLORS
     border_preset_id: str = "none"
+    canvas_mode: str = "preset"
+    tiles_across: int | None = None
+    tiles_down: int | None = None
 
     @property
     def tile_orientation(self) -> str:
@@ -158,7 +169,7 @@ class DesignerProjectShell:
         cls, canvas_id: str, tile_id: str, orientation: str = "point_top",
     ) -> DesignerProjectShell:
         try:
-            canvas = _CANVASES[canvas_id]
+            canvas = {**_CANVASES, **_LEGACY_CANVASES}[canvas_id]
         except KeyError as exc:
             raise ValueError(f"Unknown canvas preset: {canvas_id}") from exc
         try:
@@ -178,6 +189,42 @@ class DesignerProjectShell:
             config, canvas.width_in, canvas.height_in,
         )
         return cls(canvas, tile, DESIGNER_GROUT_MM, geometry)
+
+    @classmethod
+    def create_custom(
+        cls, tile_id: str, orientation: str, tiles_across: int, tiles_down: int,
+    ) -> DesignerProjectShell:
+        for name, value in (("Tiles Across", tiles_across), ("Tiles Down", tiles_down)):
+            if isinstance(value, bool) or not isinstance(value, int):
+                raise ValueError(f"{name} must be a whole number.")
+            if not 1 <= value <= CUSTOM_GRID_MAX:
+                raise ValueError(f"{name} must be between 1 and {CUSTOM_GRID_MAX}.")
+        tile = _TILES[tile_id]
+        pitch = tile.flat_to_flat_in + DESIGNER_GROUT_MM / MM_PER_INCH
+        radius = tile.flat_to_flat_in / sqrt(3.0)
+        stagger = sqrt(3.0) / 2.0 * pitch
+        # Counts describe principal full-tile spans; partial boundary pieces
+        # are not included. The staggered axis advances in complete parity
+        # pairs so every arbitrary count remains vertex-constrained.
+        if orientation == "point_top":
+            width, height = tiles_across * pitch, 2 * tiles_down * stagger - radius
+        elif orientation == "flat_top":
+            width, height = 2 * tiles_across * stagger - radius, tiles_down * pitch
+        else:
+            raise ValueError(f"Unsupported canonical hex orientation: {orientation}")
+        canvas = CanvasPreset("custom", "Custom", width, height)
+        config = MosaicConfig(
+            tile_shape="hex", tile_width_in=tile.flat_to_flat_in,
+            tile_height_in=tile.flat_to_flat_in,
+            grout_width_in=DESIGNER_GROUT_MM / MM_PER_INCH,
+            hex_orientation=orientation,
+        )
+        geometry = vertex_constrained_panel_hex_geometry(config, width, height)
+        return cls(
+            canvas, tile, DESIGNER_GROUT_MM, geometry,
+            canvas_mode="custom_grid", tiles_across=tiles_across,
+            tiles_down=tiles_down,
+        )
 
     def with_border(self, preset_id: str) -> DesignerProjectShell:
         border_preset(preset_id)
@@ -243,6 +290,11 @@ class DesignerProjectShell:
         )
         return {
             "canvas_preset": self.canvas.to_dict(),
+            "canvas_mode": self.canvas_mode,
+            "custom_grid": (
+                {"tiles_across": self.tiles_across, "tiles_down": self.tiles_down}
+                if self.canvas_mode == "custom_grid" else None
+            ),
             "tile_preset": self.tile.to_dict(),
             "tile_shape": "hexagon",
             "tile_orientation": self.tile_orientation,
@@ -345,6 +397,9 @@ class MosaicDesignerApp:
 
     def __init__(self) -> None:
         self._state_lock = RLock()
+        self.tile_shape: str | None = None
+        self.tile_id: str | None = None
+        self.tile_orientation: str | None = None
         self.canvas_id: str | None = None
         self.project: DesignerProjectShell | None = None
         self.artwork: DesignerArtwork | None = None
@@ -369,11 +424,18 @@ class MosaicDesignerApp:
                 return self._asset(path, start_response)
             if method == "GET" and path == "/api/designer":
                 return self._json(start_response, "200 OK", self.payload())
-            if method == "POST" and path == "/api/designer/canvas":
-                canvas_id = self._request_json(environ).get("canvas_id")
-                if canvas_id not in _CANVASES:
-                    raise ValueError(f"Unknown canvas preset: {canvas_id}")
-                self.canvas_id = canvas_id
+            if method == "POST" and path == "/api/designer/shape":
+                body = self._request_json(environ)
+                shape = body.get("shape")
+                if shape != "hexagon":
+                    raise ValueError(f"Unknown tile shape: {shape}")
+                self.tile_shape = shape
+                self.tile_id = None
+                orientation = body.get("orientation", "point_top")
+                if orientation not in {"flat_top", "point_top"}:
+                    raise ValueError(f"Unsupported canonical hex orientation: {orientation}")
+                self.tile_orientation = orientation
+                self.canvas_id = None
                 self.project = None
                 self.artwork = None
                 self.generated_artwork = None
@@ -381,14 +443,65 @@ class MosaicDesignerApp:
                 self.document_dirty = False
                 return self._json(start_response, "200 OK", self.payload())
             if method == "POST" and path == "/api/designer/tile":
-                if self.canvas_id is None:
-                    raise ValueError("Select a canvas preset before a tile preset.")
+                if self.tile_shape is None:
+                    raise ValueError("Select a tile shape before configuring tiles.")
                 body = self._request_json(environ)
                 tile_id = body.get("tile_id")
-                orientation = body.get("orientation", "point_top")
-                self.project = DesignerProjectShell.create(
-                    self.canvas_id, tile_id, orientation,
+                if tile_id not in _TILES:
+                    raise ValueError(f"Unknown tile preset: {tile_id}")
+                orientation = body.get("orientation", self.tile_orientation or "point_top")
+                if orientation not in {"flat_top", "point_top"}:
+                    raise ValueError(f"Unsupported canonical hex orientation: {orientation}")
+                self.tile_id = tile_id
+                self.tile_orientation = orientation
+                if self.canvas_id in _CANVASES:
+                    # Compatibility for pre-v1.8 API clients. The product UI
+                    # always selects the tile system before the canvas.
+                    self.project = DesignerProjectShell.create(
+                        self.canvas_id, tile_id, orientation,
+                    )
+                else:
+                    self.canvas_id = None
+                    self.project = None
+                self.artwork = None
+                self.generated_artwork = None
+                self.paint_overrides = {}
+                self.document_dirty = False
+                return self._json(start_response, "200 OK", self.payload())
+            if method == "POST" and path == "/api/designer/canvas-preview":
+                return self._json(
+                    start_response, "200 OK", self._canvas_preview_payload(
+                        self._request_json(environ),
+                    ),
                 )
+            if method == "POST" and path == "/api/designer/canvas":
+                if self.tile_id is None or self.tile_orientation is None:
+                    body = self._request_json(environ)
+                    canvas_id = body.get("canvas_id")
+                    if canvas_id not in _CANVASES:
+                        raise ValueError("Configure the tile system before selecting a canvas.")
+                    self.tile_shape = "hexagon"
+                    self.canvas_id = canvas_id
+                    self.project = None
+                    self.artwork = None
+                    self.generated_artwork = None
+                    self.paint_overrides = {}
+                    self.document_dirty = False
+                    return self._json(start_response, "200 OK", self.payload())
+                body = self._request_json(environ)
+                canvas_id = body.get("canvas_id")
+                if canvas_id == "custom":
+                    self.project = DesignerProjectShell.create_custom(
+                        self.tile_id, self.tile_orientation,
+                        body.get("tiles_across"), body.get("tiles_down"),
+                    )
+                elif canvas_id in _CANVASES:
+                    self.project = DesignerProjectShell.create(
+                        canvas_id, self.tile_id, self.tile_orientation,
+                    )
+                else:
+                    raise ValueError(f"Unknown canvas preset: {canvas_id}")
+                self.canvas_id = canvas_id
                 self.artwork = None
                 self.generated_artwork = None
                 self.paint_overrides = {}
@@ -607,6 +720,12 @@ class MosaicDesignerApp:
                     self.paint_overrides = {}
                     self.artwork_edit_mode = True
                     self.document_dirty = False
+                elif self.tile_id is not None:
+                    self.tile_id = None
+                    self.tile_orientation = None
+                    self.canvas_id = None
+                elif self.tile_shape is not None:
+                    self.tile_shape = None
                 else:
                     self.canvas_id = None
                 return self._json(start_response, "200 OK", self.payload())
@@ -627,22 +746,63 @@ class MosaicDesignerApp:
                 }
                 if self.artwork is not None else None
             )
+        canvas_presets = [value.to_dict() for value in CANVAS_PRESETS]
+        if self.tile_id is not None and self.tile_orientation is not None:
+            tile = _TILES[self.tile_id]
+            config = MosaicConfig(
+                tile_shape="hex", tile_width_in=tile.flat_to_flat_in,
+                grout_width_in=DESIGNER_GROUT_MM / MM_PER_INCH,
+                hex_orientation=self.tile_orientation,
+            )
+            for preset in canvas_presets:
+                width, height = vertex_constrained_panel_dimensions(
+                    config, preset["width_in"], preset["height_in"],
+                )
+                preset["actual"] = {
+                    "width_in": width, "height_in": height,
+                }
         return {
             "stage": (
                 "workspace" if self.project is not None
-                else "tile" if self.canvas_id is not None
-                else "canvas"
+                else "canvas" if self.tile_id is not None
+                else "tile" if self.tile_shape is not None
+                else "shape"
             ),
-            "canvas_presets": [value.to_dict() for value in CANVAS_PRESETS],
+            "canvas_presets": canvas_presets,
             "tile_presets": [value.to_dict() for value in TILE_PRESETS],
             "border_presets": [value.to_dict() for value in BORDER_PRESETS],
             "fixed_grout_mm": DESIGNER_GROUT_MM,
             "selected_canvas_id": self.canvas_id,
+            "selected_tile_shape": self.tile_shape,
+            "selected_tile_id": self.tile_id,
+            "selected_tile_orientation": self.tile_orientation,
+            "custom_grid_max": CUSTOM_GRID_MAX,
             "document": {
                 "title": self.document_title,
                 "dirty": self.document_dirty,
             },
             "project": project_payload,
+        }
+
+    def _canvas_preview_payload(self, body: dict) -> dict:
+        if self.tile_id is None or self.tile_orientation is None:
+            raise ValueError("Configure the tile system before previewing a canvas.")
+        canvas_id = body.get("canvas_id")
+        shell = (
+            DesignerProjectShell.create_custom(
+                self.tile_id, self.tile_orientation,
+                body.get("tiles_across"), body.get("tiles_down"),
+            )
+            if canvas_id == "custom"
+            else DesignerProjectShell.create(canvas_id, self.tile_id, self.tile_orientation)
+        )
+        return {
+            "canvas_id": canvas_id,
+            "width_in": shell.geometry.width_in,
+            "height_in": shell.geometry.height_in,
+            "visible_piece_count": sum(
+                value.piece_type != "outside" for value in shell.geometry.placements
+            ),
         }
 
     def _require_project(self) -> DesignerProjectShell:

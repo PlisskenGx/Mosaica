@@ -30,8 +30,9 @@ def _request(app, method, path, body=None):
 
 def _app():
     app = MosaicDesignerApp()
-    _request(app, "POST", "/api/designer/canvas", {"canvas_id": "square-s"})
+    _request(app, "POST", "/api/designer/shape", {"shape": "hexagon"})
     _request(app, "POST", "/api/designer/tile", {"tile_id": "m"})
+    _request(app, "POST", "/api/designer/canvas", {"canvas_id": "square-s"})
     return app
 
 
@@ -184,10 +185,11 @@ def test_artwork_removal_retains_paint_but_geometry_rebuild_clears_it():
 @pytest.mark.parametrize("orientation", ("flat_top", "point_top"))
 def test_half_and_triangle_perimeter_pieces_paint_erase_and_clear(orientation):
     app = MosaicDesignerApp()
-    _request(app, "POST", "/api/designer/canvas", {"canvas_id": "square-s"})
+    _request(app, "POST", "/api/designer/shape", {"shape": "hexagon"})
     _request(app, "POST", "/api/designer/tile", {
         "tile_id": "m", "orientation": orientation,
     })
+    _request(app, "POST", "/api/designer/canvas", {"canvas_id": "square-s"})
     _, initial = _request(app, "GET", "/api/designer")
     partials = initial["project"]["geometry"]["tiles"]
     half = next(tile for tile in partials if tile["piece_type"] == "half")

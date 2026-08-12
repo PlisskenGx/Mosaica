@@ -10,6 +10,10 @@
   let activePaintColorId = null;
   let paintStroke = null;
   let activePartialPreviewId = null;
+  let selectedShapeOrientation = "point_top";
+  let customCanvasActive = false;
+  let customAcross = 40;
+  let customDown = 24;
   const byId = (id) => document.getElementById(id);
   const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
   const orientationLabel = (orientation) => (
@@ -115,10 +119,12 @@
   }
 
   function showScreen(stage) {
+    byId("setup-viewport").dataset.stage = stage;
+    byId("shape-screen").hidden = stage !== "shape";
     byId("canvas-screen").hidden = stage !== "canvas";
     byId("tile-screen").hidden = stage !== "tile";
     byId("workspace").hidden = stage !== "workspace";
-    byId("back").hidden = stage === "canvas";
+    byId("back").hidden = stage === "shape";
     document.body.classList.toggle("workspace-active", stage === "workspace");
     byId("document-name").textContent = state.document.title;
     byId("document-edited").hidden = !state.document.dirty;
@@ -127,17 +133,54 @@
   function renderCanvasPresets() {
     const container = byId("canvas-presets");
     container.replaceChildren();
-    for (const preset of state.canvas_presets) {
-      const card = document.createElement("button");
+    const presets = [
+      ...state.canvas_presets,
+      { id: "custom", name: "Custom", width_in: null, height_in: null,
+        aspect_ratio: 1.6, preview_width_rem: 4.8, preview_height_rem: 3 },
+    ];
+    for (const preset of presets) {
+      const card = document.createElement(preset.id === "custom" ? "article" : "button");
       card.className = "choice-card canvas-card";
-      card.type = "button";
-      card.setAttribute("aria-label", `${preset.name}, ${preset.width_in} by ${preset.height_in} inches`);
-      card.innerHTML = `
+      if (preset.id !== "custom") card.type = "button";
+      card.setAttribute("aria-label", preset.id === "custom" ? "Custom tile grid" : `${preset.name}, ${preset.width_in} by ${preset.height_in} inches`);
+      const actual = preset.id === "custom" ? null : preset.actual;
+      card.classList.toggle("selected", preset.id === "custom" && customCanvasActive);
+      card.innerHTML = preset.id === "custom" && customCanvasActive ? `
+        <strong class="choice-title">Custom</strong>
+        <div class="custom-lattice ${state.selected_tile_orientation}">
+          <span class="lattice-hex h1"></span><span class="lattice-hex h2"></span><span class="lattice-hex h3"></span><span class="lattice-hex h4"></span><span class="lattice-hex h5"></span>
+          <span class="measure across">Across</span><span class="measure down">Down</span>
+        </div>
+        <div class="custom-fields">
+          <label>Tiles Across<input id="custom-across" type="number" min="1" max="${state.custom_grid_max}" step="1" value="${customAcross}"></label>
+          <label>Tiles Down<input id="custom-down" type="number" min="1" max="${state.custom_grid_max}" step="1" value="${customDown}"></label>
+        </div>
+        <p id="custom-finished" class="custom-finished">Finished</p>
+        <button id="custom-create" class="inspector-action primary" type="button">Create Canvas</button>` : `
         <span class="canvas-preview-wrap"><span class="canvas-preview" style="--aspect:${preset.aspect_ratio};--preview-width:${preset.preview_width_rem}rem;--preview-height:${preset.preview_height_rem}rem"></span></span>
         <strong class="choice-title">${preset.name}</strong>
-        <span class="choice-meta">≈ ${preset.width_in} × ${preset.height_in} in</span>`;
-      card.addEventListener("click", () => chooseCanvas(preset.id));
+        <span class="choice-meta">${preset.id === "custom" ? "Tiles Across × Tiles Down" : `≈ ${preset.width_in} × ${preset.height_in} in`}</span>
+        <span class="choice-actual">${actual ? `${actual.width_in.toFixed(2)} × ${actual.height_in.toFixed(2)} in finished` : ""}</span>`;
+      card.addEventListener("click", (event) => {
+        if (preset.id === "custom") {
+          if (event.target.closest("input, button")) return;
+          customCanvasActive = true;
+          renderCanvasPresets();
+          updateCustomPreview();
+        } else chooseCanvas(preset.id);
+      });
       container.appendChild(card);
+      if (preset.id === "custom" && customCanvasActive) {
+        byId("custom-across").addEventListener("input", (event) => {
+          customAcross = event.target.value;
+          updateCustomPreview();
+        });
+        byId("custom-down").addEventListener("input", (event) => {
+          customDown = event.target.value;
+          updateCustomPreview();
+        });
+        byId("custom-create").addEventListener("click", createCustomCanvas);
+      }
     }
   }
 
@@ -153,37 +196,8 @@
         ${preset.recommended ? '<span class="recommended-badge">Recommended</span>' : ''}
         <span class="hex-preview-wrap"><span class="hex-preview point-top" style="--hex-size:${relativeSize}rem"></span></span>
         <span class="tile-size"><strong>${preset.id.toUpperCase()}</strong><span>${preset.flat_to_flat_mm} mm</span></span>
-        <h2>${preset.title}</h2>
-        <p>${preset.summary}</p>
-        <span class="orientation-choices" role="group" aria-label="Hex orientation">
-          <button type="button" data-orientation="flat_top" aria-pressed="false"><span class="mini-hex flat-top"></span>Flat Top</button>
-          <button type="button" data-orientation="point_top" aria-pressed="true"><span class="mini-hex point-top"></span>Point Top</button>
-        </span>`;
-      const preview = card.querySelector(".hex-preview");
-      const orientationButtons = [
-        card.querySelector("[data-orientation=flat_top]"),
-        card.querySelector("[data-orientation=point_top]"),
-      ];
-      let selectedOrientation = "point_top";
-      const showOrientation = (orientation) => {
-        preview.style.setProperty(
-          "--preview-rotation", orientation === "flat_top" ? "30deg" : "0deg",
-        );
-      };
-      for (const button of orientationButtons) {
-        button.addEventListener("pointerenter", () => showOrientation(button.dataset.orientation));
-        button.addEventListener("focus", () => showOrientation(button.dataset.orientation));
-        button.addEventListener("pointerleave", () => showOrientation(selectedOrientation));
-        button.addEventListener("blur", () => showOrientation(selectedOrientation));
-        button.addEventListener("click", () => {
-          selectedOrientation = button.dataset.orientation;
-          for (const choice of orientationButtons) {
-            choice.setAttribute("aria-pressed", String(choice === button));
-          }
-          showOrientation(selectedOrientation);
-          chooseTile(preset.id, selectedOrientation);
-        });
-      }
+        <h2>${preset.title}</h2><p>${preset.summary}</p>`;
+      card.addEventListener("click", () => chooseTile(preset.id));
       container.appendChild(card);
     }
   }
@@ -569,7 +583,7 @@
     if (
       !payload
       || typeof payload !== "object"
-      || !["canvas", "tile", "workspace"].includes(payload.stage)
+      || !["shape", "canvas", "tile", "workspace"].includes(payload.stage)
       || !payload.document
       || !Array.isArray(payload.canvas_presets)
       || !Array.isArray(payload.tile_presets)
@@ -1061,8 +1075,27 @@
 
   async function chooseTile(tileId, orientation = "point_top") {
     await performDesignerMutation(
-      "/api/designer/tile", { tile_id: tileId, orientation }, { name: "Choose tile" },
+      "/api/designer/tile", {
+        tile_id: tileId, orientation: state.selected_tile_orientation || orientation,
+      }, { name: "Choose tile" },
     );
+  }
+
+  async function updateCustomPreview() {
+    const across = byId("custom-across").value;
+    const down = byId("custom-down").value;
+    try {
+      const preview = await request("/api/designer/canvas-preview", {
+        canvas_id: "custom", tiles_across: Number(across), tiles_down: Number(down),
+      }, "Preview custom canvas");
+      byId("custom-finished").textContent = (
+        `Finished size ${preview.width_in.toFixed(2)} × ${preview.height_in.toFixed(2)} in`
+      );
+      byId("custom-create").disabled = false;
+    } catch (error) {
+      byId("custom-finished").textContent = error.message;
+      byId("custom-create").disabled = true;
+    }
   }
 
   async function chooseBorder(presetId) {
@@ -1070,8 +1103,52 @@
   }
 
   byId("back").addEventListener("click", async () => {
-    await performDesignerMutation("/api/designer/back", {}, { name: "Back" });
+    if (state.stage === "tile") {
+      state = { ...state, stage: "shape" };
+      render();
+      return;
+    }
+    if (state.stage === "canvas") {
+      state = { ...state, stage: "tile" };
+      render();
+      return;
+    }
+    if (state.stage === "workspace") {
+      await performDesignerMutation("/api/designer/back", {}, { name: "Back" });
+    }
   });
+  const shapePreview = byId("shape-hexagon").querySelector(".hex-preview");
+  const shapeOrientationButtons = [
+    byId("shape-hexagon").querySelector("[data-shape-orientation=flat_top]"),
+    byId("shape-hexagon").querySelector("[data-shape-orientation=point_top]"),
+  ];
+  const previewShapeOrientation = (orientation) => shapePreview.style.setProperty(
+    "--preview-rotation", orientation === "flat_top" ? "30deg" : "0deg",
+  );
+  for (const button of shapeOrientationButtons) {
+    button.addEventListener("pointerenter", () => previewShapeOrientation(button.dataset.shapeOrientation));
+    button.addEventListener("focus", () => previewShapeOrientation(button.dataset.shapeOrientation));
+    button.addEventListener("pointerleave", () => previewShapeOrientation(selectedShapeOrientation));
+    button.addEventListener("blur", () => previewShapeOrientation(selectedShapeOrientation));
+    button.addEventListener("click", async () => {
+      selectedShapeOrientation = button.dataset.shapeOrientation;
+      for (const choice of shapeOrientationButtons) {
+        choice.setAttribute("aria-pressed", String(choice === button));
+      }
+      previewShapeOrientation(selectedShapeOrientation);
+      await performDesignerMutation("/api/designer/shape", {
+        shape: "hexagon", orientation: selectedShapeOrientation,
+      }, { name: "Choose Hexagon" });
+    });
+  }
+
+  async function createCustomCanvas() {
+    await performDesignerMutation("/api/designer/canvas", {
+      canvas_id: "custom",
+      tiles_across: Number(byId("custom-across").value),
+      tiles_down: Number(byId("custom-down").value),
+    }, { name: "Create custom canvas" });
+  }
   byId("artwork-upload").addEventListener("click", () => {
     artworkUploadPath = "/api/designer/artwork/upload";
     byId("artwork-file").click();

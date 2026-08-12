@@ -1081,6 +1081,38 @@ def vertex_constrained_panel_hex_geometry(
     )
 
 
+def vertex_constrained_panel_dimensions(
+    config: MosaicConfig, target_width_in: float, target_height_in: float,
+) -> tuple[float, float]:
+    """Return the same nearest valid extent without allocating placements."""
+    if target_width_in <= 0 or target_height_in <= 0:
+        raise ValueError("Panel dimensions must be positive.")
+    if config.hex_orientation not in {"point_top", "flat_top"}:
+        raise ValueError(
+            f"Unsupported canonical hex orientation: {config.hex_orientation}"
+        )
+    across_flats = config.tile_width_in
+    pitch = across_flats + config.grout_width_in
+    radius = across_flats / sqrt(3.0)
+    stagger = sqrt(3.0) / 2.0 * pitch
+
+    def nearest(target, step, offset=0.0, even=False):
+        raw = max(1, round((target - offset) / step))
+        candidates = range(max(1, raw - 3), raw + 4)
+        valid = [value for value in candidates if not even or value % 2 == 0]
+        return min(valid, key=lambda value: (abs(value * step + offset - target), value))
+
+    if config.hex_orientation == "point_top":
+        return (
+            nearest(target_width_in, pitch) * pitch,
+            nearest(target_height_in, stagger, -radius, True) * stagger - radius,
+        )
+    return (
+        nearest(target_width_in, stagger, -radius, True) * stagger - radius,
+        nearest(target_height_in, pitch) * pitch,
+    )
+
+
 def build_geometry(
     config: MosaicConfig,
     columns: int,

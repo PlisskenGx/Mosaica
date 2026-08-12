@@ -46,12 +46,11 @@ def _request(app, method, path, body=None):
 
 def test_all_canvas_presets_have_exact_fixed_dimensions():
     assert [(value.id, value.name, value.width_in, value.height_in) for value in CANVAS_PRESETS] == [
-        ("square-s", "Square S", 24.0, 24.0),
-        ("square-m", "Square M", 36.0, 36.0),
-        ("square-l", "Square L", 48.0, 48.0),
+        ("square-s", "Small Square", 24.0, 24.0),
+        ("square-m", "Medium Square", 36.0, 36.0),
+        ("square-l", "Large Square", 48.0, 48.0),
         ("landscape", "Landscape", 48.0, 30.0),
         ("wide", "Wide", 60.0, 30.0),
-        ("panoramic", "Panoramic", 72.0, 30.0),
     ]
 
 
@@ -86,20 +85,19 @@ def test_canvas_previews_share_one_physical_scale_and_preserve_aspect():
         )
     squares = payloads[:3]
     assert [value["preview_width_rem"] for value in squares] == [2.4, 3.6, 4.8]
-    landscape, wide, panoramic = payloads[3:]
+    landscape, wide = payloads[3:]
     assert landscape["aspect_ratio"] == 1.6
     assert wide["aspect_ratio"] == 2.0
-    assert panoramic["aspect_ratio"] == 2.4
     assert [
         (value["preview_width_rem"], value["preview_height_rem"])
-        for value in (landscape, wide, panoramic)
-    ] == [(4.8, 3.0), (6.0, 3.0), (7.2, 3.0)]
+        for value in (landscape, wide)
+    ] == [(4.8, 3.0), (6.0, 3.0)]
 
 
 @pytest.mark.parametrize("canvas_id,tile_id", [
     ("square-s", "s"),
     ("landscape", "m"),
-    ("panoramic", "l"),
+    ("wide", "l"),
 ])
 def test_representative_presets_create_nearest_vertex_constrained_geometry(canvas_id, tile_id):
     shell = DesignerProjectShell.create(canvas_id, tile_id)
@@ -133,25 +131,26 @@ def test_preset_selection_api_state_flow():
     app = MosaicDesignerApp()
     status, payload = _request(app, "GET", "/api/designer")
     assert status == "200 OK"
-    assert payload["stage"] == "canvas"
-    assert len(payload["canvas_presets"]) == 6
+    assert payload["stage"] == "shape"
+    assert len(payload["canvas_presets"]) == 5
     assert len(payload["tile_presets"]) == 3
     assert payload["fixed_grout_mm"] == 1.8
     assert payload["document"] == {"title": "Untitled", "dirty": False}
 
-    status, payload = _request(
-        app, "POST", "/api/designer/canvas", {"canvas_id": "wide"},
-    )
+    status, payload = _request(app, "POST", "/api/designer/shape", {"shape": "hexagon"})
     assert status == "200 OK"
     assert payload["stage"] == "tile"
-    assert payload["selected_canvas_id"] == "wide"
+    assert payload["selected_tile_shape"] == "hexagon"
     assert payload["project"] is None
     assert payload["document"] == {"title": "Untitled", "dirty": False}
 
     status, payload = _request(
-        app, "POST", "/api/designer/tile", {"tile_id": "m"},
+        app, "POST", "/api/designer/tile", {"tile_id": "m", "orientation": "point_top"},
     )
     assert status == "200 OK"
+    assert payload["stage"] == "canvas"
+    assert payload["canvas_presets"][0]["actual"]
+    status, payload = _request(app, "POST", "/api/designer/canvas", {"canvas_id": "wide"})
     assert payload["stage"] == "workspace"
     assert payload["project"]["canvas_preset"]["width_in"] == 60
     assert payload["project"]["canvas_preset"]["height_in"] == 30
@@ -163,12 +162,11 @@ def test_preset_selection_api_state_flow():
 
     status, payload = _request(app, "POST", "/api/designer/back", {})
     assert status == "200 OK"
-    assert payload["stage"] == "tile"
+    assert payload["stage"] == "canvas"
 
     status, payload = _request(app, "POST", "/api/designer/back", {})
     assert status == "200 OK"
-    assert payload["stage"] == "canvas"
-    assert payload["selected_canvas_id"] is None
+    assert payload["stage"] == "tile"
 
 
 def test_tile_cannot_be_selected_before_canvas_and_presets_are_closed():
@@ -177,12 +175,12 @@ def test_tile_cannot_be_selected_before_canvas_and_presets_are_closed():
         app, "POST", "/api/designer/tile", {"tile_id": "m"},
     )
     assert status == "400 Bad Request"
-    assert "canvas" in payload["error"]
+    assert "shape" in payload["error"]
     status, payload = _request(
         app, "POST", "/api/designer/canvas", {"canvas_id": "custom"},
     )
     assert status == "400 Bad Request"
-    assert "Unknown canvas preset" in payload["error"]
+    assert "Configure the tile system" in payload["error"]
 
 
 def test_designer_assets_use_backend_polygons_and_responsive_regions():
@@ -196,8 +194,9 @@ def test_designer_assets_use_backend_polygons_and_responsive_regions():
     assert "<title>Mosaica</title>" in html
     assert "New mosaic" not in html
     assert "Physical tile system" not in html
-    assert "Choose your canvas" in html
-    assert "Choose your tile size" in html
+    assert "Choose tile shape" in html
+    assert "Choose canvas size" in html
+    assert "Choose tile size" in html
     assert "canvas-presets" in html
     assert "tile-presets" in html
     assert "mosaic-canvas" in html
@@ -235,12 +234,13 @@ def test_designer_assets_use_backend_polygons_and_responsive_regions():
 
 def test_orientation_frontend_uses_scoped_label_helper_and_wires_both_choices():
     app = MosaicDesignerApp()
+    _, html = _request(app, "GET", "/")
     _, script = _request(app, "GET", "/designer.js")
     assert 'const orientationLabel = (orientation)' in script
     assert 'orientation === "flat_top" ? "Flat Top" : "Point Top"' in script
-    assert 'data-orientation="flat_top"' in script
-    assert 'data-orientation="point_top"' in script
-    assert 'chooseTile(preset.id, selectedOrientation)' in script
+    assert 'data-shape-orientation="flat_top"' in html
+    assert 'data-shape-orientation="point_top"' in html
+    assert 'chooseTile(preset.id)' in script
     assert 'chooseTile(tileId, orientation = "point_top")' in script
     assert script.count("const orientationName = orientationLabel(") == 1
     assert 'pointerenter' in script
@@ -279,7 +279,12 @@ def test_workspace_and_sidebar_polish_is_structurally_scoped():
     assert "Est. minimum:" not in script
     assert "preset.best_for" not in script
     assert "preset.tradeoff" not in script
-    assert 'byId("back").hidden = stage === "canvas"' in script
+    assert 'byId("back").hidden = stage === "shape"' in script
+    assert 'if (state.stage === "tile")' in script
+    assert 'state = { ...state, stage: "shape" }' in script
+    assert 'if (state.stage === "canvas")' in script
+    assert 'state = { ...state, stage: "tile" }' in script
+    assert 'if (state.stage === "workspace")' in script
     assert 'performDesignerMutation("/api/designer/back", {}, { name: "Back" })' in script
 
     _, stylesheet = _request(app, "GET", "/designer.css")
@@ -315,7 +320,6 @@ def test_workspace_and_sidebar_polish_is_structurally_scoped():
     ("square-l", 5, 5, 25),
     ("landscape", 5, 3, 15),
     ("wide", 6, 3, 18),
-    ("panoramic", 8, 3, 24),
 ])
 def test_p1s_rectangular_lower_bound_for_every_canvas(
     canvas_id, columns, rows, total,
@@ -383,7 +387,7 @@ def test_json_response_framing_matches_body_exactly():
     )
     assert int(captured["headers"]["Content-Length"]) == len(body)
     assert "Transfer-Encoding" not in captured["headers"]
-    assert json.loads(body)["stage"] == "canvas"
+    assert json.loads(body)["stage"] == "shape"
 
 
 def test_threaded_http_server_writes_complete_framed_response(caplog):
@@ -412,7 +416,7 @@ def test_threaded_http_server_writes_complete_framed_response(caplog):
     )
     assert content_length == len(body)
     assert b"Connection: close" in headers
-    assert json.loads(body)["stage"] == "canvas"
+    assert json.loads(body)["stage"] == "shape"
     assert "write_completed=True" in caplog.text
     assert "transfer_encoding=None" in caplog.text
     assert ThreadingWSGIServer.daemon_threads is True

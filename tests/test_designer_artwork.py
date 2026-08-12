@@ -241,7 +241,7 @@ def test_geometry_setup_navigation_clears_session_artwork():
     app = _workspace()
     _upload(app)
     _, payload = _request(app, "POST", "/api/designer/back", {})
-    assert payload["stage"] == "tile"
+    assert payload["stage"] == "canvas"
     assert app.artwork is None
     _, payload = _request(app, "POST", "/api/designer/tile", {"tile_id": "l"})
     assert payload["project"]["artwork"] is None

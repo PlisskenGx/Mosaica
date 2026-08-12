@@ -23,19 +23,37 @@
     </div>
   </header>
 
-  <main>
-    <section id="canvas-screen" class="setup-screen">
+  <main id="setup-viewport" class="setup-viewport">
+    <section id="shape-screen" class="setup-screen">
       <div class="setup-heading">
-        <h1>Choose your canvas</h1>
-        <p>Choose an approximate physical target for your finished mosaic.</p>
+        <h1>Choose tile shape</h1>
+        <p>Start with the physical tile system for your mosaic.</p>
+      </div>
+      <div class="shape-presets">
+        <article id="shape-hexagon" class="choice-card shape-card">
+          <span class="hex-preview-wrap"><span class="hex-preview point-top" style="--hex-size:4rem"></span></span>
+          <strong class="choice-title">Hexagon</strong>
+          <span class="choice-meta">Regular physical mosaic tiles</span>
+          <span class="orientation-choices" role="group" aria-label="Hexagon orientation">
+            <button type="button" data-shape-orientation="flat_top" aria-pressed="false"><span class="mini-hex flat-top"></span>Flat Top</button>
+            <button type="button" data-shape-orientation="point_top" aria-pressed="true"><span class="mini-hex point-top"></span>Point Top</button>
+          </span>
+        </article>
+      </div>
+    </section>
+
+    <section id="canvas-screen" class="setup-screen" hidden>
+      <div class="setup-heading">
+        <h1>Choose canvas size</h1>
+        <p>Finished dimensions reflect your selected physical tile system.</p>
       </div>
       <div id="canvas-presets" class="canvas-presets" aria-label="Canvas presets"></div>
     </section>
 
     <section id="tile-screen" class="setup-screen" hidden>
       <div class="setup-heading">
-        <h1>Choose your tile size</h1>
-        <p>Choose a hex size and orientation. Every option uses a fixed 1.8 mm grout gap.</p>
+        <h1>Choose tile size</h1>
+        <p>Every option uses a fixed 1.8 mm grout gap.</p>
       </div>
       <div id="tile-presets" class="tile-presets" aria-label="Tile presets"></div>
     </section>

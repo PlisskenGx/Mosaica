@@ -111,9 +111,13 @@ def test_orientation_changes_geometry_and_placement_catalog():
 @pytest.mark.parametrize("orientation", ORIENTATIONS)
 def test_selected_orientation_reaches_workspace_api(orientation):
     app = MosaicDesignerApp()
-    _request(app, "POST", "/api/designer/canvas", {"canvas_id": "square-s"})
+    _request(app, "POST", "/api/designer/shape", {"shape": "hexagon"})
     status, payload = _request(app, "POST", "/api/designer/tile", {
         "tile_id": "m", "orientation": orientation,
+    })
+    assert status == "200 OK"
+    status, payload = _request(app, "POST", "/api/designer/canvas", {
+        "canvas_id": "square-s",
     })
     assert status == "200 OK"
     assert payload["stage"] == "workspace"
