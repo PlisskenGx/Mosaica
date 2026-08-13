@@ -76,6 +76,42 @@ def test_setup_back_is_local_and_accepts_the_shape_setup_payload():
     assert 'state.stage === "workspace"' in back_handler
 
 
+def test_setup_slide_transition_has_central_stage_order_and_directions():
+    app = MosaicDesignerApp()
+    _, script = _request(app, "GET", "/designer.js")
+    _, css = _request(app, "GET", "/designer.css")
+    assert 'SETUP_STAGE_ORDER = ["shape", "tile", "canvas", "custom"]' in script
+    assert "function transitionSetupStage(previous, next)" in script
+    assert 'forward ? "is-exiting-right" : "is-exiting-left"' in script
+    assert 'forward ? "is-entering-left" : "is-entering-right"' in script
+    assert ".setup-screen.is-entering-left" in css
+    assert ".setup-screen.is-entering-right" in css
+    assert ".setup-screen.is-exiting-left.is-active" in css
+    assert ".setup-screen.is-exiting-right.is-active" in css
+
+
+def test_setup_transition_is_bounded_accessible_and_reduced_motion_safe():
+    app = MosaicDesignerApp()
+    _, script = _request(app, "GET", "/designer.js")
+    _, css = _request(app, "GET", "/designer.css")
+    assert "setupTransitionActive" in script
+    assert "if (setupTransitionActive) return" in script
+    assert 'panel.inert = !active' in script
+    assert 'panel.setAttribute("aria-hidden", String(!active))' in script
+    assert 'window.matchMedia?.("(prefers-reduced-motion: reduce)").matches' in script
+    assert "window.setTimeout(complete, SETUP_TRANSITION_MS + 80)" in script
+    assert "overflow-x: clip" in css
+    assert "@media (prefers-reduced-motion: reduce)" in css
+
+
+def test_workspace_is_outside_setup_slide_order():
+    app = MosaicDesignerApp()
+    _, script = _request(app, "GET", "/designer.js")
+    order = script[script.index("SETUP_STAGE_ORDER"):script.index("SETUP_TRANSITION_MS")]
+    assert "workspace" not in order
+    assert "settleSetupPanels(null)" in script
+
+
 def test_setup_back_preserves_selections_without_creating_geometry():
     app = MosaicDesignerApp()
     _request(app, "POST", "/api/designer/shape", {

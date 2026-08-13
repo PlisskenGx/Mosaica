@@ -62,7 +62,26 @@ button { font: inherit; }
   padding: clamp(1.5rem, 4vh, 3.5rem) clamp(1.25rem, 4vw, 3rem);
   overflow: auto;
 }
-.setup-viewport { min-height: 0; }
+.setup-viewport { position: relative; min-height: 0; overflow-x: clip; }
+.setup-viewport.is-transitioning { height: calc(100dvh - var(--app-bar-height)); overflow: hidden; }
+.setup-viewport.is-transitioning .setup-screen {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 250ms cubic-bezier(.4, 0, .2, 1), opacity 250ms cubic-bezier(.4, 0, .2, 1);
+}
+.setup-screen.is-entering-left { transform: translateX(-36px); }
+.setup-screen.is-entering-right { transform: translateX(36px); }
+.setup-screen.is-exiting-left,
+.setup-screen.is-exiting-right { opacity: 1; transform: translateX(0); }
+.setup-screen.is-entering-left.is-active,
+.setup-screen.is-entering-right.is-active { opacity: 1; transform: translateX(0); }
+.setup-screen.is-exiting-left.is-active { opacity: 0; transform: translateX(-36px); }
+.setup-screen.is-exiting-right.is-active { opacity: 0; transform: translateX(36px); }
+@media (prefers-reduced-motion: reduce) {
+  .setup-viewport.is-transitioning .setup-screen { transition: none; transform: none; }
+}
 .setup-heading { max-width: 42rem; margin: 0 auto clamp(1.5rem, 3vh, 2.5rem); text-align: center; }
 .eyebrow { margin: 0 0 .55rem; color: #77777c; font-size: .75rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
 h1, h2, h3, p { margin-top: 0; }

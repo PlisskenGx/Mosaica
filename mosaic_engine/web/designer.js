@@ -120,12 +120,98 @@
     );
   }
 
+  const SETUP_STAGE_ORDER = ["shape", "tile", "canvas", "custom"];
+  const SETUP_TRANSITION_MS = 250;
+  let visibleStage = null;
+  let setupTransitionActive = false;
+  let setupTransitionToken = 0;
+
+  function setupPanel(stage) {
+    return byId(`${stage}-screen`);
+  }
+
+  function focusSetupStage(panel) {
+    const target = panel?.querySelector("h1, button, input");
+    if (!target) return;
+    if (target.matches("h1")) target.setAttribute("tabindex", "-1");
+    target.focus({ preventScroll: true });
+  }
+
+  function settleSetupPanels(stage, focus = false) {
+    for (const name of SETUP_STAGE_ORDER) {
+      const panel = setupPanel(name);
+      const active = name === stage;
+      panel.classList.remove(
+        "is-entering-left", "is-entering-right",
+        "is-exiting-left", "is-exiting-right", "is-active",
+      );
+      panel.hidden = !active;
+      panel.inert = !active;
+      panel.setAttribute("aria-hidden", String(!active));
+      if (active) panel.classList.add("is-active");
+    }
+    setupTransitionActive = false;
+    byId("setup-viewport").classList.remove("is-transitioning");
+    if (focus && SETUP_STAGE_ORDER.includes(stage)) focusSetupStage(setupPanel(stage));
+  }
+
+  function transitionSetupStage(previous, next) {
+    if (previous === next) {
+      settleSetupPanels(next);
+      return;
+    }
+    const previousIndex = SETUP_STAGE_ORDER.indexOf(previous);
+    const nextIndex = SETUP_STAGE_ORDER.indexOf(next);
+    const adjacent = previousIndex >= 0 && nextIndex >= 0
+      && Math.abs(previousIndex - nextIndex) === 1;
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (!adjacent || reduced) {
+      settleSetupPanels(next, previous !== null);
+      return;
+    }
+
+    const forward = nextIndex > previousIndex;
+    const outgoing = setupPanel(previous);
+    const incoming = setupPanel(next);
+    const token = ++setupTransitionToken;
+    setupTransitionActive = true;
+    byId("setup-viewport").classList.add("is-transitioning");
+    outgoing.inert = true;
+    outgoing.setAttribute("aria-hidden", "true");
+    incoming.hidden = false;
+    incoming.inert = true;
+    incoming.setAttribute("aria-hidden", "true");
+    outgoing.classList.remove("is-active");
+    outgoing.classList.add(forward ? "is-exiting-right" : "is-exiting-left");
+    incoming.classList.add(forward ? "is-entering-left" : "is-entering-right");
+
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (token !== setupTransitionToken) return;
+      outgoing.classList.add("is-active");
+      incoming.classList.add("is-active");
+    }));
+
+    let completed = false;
+    const complete = () => {
+      if (completed || token !== setupTransitionToken) return;
+      completed = true;
+      incoming.removeEventListener("transitionend", complete);
+      settleSetupPanels(next, true);
+    };
+    incoming.addEventListener("transitionend", complete, { once: true });
+    window.setTimeout(complete, SETUP_TRANSITION_MS + 80);
+  }
+
   function showScreen(stage) {
     byId("setup-viewport").dataset.stage = stage;
-    byId("shape-screen").hidden = stage !== "shape";
-    byId("canvas-screen").hidden = stage !== "canvas";
-    byId("tile-screen").hidden = stage !== "tile";
-    byId("custom-screen").hidden = stage !== "custom";
+    const previous = visibleStage;
+    visibleStage = stage;
+    if (SETUP_STAGE_ORDER.includes(stage)) {
+      transitionSetupStage(previous, stage);
+    } else {
+      ++setupTransitionToken;
+      settleSetupPanels(null);
+    }
     byId("workspace").hidden = stage !== "workspace";
     byId("back").hidden = stage !== "workspace";
     document.body.classList.toggle("workspace-active", stage === "workspace");
@@ -1054,10 +1140,12 @@
   }
 
   async function chooseCanvas(canvasId) {
+    if (setupTransitionActive) return;
     await performDesignerMutation("/api/designer/canvas", { canvas_id: canvasId }, { name: "Choose canvas" });
   }
 
   async function chooseTile(tileId, orientation = "point_top") {
+    if (setupTransitionActive) return;
     await performDesignerMutation(
       "/api/designer/tile", {
         tile_id: tileId, orientation: state.selected_tile_orientation || orientation,
@@ -1093,6 +1181,7 @@
   });
   for (const button of document.querySelectorAll(".setup-back")) {
     button.addEventListener("click", () => {
+      if (setupTransitionActive) return;
       state = { ...state, stage: button.dataset.backStage };
       render();
     });
@@ -1111,6 +1200,7 @@
     button.addEventListener("pointerleave", () => previewShapeOrientation(selectedShapeOrientation));
     button.addEventListener("blur", () => previewShapeOrientation(selectedShapeOrientation));
     button.addEventListener("click", async () => {
+      if (setupTransitionActive) return;
       selectedShapeOrientation = button.dataset.shapeOrientation;
       for (const choice of shapeOrientationButtons) {
         choice.setAttribute("aria-pressed", String(choice === button));
@@ -1130,9 +1220,10 @@
     }, { name: "Create custom canvas" });
   }
   byId("custom-size").addEventListener("click", () => {
+    if (setupTransitionActive) return;
     state = { ...state, stage: "custom" };
     byId("custom-lattice").className = `custom-lattice ${state.selected_tile_orientation}`;
-    showScreen("custom");
+    render();
     updateCustomPreview();
   });
   byId("custom-across").addEventListener("input", (event) => {
