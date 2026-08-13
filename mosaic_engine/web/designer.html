@@ -24,6 +24,7 @@
   </header>
 
   <main id="setup-viewport" class="setup-viewport">
+    <button id="setup-previous" class="setup-carousel-navigation previous" type="button" aria-label="Previous setup step" hidden>‹</button>
     <section id="shape-screen" class="setup-screen">
       <div class="setup-heading">
         <h1>Choose tile shape</h1>
@@ -51,7 +52,6 @@
       <div class="custom-size-row">
         <button id="custom-size" class="custom-size-action" type="button">Custom size…</button>
       </div>
-      <div class="setup-back-row"><button class="setup-back" type="button" data-back-stage="tile">Back</button></div>
     </section>
 
     <section id="tile-screen" class="setup-screen" hidden>
@@ -60,7 +60,6 @@
         <p>Every option uses a fixed 1.8 mm grout gap.</p>
       </div>
       <div id="tile-presets" class="tile-presets" aria-label="Tile presets"></div>
-      <div class="setup-back-row"><button class="setup-back" type="button" data-back-stage="shape">Back</button></div>
     </section>
 
     <section id="custom-screen" class="setup-screen custom-screen" hidden>
@@ -85,7 +84,6 @@
         <p id="custom-finished" class="custom-finished">Finished size</p>
         <button id="custom-create" class="inspector-action primary" type="button">Create Canvas</button>
       </div>
-      <div class="setup-back-row"><button class="setup-back" type="button" data-back-stage="canvas">Back</button></div>
     </section>
 
     <section id="workspace" class="workspace" hidden>

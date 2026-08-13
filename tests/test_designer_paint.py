@@ -360,6 +360,44 @@ def test_parent_preview_is_below_physical_tiles_and_paint_gated():
     assert "#mosaic-canvas.paint-active .partial-parent-ghost.visible" in stylesheet
     assert "if (paintTool === null || !tileId) return" in script
     assert "if (paintTool === null) return hidePartialPreview()" in script
+    assert ".panel-boundary { fill: none" in stylesheet
+    assert "pointer-events: none" in stylesheet[stylesheet.index(".panel-boundary"):stylesheet.index(".tile-hit-layer")]
+
+
+@pytest.mark.parametrize("orientation", ("point_top", "flat_top"))
+@pytest.mark.parametrize("across,down", ((5, 5), (10, 10)))
+def test_every_custom_clipped_piece_exposes_full_parent_hit_geometry(
+    orientation, across, down,
+):
+    shell = DesignerProjectShell.create_custom("m", orientation, across, down)
+    payload = shell.to_dict()
+    clipped = [
+        tile for tile in payload["geometry"]["tiles"]
+        if tile["piece_type"] != "full"
+    ]
+    assert clipped
+    assert all(tile["full_vertices_in"] for tile in clipped)
+    assert all(tile["parent_center_in"] for tile in clipped)
+    assert all(tile["full_vertices_in"] != tile["vertices_in"] for tile in clipped)
+    assert any(
+        x < 0 or y < 0
+        or x > payload["geometry"]["width_in"]
+        or y > payload["geometry"]["height_in"]
+        for tile in clipped for x, y in tile["full_vertices_in"]
+    )
+
+
+def test_partial_target_resolution_prioritizes_physical_then_nearest_then_id():
+    app = MosaicDesignerApp()
+    _, script = _request(app, "GET", "/designer.js")
+    resolver = script[
+        script.index("function resolvePartialTarget"):
+        script.index("function showPartialPreview")
+    ]
+    assert "if (actual)" in resolver
+    assert "target = actual" in resolver
+    assert "leftDistance - rightDistance" in resolver
+    assert "left.dataset.tileId.localeCompare(right.dataset.tileId)" in resolver
 
 
 def test_every_visible_piece_gets_an_exact_top_level_paint_hit_polygon():

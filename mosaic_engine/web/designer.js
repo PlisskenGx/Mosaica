@@ -137,6 +137,21 @@
     target.focus({ preventScroll: true });
   }
 
+  function previousSetupStage(stage) {
+    const index = SETUP_STAGE_ORDER.indexOf(stage);
+    return index > 0 ? SETUP_STAGE_ORDER[index - 1] : null;
+  }
+
+  function updateSetupNavigation(stage) {
+    const previous = previousSetupStage(stage);
+    const previousButton = byId("setup-previous");
+    previousButton.hidden = !previous;
+    previousButton.dataset.stage = previous || "";
+    previousButton.setAttribute(
+      "aria-label", previous ? `Back to ${setupPanel(previous).querySelector("h1").textContent}` : "Previous setup step",
+    );
+  }
+
   function settleSetupPanels(stage, focus = false) {
     for (const name of SETUP_STAGE_ORDER) {
       const panel = setupPanel(name);
@@ -150,6 +165,7 @@
       panel.setAttribute("aria-hidden", String(!active));
       if (active) panel.classList.add("is-active");
     }
+    updateSetupNavigation(stage);
     setupTransitionActive = false;
     byId("setup-viewport").classList.remove("is-transitioning");
     if (focus && SETUP_STAGE_ORDER.includes(stage)) focusSetupStage(setupPanel(stage));
@@ -182,8 +198,9 @@
     incoming.inert = true;
     incoming.setAttribute("aria-hidden", "true");
     outgoing.classList.remove("is-active");
-    outgoing.classList.add(forward ? "is-exiting-right" : "is-exiting-left");
-    incoming.classList.add(forward ? "is-entering-left" : "is-entering-right");
+    outgoing.classList.add(forward ? "is-exiting-left" : "is-exiting-right");
+    incoming.classList.add(forward ? "is-entering-right" : "is-entering-left");
+    byId("setup-previous").hidden = true;
 
     requestAnimationFrame(() => requestAnimationFrame(() => {
       if (token !== setupTransitionToken) return;
@@ -1179,13 +1196,14 @@
       await performDesignerMutation("/api/designer/back", {}, { name: "Back" });
     }
   });
-  for (const button of document.querySelectorAll(".setup-back")) {
-    button.addEventListener("click", () => {
-      if (setupTransitionActive) return;
-      state = { ...state, stage: button.dataset.backStage };
-      render();
-    });
+  function navigateSetupNeighbor(event) {
+    if (setupTransitionActive) return;
+    const stage = event.currentTarget.dataset.stage;
+    if (!stage || !SETUP_STAGE_ORDER.includes(stage)) return;
+    state = { ...state, stage };
+    render();
   }
+  byId("setup-previous").addEventListener("click", navigateSetupNeighbor);
   const shapePreview = byId("shape-hexagon").querySelector(".hex-preview");
   const shapeOrientationButtons = [
     byId("shape-hexagon").querySelector("[data-shape-orientation=flat_top]"),

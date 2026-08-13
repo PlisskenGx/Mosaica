@@ -271,8 +271,8 @@ def test_workspace_and_sidebar_polish_is_structurally_scoped():
     assert "preset.best_for" not in script
     assert "preset.tradeoff" not in script
     assert 'byId("back").hidden = stage !== "workspace"' in script
-    assert 'document.querySelectorAll(".setup-back")' in script
-    assert 'stage: button.dataset.backStage' in script
+    assert 'byId("setup-previous").addEventListener' in script
+    assert 'byId("setup-next")' not in script
     assert 'if (state.stage === "workspace")' in script
     assert 'performDesignerMutation("/api/designer/back", {}, { name: "Back" })' in script
 

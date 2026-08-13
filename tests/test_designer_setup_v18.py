@@ -70,10 +70,10 @@ def test_setup_back_is_local_and_accepts_the_shape_setup_payload():
         script.index('byId("back").addEventListener'):
         script.index('const shapePreview')
     ]
-    assert 'document.querySelectorAll(".setup-back")' in back_handler
-    assert 'stage: button.dataset.backStage' in back_handler
     assert back_handler.count('/api/designer/back') == 1
     assert 'state.stage === "workspace"' in back_handler
+    assert 'byId("setup-previous").addEventListener' in back_handler
+    assert 'byId("setup-next")' not in script
 
 
 def test_setup_slide_transition_has_central_stage_order_and_directions():
@@ -82,12 +82,11 @@ def test_setup_slide_transition_has_central_stage_order_and_directions():
     _, css = _request(app, "GET", "/designer.css")
     assert 'SETUP_STAGE_ORDER = ["shape", "tile", "canvas", "custom"]' in script
     assert "function transitionSetupStage(previous, next)" in script
-    assert 'forward ? "is-exiting-right" : "is-exiting-left"' in script
-    assert 'forward ? "is-entering-left" : "is-entering-right"' in script
-    assert ".setup-screen.is-entering-left" in css
-    assert ".setup-screen.is-entering-right" in css
-    assert ".setup-screen.is-exiting-left.is-active" in css
-    assert ".setup-screen.is-exiting-right.is-active" in css
+    assert 'forward ? "is-exiting-left" : "is-exiting-right"' in script
+    assert 'forward ? "is-entering-right" : "is-entering-left"' in script
+    assert ".setup-screen.is-previous" not in css
+    assert ".setup-screen.is-next" not in css
+    assert "mask-image" not in css
 
 
 def test_setup_transition_is_bounded_accessible_and_reduced_motion_safe():
@@ -100,7 +99,7 @@ def test_setup_transition_is_bounded_accessible_and_reduced_motion_safe():
     assert 'panel.setAttribute("aria-hidden", String(!active))' in script
     assert 'window.matchMedia?.("(prefers-reduced-motion: reduce)").matches' in script
     assert "window.setTimeout(complete, SETUP_TRANSITION_MS + 80)" in script
-    assert "overflow-x: clip" in css
+    assert "overflow: clip" in css
     assert "@media (prefers-reduced-motion: reduce)" in css
 
 
@@ -266,7 +265,7 @@ def test_custom_stage_copy_controls_and_paint_action_row():
     assert ".paint-actions { display: flex; align-items: center" in css
 
 
-def test_local_setup_back_controls_and_custom_teaching_lattice():
+def test_setup_carousel_controls_and_custom_teaching_lattice():
     app = MosaicDesignerApp()
     _, html = _request(app, "GET", "/")
     _, script = _request(app, "GET", "/designer.js")
@@ -275,10 +274,10 @@ def test_local_setup_back_controls_and_custom_teaching_lattice():
     tile = html[html.index('id="tile-screen"'):html.index('id="custom-screen"')]
     canvas = html[html.index('id="canvas-screen"'):html.index('id="tile-screen"')]
     custom = html[html.index('id="custom-screen"'):html.index('id="workspace"')]
-    assert "setup-back" not in shape
-    assert 'data-back-stage="shape"' in tile
-    assert 'data-back-stage="tile"' in canvas
-    assert 'data-back-stage="canvas"' in custom
+    assert "setup-back" not in shape + tile + canvas + custom
+    assert 'id="setup-previous"' in html
+    assert 'id="setup-next"' not in html
+    assert 'aria-label="Previous setup step"' in html
     assert 'byId("back").hidden = stage !== "workspace"' in script
     assert "Tiles Across = 5" in custom
     assert "Tiles Down = 3" in custom
@@ -286,7 +285,7 @@ def test_local_setup_back_controls_and_custom_teaching_lattice():
     assert 'custom-lattice ${state.selected_tile_orientation}' in script
     assert ".custom-lattice.point_top .lattice-hex" in css
     assert ".custom-lattice.flat_top .lattice-hex" in css
-    assert ".setup-back:focus-visible" in css
+    assert ".setup-carousel-navigation:focus-visible" in css
 
 
 def test_canvas_cards_use_common_larger_illustration_region():
@@ -327,7 +326,7 @@ def test_custom_configuration_has_dedicated_stage_and_bounded_schematic():
     _, css = _request(app, "GET", "/designer.css")
     assert 'id="custom-canvas"' not in html
     assert 'state = { ...state, stage: "custom" }' in script
-    assert 'data-back-stage="canvas"' in html
+    assert 'return index > 0 ? SETUP_STAGE_ORDER[index - 1] : null' in script
     assert "custom-fields" in html
     assert html.count('class="lattice-hex') == 15
     assert "c0 r0" in html and "c4 r2" in html
