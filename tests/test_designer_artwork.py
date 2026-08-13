@@ -470,4 +470,4 @@ def test_direct_transform_model_is_viewport_independent():
     )
     assert moved.transform.width_in == before.width_in
     assert moved.transform.height_in == before.height_in
-    assert abs(shell.geometry.width_in - 48.0) < 1.0
+    assert abs(shell.geometry.width_in - 36.0) < 1.0

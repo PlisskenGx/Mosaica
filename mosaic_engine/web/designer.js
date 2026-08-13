@@ -11,13 +11,15 @@
   let paintStroke = null;
   let activePartialPreviewId = null;
   let selectedShapeOrientation = "point_top";
-  let customCanvasActive = false;
   let customAcross = 40;
   let customDown = 24;
   const byId = (id) => document.getElementById(id);
   const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
   const orientationLabel = (orientation) => (
     orientation === "flat_top" ? "Flat Top" : "Point Top"
+  );
+  const tileShapeLabel = (shape) => (
+    shape === "hexagon" ? "Hexagon" : shape
   );
 
   class DesignerResponseReadError extends Error {
@@ -123,8 +125,9 @@
     byId("shape-screen").hidden = stage !== "shape";
     byId("canvas-screen").hidden = stage !== "canvas";
     byId("tile-screen").hidden = stage !== "tile";
+    byId("custom-screen").hidden = stage !== "custom";
     byId("workspace").hidden = stage !== "workspace";
-    byId("back").hidden = stage === "shape";
+    byId("back").hidden = stage !== "workspace";
     document.body.classList.toggle("workspace-active", stage === "workspace");
     byId("document-name").textContent = state.document.title;
     byId("document-edited").hidden = !state.document.dirty;
@@ -133,54 +136,17 @@
   function renderCanvasPresets() {
     const container = byId("canvas-presets");
     container.replaceChildren();
-    const presets = [
-      ...state.canvas_presets,
-      { id: "custom", name: "Custom", width_in: null, height_in: null,
-        aspect_ratio: 1.6, preview_width_rem: 4.8, preview_height_rem: 3 },
-    ];
-    for (const preset of presets) {
-      const card = document.createElement(preset.id === "custom" ? "article" : "button");
+    for (const preset of state.canvas_presets) {
+      const card = document.createElement("button");
       card.className = "choice-card canvas-card";
-      if (preset.id !== "custom") card.type = "button";
-      card.setAttribute("aria-label", preset.id === "custom" ? "Custom tile grid" : `${preset.name}, ${preset.width_in} by ${preset.height_in} inches`);
-      const actual = preset.id === "custom" ? null : preset.actual;
-      card.classList.toggle("selected", preset.id === "custom" && customCanvasActive);
-      card.innerHTML = preset.id === "custom" && customCanvasActive ? `
-        <strong class="choice-title">Custom</strong>
-        <div class="custom-lattice ${state.selected_tile_orientation}">
-          <span class="lattice-hex h1"></span><span class="lattice-hex h2"></span><span class="lattice-hex h3"></span><span class="lattice-hex h4"></span><span class="lattice-hex h5"></span>
-          <span class="measure across">Across</span><span class="measure down">Down</span>
-        </div>
-        <div class="custom-fields">
-          <label>Tiles Across<input id="custom-across" type="number" min="1" max="${state.custom_grid_max}" step="1" value="${customAcross}"></label>
-          <label>Tiles Down<input id="custom-down" type="number" min="1" max="${state.custom_grid_max}" step="1" value="${customDown}"></label>
-        </div>
-        <p id="custom-finished" class="custom-finished">Finished</p>
-        <button id="custom-create" class="inspector-action primary" type="button">Create Canvas</button>` : `
-        <span class="canvas-preview-wrap"><span class="canvas-preview" style="--aspect:${preset.aspect_ratio};--preview-width:${preset.preview_width_rem}rem;--preview-height:${preset.preview_height_rem}rem"></span></span>
+      card.type = "button";
+      card.setAttribute("aria-label", `${preset.name}, ${preset.width_in} by ${preset.height_in} inches`);
+      card.innerHTML = `
+        <span class="canvas-preview-wrap"><span class="canvas-preview" style="--aspect:${preset.aspect_ratio}"></span></span>
         <strong class="choice-title">${preset.name}</strong>
-        <span class="choice-meta">${preset.id === "custom" ? "Tiles Across × Tiles Down" : `≈ ${preset.width_in} × ${preset.height_in} in`}</span>
-        <span class="choice-actual">${actual ? `${actual.width_in.toFixed(2)} × ${actual.height_in.toFixed(2)} in finished` : ""}</span>`;
-      card.addEventListener("click", (event) => {
-        if (preset.id === "custom") {
-          if (event.target.closest("input, button")) return;
-          customCanvasActive = true;
-          renderCanvasPresets();
-          updateCustomPreview();
-        } else chooseCanvas(preset.id);
-      });
+        <span class="choice-meta">≈ ${preset.width_in} × ${preset.height_in} in</span>`;
+      card.addEventListener("click", () => chooseCanvas(preset.id));
       container.appendChild(card);
-      if (preset.id === "custom" && customCanvasActive) {
-        byId("custom-across").addEventListener("input", (event) => {
-          customAcross = event.target.value;
-          updateCustomPreview();
-        });
-        byId("custom-down").addEventListener("input", (event) => {
-          customDown = event.target.value;
-          updateCustomPreview();
-        });
-        byId("custom-create").addEventListener("click", createCustomCanvas);
-      }
     }
   }
 
@@ -194,7 +160,7 @@
       const relativeSize = 3.2 * preset.flat_to_flat_mm / 24;
       card.innerHTML = `
         ${preset.recommended ? '<span class="recommended-badge">Recommended</span>' : ''}
-        <span class="hex-preview-wrap"><span class="hex-preview point-top" style="--hex-size:${relativeSize}rem"></span></span>
+        <span class="hex-preview-wrap"><span class="hex-preview ${state.selected_tile_orientation}" style="--hex-size:${relativeSize}rem;--preview-rotation:${state.selected_tile_orientation === "flat_top" ? "30deg" : "0deg"}"></span></span>
         <span class="tile-size"><strong>${preset.id.toUpperCase()}</strong><span>${preset.flat_to_flat_mm} mm</span></span>
         <h2>${preset.title}</h2><p>${preset.summary}</p>`;
       card.addEventListener("click", () => chooseTile(preset.id));
@@ -271,20 +237,18 @@
 
   function renderWorkspaceStatus(project) {
     const geometry = project.geometry;
-    const plateEstimate = project.print_plate_estimate;
     const orientationName = orientationLabel(project.tile_orientation);
+    const canvasSummary = project.canvas_mode === "custom_grid"
+      ? `${project.custom_grid.tiles_across} × ${project.custom_grid.tiles_down} tiles`
+      : `≈ ${project.canvas_preset.width_in} × ${project.canvas_preset.height_in} in`;
     const statusBar = byId("workspace-status");
     statusBar.replaceChildren(
-      createStatusGroup("status-physical-setup", [
-        `${geometry.width_in.toFixed(2)} × ${geometry.height_in.toFixed(2)} in`,
-        project.tile_preset.id.toUpperCase(),
-        `${project.tile_preset.flat_to_flat_mm} mm`,
+      createStatusGroup("status-project-summary", [
+        tileShapeLabel(project.tile_shape),
         orientationName,
-        `${project.grout_mm} mm grout`,
-      ]),
-      createStatusGroup("status-production", [
+        project.tile_preset.title,
+        canvasSummary,
         `${geometry.visible_piece_count.toLocaleString()} pieces`,
-        `Est. ${plateEstimate.estimated_minimum_plates} plates`,
       ]),
     );
     renderColorCounts(statusBar, project.color_counts);
@@ -1103,20 +1067,16 @@
   }
 
   byId("back").addEventListener("click", async () => {
-    if (state.stage === "tile") {
-      state = { ...state, stage: "shape" };
-      render();
-      return;
-    }
-    if (state.stage === "canvas") {
-      state = { ...state, stage: "tile" };
-      render();
-      return;
-    }
     if (state.stage === "workspace") {
       await performDesignerMutation("/api/designer/back", {}, { name: "Back" });
     }
   });
+  for (const button of document.querySelectorAll(".setup-back")) {
+    button.addEventListener("click", () => {
+      state = { ...state, stage: button.dataset.backStage };
+      render();
+    });
+  }
   const shapePreview = byId("shape-hexagon").querySelector(".hex-preview");
   const shapeOrientationButtons = [
     byId("shape-hexagon").querySelector("[data-shape-orientation=flat_top]"),
@@ -1149,6 +1109,21 @@
       tiles_down: Number(byId("custom-down").value),
     }, { name: "Create custom canvas" });
   }
+  byId("custom-size").addEventListener("click", () => {
+    state = { ...state, stage: "custom" };
+    byId("custom-lattice").className = `custom-lattice ${state.selected_tile_orientation}`;
+    showScreen("custom");
+    updateCustomPreview();
+  });
+  byId("custom-across").addEventListener("input", (event) => {
+    customAcross = event.target.value;
+    updateCustomPreview();
+  });
+  byId("custom-down").addEventListener("input", (event) => {
+    customDown = event.target.value;
+    updateCustomPreview();
+  });
+  byId("custom-create").addEventListener("click", createCustomCanvas);
   byId("artwork-upload").addEventListener("click", () => {
     artworkUploadPath = "/api/designer/artwork/upload";
     byId("artwork-file").click();

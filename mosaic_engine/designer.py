@@ -126,15 +126,13 @@ class TilePreset:
 
 
 CANVAS_PRESETS = (
-    CanvasPreset("square-s", "Small Square", 24.0, 24.0),
-    CanvasPreset("square-m", "Medium Square", 36.0, 36.0),
-    CanvasPreset("square-l", "Large Square", 48.0, 48.0),
-    CanvasPreset("landscape", "Landscape", 48.0, 30.0),
-    CanvasPreset("wide", "Wide", 60.0, 30.0),
+    CanvasPreset("square", "Square", 36.0, 36.0),
+    CanvasPreset("portrait", "Portrait", 24.0, 36.0),
+    CanvasPreset("landscape", "Landscape", 36.0, 24.0),
 )
 
 TILE_PRESETS = (
-    TilePreset("s", 20.0, "Detail", "More detail · More pieces"),
+    TilePreset("s", 20.0, "Detailed", "More detail · More pieces"),
     TilePreset("m", 24.0, "Balanced", "Balanced detail · Balanced pieces", True),
     TilePreset("l", 28.0, "Bold", "Stronger mosaic · Fewer pieces"),
 )
@@ -143,6 +141,10 @@ _CANVASES = {value.id: value for value in CANVAS_PRESETS}
 # Read-only construction compatibility for integrations that still reopen the
 # removed preset by ID. It is intentionally absent from setup/API choices.
 _LEGACY_CANVASES = {
+    "square-s": CanvasPreset("square-s", "Small Square", 24.0, 24.0),
+    "square-m": CanvasPreset("square-m", "Medium Square", 36.0, 36.0),
+    "square-l": CanvasPreset("square-l", "Large Square", 48.0, 48.0),
+    "wide": CanvasPreset("wide", "Wide", 60.0, 30.0),
     "panoramic": CanvasPreset("panoramic", "Panoramic", 72.0, 30.0),
 }
 _TILES = {value.id: value for value in TILE_PRESETS}
@@ -454,7 +456,7 @@ class MosaicDesignerApp:
                     raise ValueError(f"Unsupported canonical hex orientation: {orientation}")
                 self.tile_id = tile_id
                 self.tile_orientation = orientation
-                if self.canvas_id in _CANVASES:
+                if self.canvas_id in {**_CANVASES, **_LEGACY_CANVASES}:
                     # Compatibility for pre-v1.8 API clients. The product UI
                     # always selects the tile system before the canvas.
                     self.project = DesignerProjectShell.create(
@@ -478,7 +480,7 @@ class MosaicDesignerApp:
                 if self.tile_id is None or self.tile_orientation is None:
                     body = self._request_json(environ)
                     canvas_id = body.get("canvas_id")
-                    if canvas_id not in _CANVASES:
+                    if canvas_id not in {**_CANVASES, **_LEGACY_CANVASES}:
                         raise ValueError("Configure the tile system before selecting a canvas.")
                     self.tile_shape = "hexagon"
                     self.canvas_id = canvas_id
@@ -495,7 +497,7 @@ class MosaicDesignerApp:
                         self.tile_id, self.tile_orientation,
                         body.get("tiles_across"), body.get("tiles_down"),
                     )
-                elif canvas_id in _CANVASES:
+                elif canvas_id in {**_CANVASES, **_LEGACY_CANVASES}:
                     self.project = DesignerProjectShell.create(
                         canvas_id, self.tile_id, self.tile_orientation,
                     )

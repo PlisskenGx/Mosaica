@@ -16,7 +16,7 @@
           <span class="brand-attribution">by Veradura Design</span>
         </span>
       </div>
-      <button id="back" class="back-navigation" hidden>‹ Back</button>
+      <button id="back" class="back-navigation" type="button" aria-label="Back to canvas setup" hidden>‹</button>
     </div>
     <div id="document-title" class="document-title" aria-label="Document title">
       <span id="document-name">Untitled</span><span id="document-edited" hidden>Edited</span>
@@ -33,7 +33,7 @@
         <article id="shape-hexagon" class="choice-card shape-card">
           <span class="hex-preview-wrap"><span class="hex-preview point-top" style="--hex-size:4rem"></span></span>
           <strong class="choice-title">Hexagon</strong>
-          <span class="choice-meta">Regular physical mosaic tiles</span>
+          <span class="choice-meta">Six-sided tile · versatile geometric layouts</span>
           <span class="orientation-choices" role="group" aria-label="Hexagon orientation">
             <button type="button" data-shape-orientation="flat_top" aria-pressed="false"><span class="mini-hex flat-top"></span>Flat Top</button>
             <button type="button" data-shape-orientation="point_top" aria-pressed="true"><span class="mini-hex point-top"></span>Point Top</button>
@@ -48,6 +48,10 @@
         <p>Finished dimensions reflect your selected physical tile system.</p>
       </div>
       <div id="canvas-presets" class="canvas-presets" aria-label="Canvas presets"></div>
+      <div class="custom-size-row">
+        <button id="custom-size" class="custom-size-action" type="button">Custom size…</button>
+      </div>
+      <div class="setup-back-row"><button class="setup-back" type="button" data-back-stage="tile">Back</button></div>
     </section>
 
     <section id="tile-screen" class="setup-screen" hidden>
@@ -56,6 +60,32 @@
         <p>Every option uses a fixed 1.8 mm grout gap.</p>
       </div>
       <div id="tile-presets" class="tile-presets" aria-label="Tile presets"></div>
+      <div class="setup-back-row"><button class="setup-back" type="button" data-back-stage="shape">Back</button></div>
+    </section>
+
+    <section id="custom-screen" class="setup-screen custom-screen" hidden>
+      <div class="setup-heading">
+        <h1>Create custom canvas</h1>
+        <p>Choose the dimensions of the full-tile grid.</p>
+      </div>
+      <div class="custom-panel">
+        <div id="custom-lattice" class="custom-lattice point_top" aria-hidden="true">
+          <div class="lattice-example">
+            <span class="lattice-hex c0 r0"></span><span class="lattice-hex c1 r0"></span><span class="lattice-hex c2 r0"></span><span class="lattice-hex c3 r0"></span><span class="lattice-hex c4 r0"></span>
+            <span class="lattice-hex c0 r1"></span><span class="lattice-hex c1 r1"></span><span class="lattice-hex c2 r1"></span><span class="lattice-hex c3 r1"></span><span class="lattice-hex c4 r1"></span>
+            <span class="lattice-hex c0 r2"></span><span class="lattice-hex c1 r2"></span><span class="lattice-hex c2 r2"></span><span class="lattice-hex c3 r2"></span><span class="lattice-hex c4 r2"></span>
+          </div>
+          <span class="measure across">Tiles Across = 5</span><span class="measure down">Tiles Down = 3</span>
+        </div>
+        <p class="custom-explanation">Counts refer to the full-tile grid. Edge pieces are added automatically.</p>
+        <div class="custom-fields">
+          <label>Tiles Across<input id="custom-across" type="number" min="1" max="200" step="1" value="40"></label>
+          <label>Tiles Down<input id="custom-down" type="number" min="1" max="200" step="1" value="24"></label>
+        </div>
+        <p id="custom-finished" class="custom-finished">Finished size</p>
+        <button id="custom-create" class="inspector-action primary" type="button">Create Canvas</button>
+      </div>
+      <div class="setup-back-row"><button class="setup-back" type="button" data-back-stage="canvas">Back</button></div>
     </section>
 
     <section id="workspace" class="workspace" hidden>
@@ -98,10 +128,10 @@
           </div>
           <div id="paint-tools">
             <div id="paint-colors" class="paint-colors" aria-label="Project paint colors"></div>
-            <div class="paint-modes" aria-label="Paint mode">
+            <div class="paint-actions" aria-label="Paint actions">
               <button id="paint-mode-restore" class="inspector-action" type="button" aria-pressed="false">Erase</button>
+              <button id="paint-clear" class="inspector-action danger-text" type="button">Clear Edits</button>
             </div>
-            <button id="paint-clear" class="inspector-action danger-text" type="button">Clear Edits</button>
           </div>
         </section>
         <section class="border-control" aria-labelledby="border-heading">

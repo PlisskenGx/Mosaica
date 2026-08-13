@@ -46,11 +46,9 @@ def _request(app, method, path, body=None):
 
 def test_all_canvas_presets_have_exact_fixed_dimensions():
     assert [(value.id, value.name, value.width_in, value.height_in) for value in CANVAS_PRESETS] == [
-        ("square-s", "Small Square", 24.0, 24.0),
-        ("square-m", "Medium Square", 36.0, 36.0),
-        ("square-l", "Large Square", 48.0, 48.0),
-        ("landscape", "Landscape", 48.0, 30.0),
-        ("wide", "Wide", 60.0, 30.0),
+        ("square", "Square", 36.0, 36.0),
+        ("portrait", "Portrait", 24.0, 36.0),
+        ("landscape", "Landscape", 36.0, 24.0),
     ]
 
 
@@ -70,7 +68,7 @@ def test_medium_preset_converts_twenty_four_mm_flat_to_flat_to_engine_units():
     assert not isclose(medium.side_length_mm, 24.0)
 
 
-def test_canvas_previews_share_one_physical_scale_and_preserve_aspect():
+def test_canvas_presets_preserve_nominal_aspect_ratios():
     payloads = [value.to_dict() for value in CANVAS_PRESETS]
     for preset, payload in zip(CANVAS_PRESETS, payloads):
         assert isclose(payload["preview_width_rem"], (
@@ -83,15 +81,7 @@ def test_canvas_previews_share_one_physical_scale_and_preserve_aspect():
             payload["preview_width_rem"] / payload["preview_height_rem"],
             payload["aspect_ratio"],
         )
-    squares = payloads[:3]
-    assert [value["preview_width_rem"] for value in squares] == [2.4, 3.6, 4.8]
-    landscape, wide = payloads[3:]
-    assert landscape["aspect_ratio"] == 1.6
-    assert wide["aspect_ratio"] == 2.0
-    assert [
-        (value["preview_width_rem"], value["preview_height_rem"])
-        for value in (landscape, wide)
-    ] == [(4.8, 3.0), (6.0, 3.0)]
+    assert [value["aspect_ratio"] for value in payloads] == [1.0, 2 / 3, 1.5]
 
 
 @pytest.mark.parametrize("canvas_id,tile_id", [
@@ -132,7 +122,7 @@ def test_preset_selection_api_state_flow():
     status, payload = _request(app, "GET", "/api/designer")
     assert status == "200 OK"
     assert payload["stage"] == "shape"
-    assert len(payload["canvas_presets"]) == 5
+    assert len(payload["canvas_presets"]) == 3
     assert len(payload["tile_presets"]) == 3
     assert payload["fixed_grout_mm"] == 1.8
     assert payload["document"] == {"title": "Untitled", "dirty": False}
@@ -150,12 +140,12 @@ def test_preset_selection_api_state_flow():
     assert status == "200 OK"
     assert payload["stage"] == "canvas"
     assert payload["canvas_presets"][0]["actual"]
-    status, payload = _request(app, "POST", "/api/designer/canvas", {"canvas_id": "wide"})
+    status, payload = _request(app, "POST", "/api/designer/canvas", {"canvas_id": "landscape"})
     assert payload["stage"] == "workspace"
-    assert payload["project"]["canvas_preset"]["width_in"] == 60
-    assert payload["project"]["canvas_preset"]["height_in"] == 30
-    assert abs(payload["project"]["geometry"]["width_in"] - 60) < 1
-    assert abs(payload["project"]["geometry"]["height_in"] - 30) < 1
+    assert payload["project"]["canvas_preset"]["width_in"] == 36
+    assert payload["project"]["canvas_preset"]["height_in"] == 24
+    assert abs(payload["project"]["geometry"]["width_in"] - 36) < 1
+    assert abs(payload["project"]["geometry"]["height_in"] - 24) < 1
     assert payload["project"]["tile_orientation"] == "point_top"
     assert payload["project"]["tile_preset"]["flat_to_flat_mm"] == 24
     assert payload["document"] == {"title": "Untitled", "dirty": False}
@@ -206,7 +196,8 @@ def test_designer_assets_use_backend_polygons_and_responsive_regions():
     assert 'id="workspace-status"' in html
     assert 'id="document-name">Untitled' in html
     assert '<div class="app-bar-left">' in html
-    assert '<button id="back" class="back-navigation" hidden>‹ Back</button>' in html
+    assert '<button id="back" class="back-navigation" type="button" aria-label="Back to canvas setup" hidden>‹</button>' in html
+    assert "‹ Back" not in html
     assert html.index('class="brand"') < html.index('id="back"')
     assert html.index('id="back"') < html.index('id="document-title"')
     assert 'id="paint-heading">Paint<' in html
@@ -274,16 +265,14 @@ def test_workspace_and_sidebar_polish_is_structurally_scoped():
     assert 'window.addEventListener("resize", fitToWorkspace)' in script
     assert "ResizeObserver" in script
     assert "preserveAspectRatio" in script
-    assert "project.print_plate_estimate" in script
-    assert "Est. ${plateEstimate.estimated_minimum_plates} plates" in script
+    assert "project.print_plate_estimate" not in script
+    assert "estimated_minimum_plates" not in script
     assert "Est. minimum:" not in script
     assert "preset.best_for" not in script
     assert "preset.tradeoff" not in script
-    assert 'byId("back").hidden = stage === "shape"' in script
-    assert 'if (state.stage === "tile")' in script
-    assert 'state = { ...state, stage: "shape" }' in script
-    assert 'if (state.stage === "canvas")' in script
-    assert 'state = { ...state, stage: "tile" }' in script
+    assert 'byId("back").hidden = stage !== "workspace"' in script
+    assert 'document.querySelectorAll(".setup-back")' in script
+    assert 'stage: button.dataset.backStage' in script
     assert 'if (state.stage === "workspace")' in script
     assert 'performDesignerMutation("/api/designer/back", {}, { name: "Back" })' in script
 
@@ -315,11 +304,9 @@ def test_workspace_and_sidebar_polish_is_structurally_scoped():
 
 
 @pytest.mark.parametrize("canvas_id,columns,rows,total", [
-    ("square-s", 3, 3, 9),
-    ("square-m", 4, 4, 16),
-    ("square-l", 5, 5, 25),
-    ("landscape", 5, 3, 15),
-    ("wide", 6, 3, 18),
+    ("square", 4, 4, 16),
+    ("portrait", 3, 4, 12),
+    ("landscape", 4, 3, 12),
 ])
 def test_p1s_rectangular_lower_bound_for_every_canvas(
     canvas_id, columns, rows, total,

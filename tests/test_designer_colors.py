@@ -239,25 +239,33 @@ def test_api_and_status_ui_render_backend_counts_without_inference():
     assert "Visible pieces by design color" in script
     assert "color.name" in script
     assert "color.count" in script
-    assert "querySelectorAll" not in script
-    assert ".reduce(" not in script
-    assert "tile.color_role" not in script
     start = script.index("function renderWorkspaceStatus(project)")
     status_rendering = script[start:script.index("function refreshArtworkLayers", start)]
-    assert "geometry.width_in" in status_rendering
-    assert "project.tile_preset.id" in status_rendering
-    assert "project.tile_preset.flat_to_flat_mm" in status_rendering
-    assert "project.grout_mm" in status_rendering
+    color_start = script.index("function renderColorCounts")
+    color_rendering = script[color_start:script.index("function renderBorderInspector", color_start)]
+    assert "querySelectorAll" not in status_rendering + color_rendering
+    assert ".reduce(" not in status_rendering + color_rendering
+    assert "tile.color_role" not in status_rendering + color_rendering
+    assert "tileShapeLabel(project.tile_shape)" in status_rendering
+    assert "orientationName" in status_rendering
+    assert "project.tile_preset.title" in status_rendering
+    assert "project.canvas_preset.width_in" in status_rendering
+    assert "project.canvas_preset.height_in" in status_rendering
+    assert "project.custom_grid.tiles_across" in status_rendering
+    assert "project.custom_grid.tiles_down" in status_rendering
     assert "geometry.visible_piece_count" in status_rendering
     assert "project.color_counts" in status_rendering
-    assert "Est. ${plateEstimate.estimated_minimum_plates} plates" in status_rendering
-    assert "Est. minimum" not in status_rendering
+    assert "geometry.width_in" not in status_rendering
+    assert "geometry.height_in" not in status_rendering
+    assert "project.tile_preset.id" not in status_rendering
+    assert "project.tile_preset.flat_to_flat_mm" not in status_rendering
+    assert "project.grout_mm" not in status_rendering
+    assert "estimated_minimum_plates" not in status_rendering
     assert "full_tile_count" not in status_rendering
     assert "clipped_piece_count" not in status_rendering
     assert "Border:" not in status_rendering
     assert "protected" not in status_rendering
-    assert "status-physical-setup" in status_rendering
-    assert "status-production" in status_rendering
+    assert "status-project-summary" in status_rendering
     _, stylesheet = _request(app, "GET", "/designer.css")
     assert ".physical-color-counts" in stylesheet
     assert ".physical-color-count" in stylesheet

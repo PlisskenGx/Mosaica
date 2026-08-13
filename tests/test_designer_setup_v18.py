@@ -5,7 +5,8 @@ from math import isclose
 import pytest
 
 from mosaic_engine.designer import (
-    CANVAS_PRESETS, CUSTOM_GRID_MAX, DesignerProjectShell, MosaicDesignerApp,
+    CANVAS_PRESETS, CUSTOM_GRID_MAX, TILE_PRESETS,
+    DesignerProjectShell, MosaicDesignerApp,
 )
 
 
@@ -48,7 +49,7 @@ def test_canonical_setup_flow_and_back_navigation():
     assert canvas["stage"] == "canvas"
     assert all("actual" in value for value in canvas["canvas_presets"])
     _, workspace = _request(app, "POST", "/api/designer/canvas", {
-        "canvas_id": "square-s",
+        "canvas_id": "square",
     })
     assert workspace["stage"] == "workspace"
     _request(app, "POST", "/api/designer/back", {})
@@ -68,10 +69,8 @@ def test_setup_back_is_local_and_accepts_the_shape_setup_payload():
         script.index('byId("back").addEventListener'):
         script.index('const shapePreview')
     ]
-    assert 'state.stage === "tile"' in back_handler
-    assert 'state = { ...state, stage: "shape" }' in back_handler
-    assert 'state.stage === "canvas"' in back_handler
-    assert 'state = { ...state, stage: "tile" }' in back_handler
+    assert 'document.querySelectorAll(".setup-back")' in back_handler
+    assert 'stage: button.dataset.backStage' in back_handler
     assert back_handler.count('/api/designer/back') == 1
     assert 'state.stage === "workspace"' in back_handler
 
@@ -93,18 +92,85 @@ def test_setup_back_preserves_selections_without_creating_geometry():
     assert canvas["project"] is None
 
 
-def test_six_ui_canvas_choices_replace_panoramic_with_custom():
+def test_three_primary_canvas_choices_and_dedicated_custom_action():
     assert [value.name for value in CANVAS_PRESETS] == [
-        "Small Square", "Medium Square", "Large Square", "Landscape", "Wide",
+        "Square", "Portrait", "Landscape",
     ]
     app = MosaicDesignerApp()
     _, html = _request(app, "GET", "/")
     _, script = _request(app, "GET", "/designer.js")
     assert "Panoramic" not in html + script
-    assert '{ id: "custom", name: "Custom"' in script
-    assert 'id="custom-across"' in script
-    assert 'id="custom-down"' in script
-    assert 'class="custom-lattice ${state.selected_tile_orientation}"' in script
+    assert 'id="custom-size"' in html
+    assert 'id="custom-screen"' in html
+    assert 'id="custom-across"' in html
+    assert 'id="custom-down"' in html
+    assert '`custom-lattice ${state.selected_tile_orientation}`' in script
+    assert "Small Square" not in script
+    assert "Medium Square" not in script
+    assert "Large Square" not in script
+    assert "Wide" not in script
+    assert "choice-actual" not in script
+
+
+def test_setup_copy_orientation_previews_and_neutral_controls():
+    app = MosaicDesignerApp()
+    _, html = _request(app, "GET", "/")
+    _, script = _request(app, "GET", "/designer.js")
+    _, css = _request(app, "GET", "/designer.css")
+    assert "Six-sided tile · versatile geometric layouts" in html
+    assert 'class="hex-preview ${state.selected_tile_orientation}"' in script
+    assert 'state.selected_tile_orientation === "flat_top"' in script
+    assert "No hardcoded Point Top preview" not in script
+    assert '.orientation-choices button[aria-pressed="true"]' not in css
+    assert 'choice.setAttribute("aria-pressed", String(choice === button))' in script
+    assert ".orientation-choices button:focus-visible" in css
+
+
+def test_custom_stage_copy_controls_and_paint_action_row():
+    app = MosaicDesignerApp()
+    _, html = _request(app, "GET", "/")
+    _, css = _request(app, "GET", "/designer.css")
+    assert "Create custom canvas" in html
+    assert "Tiles Across" in html and "Tiles Down" in html
+    assert "Counts refer to the full-tile grid. Edge pieces are added automatically." in html
+    assert "Finished size" in html and "Create Canvas" in html
+    paint_actions = html[html.index('class="paint-actions"'):html.index("</div>", html.index('class="paint-actions"'))]
+    assert "paint-mode-restore" in paint_actions
+    assert "paint-clear" in paint_actions
+    assert ".paint-actions { display: flex; align-items: center" in css
+
+
+def test_local_setup_back_controls_and_custom_teaching_lattice():
+    app = MosaicDesignerApp()
+    _, html = _request(app, "GET", "/")
+    _, script = _request(app, "GET", "/designer.js")
+    _, css = _request(app, "GET", "/designer.css")
+    shape = html[html.index('id="shape-screen"'):html.index('id="canvas-screen"')]
+    tile = html[html.index('id="tile-screen"'):html.index('id="custom-screen"')]
+    canvas = html[html.index('id="canvas-screen"'):html.index('id="tile-screen"')]
+    custom = html[html.index('id="custom-screen"'):html.index('id="workspace"')]
+    assert "setup-back" not in shape
+    assert 'data-back-stage="shape"' in tile
+    assert 'data-back-stage="tile"' in canvas
+    assert 'data-back-stage="canvas"' in custom
+    assert 'byId("back").hidden = stage !== "workspace"' in script
+    assert "Tiles Across = 5" in custom
+    assert "Tiles Down = 3" in custom
+    assert custom.count('class="lattice-hex') == 15
+    assert 'custom-lattice ${state.selected_tile_orientation}' in script
+    assert ".custom-lattice.point_top .lattice-hex" in css
+    assert ".custom-lattice.flat_top .lattice-hex" in css
+    assert ".setup-back:focus-visible" in css
+
+
+def test_canvas_cards_use_common_larger_illustration_region():
+    app = MosaicDesignerApp()
+    _, script = _request(app, "GET", "/designer.js")
+    _, css = _request(app, "GET", "/designer.css")
+    assert 'style="--aspect:${preset.aspect_ratio}"' in script
+    assert ".canvas-card { min-height: 17rem; }" in css
+    assert ".canvas-preview-wrap { display: grid; height: 10.5rem" in css
+    assert "height: min(8rem, 82%)" in css
 
 
 def test_orientation_belongs_to_shape_and_tile_cards_are_size_only():
@@ -122,16 +188,23 @@ def test_orientation_belongs_to_shape_and_tile_cards_are_size_only():
     assert "state.selected_tile_orientation" in script
 
 
-def test_custom_configuration_is_in_card_and_schematic_is_bounded():
+def test_tile_character_terminology_is_consistent():
+    assert [(value.id, value.title) for value in TILE_PRESETS] == [
+        ("s", "Detailed"), ("m", "Balanced"), ("l", "Bold"),
+    ]
+
+
+def test_custom_configuration_has_dedicated_stage_and_bounded_schematic():
     app = MosaicDesignerApp()
     _, html = _request(app, "GET", "/")
     _, script = _request(app, "GET", "/designer.js")
     _, css = _request(app, "GET", "/designer.css")
     assert 'id="custom-canvas"' not in html
-    assert "customCanvasActive ?" in script
-    assert "custom-fields" in script
-    assert script.count('class="lattice-hex') == 5
-    assert "h1" in script and "h5" in script
+    assert 'state = { ...state, stage: "custom" }' in script
+    assert 'data-back-stage="canvas"' in html
+    assert "custom-fields" in html
+    assert html.count('class="lattice-hex') == 15
+    assert "c0 r0" in html and "c4 r2" in html
     assert ".custom-lattice.flat_top" in css
     assert ".measure.across" in css and ".measure.down" in css
     assert "height: calc(100dvh - var(--app-bar-height))" in css
