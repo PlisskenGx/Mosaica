@@ -1132,11 +1132,37 @@ def custom_counted_hex_geometry(
     bottoms = [value for value in y_vertices if principal_bounds.bottom <= value <= principal_bounds.bottom + pitch]
 
     best = None
-    for left in lefts:
-        for right in rights:
-            for top in tops:
-                for bottom in bottoms:
-                    panel = Rect(left, top, right, bottom)
+    even_stagger_count = (
+        tiles_down % 2 == 0
+        if orientation == "point_top"
+        else tiles_across % 2 == 0
+    )
+    if even_stagger_count:
+        # The centered 23/100-pitch phase is the first stable mid-side phase
+        # above the 1/6 manufacturing floor.  It keeps the requested full
+        # field centered and prevents the next stagger-completion strip from
+        # becoming full.
+        margin = 23.0 / 100.0 * pitch
+        if orientation == "point_top":
+            candidates = (Rect(
+                principal_bounds.left, principal_bounds.top - margin,
+                principal_bounds.right, principal_bounds.bottom + margin,
+            ),)
+        else:
+            candidates = (Rect(
+                principal_bounds.left - margin, principal_bounds.top,
+                principal_bounds.right + margin, principal_bounds.bottom,
+            ),)
+    else:
+        candidates = (
+            Rect(left, top, right, bottom)
+            for left in lefts for right in rights
+            for top in tops for bottom in bottoms
+        )
+
+    for panel in candidates:
+                    left, top = panel.left, panel.top
+                    right, bottom = panel.right, panel.bottom
                     supplemental = []
                     valid = True
                     for key, full in raw_polygons.items():
@@ -1158,11 +1184,28 @@ def custom_counted_hex_geometry(
                             abs(fraction - allowed) <= 1e-8
                             for allowed in (1 / 6, 1 / 2)
                         )
-                        if not vertex_only or not standardized:
+                        safe_mid_side = (
+                            even_stagger_count
+                            and fraction >= 1 / 6 - 1e-8
+                        )
+                        if not safe_mid_side and (not vertex_only or not standardized):
                             valid = False
                             break
                         supplemental.append((key, clipped, piece_type, fraction))
                     if valid:
+                        full_keys = principal_keys | {
+                            key for key, _, piece_type, _ in supplemental
+                            if piece_type == "full"
+                        }
+                        visible_stagger_count = len({
+                            raw_center(*key)[1 if orientation == "point_top" else 0]
+                            for key in full_keys
+                        })
+                        requested_stagger_count = (
+                            tiles_down if orientation == "point_top" else tiles_across
+                        )
+                        if visible_stagger_count != requested_stagger_count:
+                            continue
                         score = (
                             -((right - left) * (bottom - top)),
                             len(supplemental),
@@ -1193,6 +1236,12 @@ def custom_counted_hex_geometry(
                 "Custom grid omitted an intersecting supplemental lattice tile "
                 f"at row {key[0]}, column {key[1]}."
             )
+
+    if any(
+        fraction < 1 / 6 - 1e-8
+        for _, _, _, fraction in supplemental
+    ):
+        raise RuntimeError("Custom grid produced a perimeter piece smaller than 1/6 tile.")
 
     width = raw_panel.width
     height = raw_panel.height
@@ -1237,6 +1286,30 @@ def custom_counted_hex_geometry(
     }
     if final_principal != principal_keys:
         raise RuntimeError("Custom grid did not preserve principal tile identity.")
+    principal_rows = {
+        row: sum(
+            value.principal_grid and value.principal_row == row
+            for value in placements
+        )
+        for row in range(tiles_down)
+    }
+    principal_columns = {
+        column: sum(
+            value.principal_grid and value.principal_column == column
+            for value in placements
+        )
+        for column in range(tiles_across)
+    }
+    if (
+        set(principal_rows) != set(range(tiles_down))
+        or any(count != tiles_across for count in principal_rows.values())
+    ):
+        raise RuntimeError("Custom grid principal row count does not match the request.")
+    if (
+        set(principal_columns) != set(range(tiles_across))
+        or any(count != tiles_down for count in principal_columns.values())
+    ):
+        raise RuntimeError("Custom grid principal column count does not match the request.")
     if any(
         value.piece_type != "full"
         or value.vertices_in != value.full_vertices_in

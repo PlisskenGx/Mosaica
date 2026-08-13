@@ -93,6 +93,95 @@ def test_setup_back_preserves_selections_without_creating_geometry():
     assert canvas["project"] is None
 
 
+def test_changing_tile_after_workspace_back_requires_canvas_confirmation():
+    app = MosaicDesignerApp()
+    _request(app, "POST", "/api/designer/shape", {
+        "shape": "hexagon", "orientation": "point_top",
+    })
+    _request(app, "POST", "/api/designer/tile", {
+        "tile_id": "l", "orientation": "point_top",
+    })
+    _, workspace = _request(app, "POST", "/api/designer/canvas", {
+        "canvas_id": "landscape",
+    })
+    assert workspace["stage"] == "workspace"
+
+    _, canvas = _request(app, "POST", "/api/designer/back", {})
+    assert canvas["stage"] == "canvas"
+    assert canvas["selected_canvas_id"] == "landscape"
+
+    # Canvas -> Tile is a local setup transition in the browser. Selecting a
+    # different tile through the canonical API must not reuse the remembered
+    # canvas as implicit permission to reopen Workspace.
+    _, changed = _request(app, "POST", "/api/designer/tile", {
+        "tile_id": "s", "orientation": "point_top",
+    })
+    assert changed["stage"] == "canvas"
+    assert changed["project"] is None
+    assert changed["selected_canvas_id"] == "landscape"
+
+    _, final = _request(app, "POST", "/api/designer/canvas", {
+        "canvas_id": "square",
+    })
+    assert final["stage"] == "workspace"
+    assert final["project"]["tile_preset"]["id"] == "s"
+    assert final["project"]["canvas_preset"]["id"] == "square"
+
+
+def test_orientation_change_resumes_ordered_setup_before_workspace():
+    app = MosaicDesignerApp()
+    _request(app, "POST", "/api/designer/shape", {
+        "shape": "hexagon", "orientation": "point_top",
+    })
+    _request(app, "POST", "/api/designer/tile", {
+        "tile_id": "l", "orientation": "point_top",
+    })
+    _request(app, "POST", "/api/designer/canvas", {"canvas_id": "landscape"})
+    _request(app, "POST", "/api/designer/back", {})
+
+    _, tile = _request(app, "POST", "/api/designer/shape", {
+        "shape": "hexagon", "orientation": "flat_top",
+    })
+    assert tile["stage"] == "tile"
+    _, canvas = _request(app, "POST", "/api/designer/tile", {
+        "tile_id": "l", "orientation": "flat_top",
+    })
+    assert canvas["stage"] == "canvas"
+    assert canvas["project"] is None
+    _, workspace = _request(app, "POST", "/api/designer/canvas", {
+        "canvas_id": "landscape",
+    })
+    assert workspace["stage"] == "workspace"
+    assert workspace["project"]["tile_orientation"] == "flat_top"
+
+
+def test_changing_tile_before_recreating_custom_canvas_does_not_open_workspace():
+    app = MosaicDesignerApp()
+    _request(app, "POST", "/api/designer/shape", {
+        "shape": "hexagon", "orientation": "point_top",
+    })
+    _request(app, "POST", "/api/designer/tile", {"tile_id": "l"})
+    _, original = _request(app, "POST", "/api/designer/canvas", {
+        "canvas_id": "custom", "tiles_across": 10, "tiles_down": 10,
+    })
+    assert original["stage"] == "workspace"
+    _request(app, "POST", "/api/designer/back", {})
+
+    _, canvas = _request(app, "POST", "/api/designer/tile", {"tile_id": "m"})
+    assert canvas["stage"] == "canvas"
+    assert canvas["project"] is None
+    assert canvas["selected_canvas_id"] == "custom"
+
+    _, recreated = _request(app, "POST", "/api/designer/canvas", {
+        "canvas_id": "custom", "tiles_across": 10, "tiles_down": 10,
+    })
+    assert recreated["stage"] == "workspace"
+    assert recreated["project"]["tile_preset"]["id"] == "m"
+    assert recreated["project"]["custom_grid"] == {
+        "tiles_across": 10, "tiles_down": 10,
+    }
+
+
 def test_three_primary_canvas_choices_and_dedicated_custom_action():
     assert [value.name for value in CANVAS_PRESETS] == [
         "Square", "Portrait", "Landscape",
@@ -248,8 +337,70 @@ def test_custom_grid_is_deterministic_vertex_constrained(orientation, across, do
     )
     for placement in first.geometry.placements:
         if placement.piece_type not in {"full", "outside"}:
-            assert any(isclose(placement.piece_fraction, value, abs_tol=1e-8) for value in (1/6, 1/2))
-            assert all(any(isclose(point[0], vertex[0], abs_tol=1e-8) and isclose(point[1], vertex[1], abs_tol=1e-8) for vertex in placement.full_vertices_in) for point in placement.vertices_in)
+            assert placement.piece_fraction >= 1 / 6 - 1e-8
+            even_stagger = (
+                down % 2 == 0 if orientation == "point_top"
+                else across % 2 == 0
+            )
+            if not even_stagger:
+                assert any(isclose(placement.piece_fraction, value, abs_tol=1e-8) for value in (1/6, 1/2))
+                assert all(any(isclose(point[0], vertex[0], abs_tol=1e-8) and isclose(point[1], vertex[1], abs_tol=1e-8) for vertex in placement.full_vertices_in) for point in placement.vertices_in)
+
+
+@pytest.mark.parametrize("across", (3, 4, 5, 6, 9, 10))
+@pytest.mark.parametrize("down", (3, 4, 5, 6, 9, 10))
+def test_point_top_custom_principal_rows_are_exact_for_every_parity(across, down):
+    geometry = DesignerProjectShell.create_custom(
+        "l", "point_top", across, down,
+    ).geometry
+    principal = [value for value in geometry.placements if value.principal_grid]
+    rows = {
+        row: [value for value in principal if value.principal_row == row]
+        for row in range(down)
+    }
+    assert len(principal) == across * down
+    assert set(value.principal_row for value in principal) == set(range(down))
+    assert set(value.principal_column for value in principal) == set(range(across))
+    assert all(len(values) == across for values in rows.values())
+    assert all(value.piece_type == "full" for value in principal)
+
+
+@pytest.mark.parametrize("across", (3, 4, 5, 6, 9, 10))
+@pytest.mark.parametrize("down", (3, 4, 5, 6, 9, 10))
+def test_flat_top_custom_principal_columns_are_exact_for_every_parity(across, down):
+    geometry = DesignerProjectShell.create_custom(
+        "l", "flat_top", across, down,
+    ).geometry
+    principal = [value for value in geometry.placements if value.principal_grid]
+    columns = {
+        column: [
+            value for value in principal if value.principal_column == column
+        ]
+        for column in range(across)
+    }
+    assert len(principal) == across * down
+    assert set(value.principal_row for value in principal) == set(range(down))
+    assert set(value.principal_column for value in principal) == set(range(across))
+    assert all(len(values) == down for values in columns.values())
+    assert all(value.piece_type == "full" for value in principal)
+
+
+@pytest.mark.parametrize("orientation,across,down", (
+    ("point_top", 5, 4), ("point_top", 5, 6),
+    ("point_top", 10, 10), ("flat_top", 4, 5),
+    ("flat_top", 6, 5), ("flat_top", 10, 10),
+))
+def test_even_stagger_mid_side_phase_avoids_extra_supplemental_full_strip(
+    orientation, across, down,
+):
+    geometry = DesignerProjectShell.create_custom(
+        "l", orientation, across, down,
+    ).geometry
+    supplemental_full = [
+        value for value in geometry.placements
+        if value.piece_type == "full" and not value.principal_grid
+    ]
+    assert supplemental_full == []
 
 
 def test_flat_top_five_by_five_preserves_bottom_principal_positions():
@@ -291,11 +442,44 @@ def test_custom_grid_retains_every_positive_area_lattice_intersection(
 
     assert len({(value.row, value.column) for value in intersecting}) == len(intersecting)
     supplemental = [value for value in intersecting if not value.principal_grid]
+    assert all(value.piece_fraction >= 1 / 6 - 1e-8 for value in supplemental)
+
+
+@pytest.mark.parametrize("orientation,across,down", (
+    ("point_top", 1, 1), ("point_top", 2, 2),
+    ("point_top", 3, 3), ("point_top", 4, 4),
+    ("point_top", 5, 3), ("point_top", 3, 5),
+    ("point_top", 5, 5), ("point_top", 6, 6),
+    ("point_top", 10, 10), ("point_top", 10, 5),
+    ("point_top", 5, 10), ("point_top", 40, 24),
+    ("flat_top", 1, 1), ("flat_top", 2, 2),
+    ("flat_top", 3, 3), ("flat_top", 4, 4),
+    ("flat_top", 5, 3), ("flat_top", 3, 5),
+    ("flat_top", 5, 5), ("flat_top", 6, 6),
+    ("flat_top", 10, 10), ("flat_top", 10, 5),
+    ("flat_top", 5, 10), ("flat_top", 40, 24),
+))
+def test_custom_visible_stagger_count_and_field_center_are_exact(
+    orientation, across, down,
+):
+    geometry = DesignerProjectShell.create_custom(
+        "m", orientation, across, down,
+    ).geometry
+    full = [value for value in geometry.placements if value.piece_type == "full"]
+    axis = "center_y_in" if orientation == "point_top" else "center_x_in"
+    expected = down if orientation == "point_top" else across
+    assert len({round(getattr(value, axis), 10) for value in full}) == expected
+
+    principal = [value for value in full if value.principal_grid]
+    xs = [point[0] for value in principal for point in value.vertices_in]
+    ys = [point[1] for value in principal for point in value.vertices_in]
+    even_stagger = down % 2 == 0 if orientation == "point_top" else across % 2 == 0
+    if even_stagger:
+        assert isclose((min(xs) + max(xs)) / 2, geometry.width_in / 2, abs_tol=1e-9)
+        assert isclose((min(ys) + max(ys)) / 2, geometry.height_in / 2, abs_tol=1e-9)
     assert all(
-        value.piece_type == "full"
-        or isclose(value.piece_fraction, 1 / 2, abs_tol=1e-8)
-        or isclose(value.piece_fraction, 1 / 6, abs_tol=1e-8)
-        for value in supplemental
+        value.piece_fraction >= 1 / 6 - 1e-8
+        for value in geometry.placements if value.piece_type != "outside"
     )
 
 
