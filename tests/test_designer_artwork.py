@@ -244,7 +244,9 @@ def test_geometry_setup_navigation_clears_session_artwork():
     assert payload["stage"] == "canvas"
     assert app.artwork is None
     _, payload = _request(app, "POST", "/api/designer/tile", {"tile_id": "l"})
-    assert payload["project"]["artwork"] is None
+    assert payload["stage"] == "canvas"
+    assert payload["project"] is None
+    assert app.artwork is None
 
 
 def test_artwork_does_not_change_tile_state_or_physical_color_counts():

@@ -400,6 +400,7 @@ class MosaicDesignerApp:
         self.tile_id: str | None = None
         self.tile_orientation: str | None = None
         self.canvas_id: str | None = None
+        self._canvas_confirmed = False
         self.project: DesignerProjectShell | None = None
         self.artwork: DesignerArtwork | None = None
         self.generated_artwork: DesignerGeneratedArtwork | None = None
@@ -435,6 +436,7 @@ class MosaicDesignerApp:
                     raise ValueError(f"Unsupported canonical hex orientation: {orientation}")
                 self.tile_orientation = orientation
                 self.canvas_id = None
+                self._canvas_confirmed = False
                 self.project = None
                 self.artwork = None
                 self.generated_artwork = None
@@ -453,15 +455,16 @@ class MosaicDesignerApp:
                     raise ValueError(f"Unsupported canonical hex orientation: {orientation}")
                 self.tile_id = tile_id
                 self.tile_orientation = orientation
-                if self.canvas_id in {**_CANVASES, **_LEGACY_CANVASES}:
-                    # Compatibility for pre-v1.8 API clients. The product UI
-                    # always selects the tile system before the canvas.
-                    self.project = DesignerProjectShell.create(
-                        self.canvas_id, tile_id, orientation,
-                    )
-                else:
-                    self.canvas_id = None
-                    self.project = None
+                # A remembered canvas is setup continuity, not confirmation.
+                # The product flow resumes at Canvas; the guarded branch only
+                # preserves the legacy API's explicit Canvas-then-Tile order.
+                self.project = (
+                    DesignerProjectShell.create(self.canvas_id, tile_id, orientation)
+                    if self._canvas_confirmed
+                    and self.canvas_id in {**_CANVASES, **_LEGACY_CANVASES}
+                    else None
+                )
+                self._canvas_confirmed = False
                 self.artwork = None
                 self.generated_artwork = None
                 self.paint_overrides = {}
@@ -481,6 +484,7 @@ class MosaicDesignerApp:
                         raise ValueError("Configure the tile system before selecting a canvas.")
                     self.tile_shape = "hexagon"
                     self.canvas_id = canvas_id
+                    self._canvas_confirmed = True
                     self.project = None
                     self.artwork = None
                     self.generated_artwork = None
@@ -501,6 +505,7 @@ class MosaicDesignerApp:
                 else:
                     raise ValueError(f"Unknown canvas preset: {canvas_id}")
                 self.canvas_id = canvas_id
+                self._canvas_confirmed = False
                 self.artwork = None
                 self.generated_artwork = None
                 self.paint_overrides = {}
@@ -719,10 +724,12 @@ class MosaicDesignerApp:
                     self.paint_overrides = {}
                     self.artwork_edit_mode = True
                     self.document_dirty = False
+                    self._canvas_confirmed = False
                 elif self.tile_id is not None:
                     self.tile_id = None
                     self.tile_orientation = None
                     self.canvas_id = None
+                    self._canvas_confirmed = False
                 elif self.tile_shape is not None:
                     self.tile_shape = None
                 else:
