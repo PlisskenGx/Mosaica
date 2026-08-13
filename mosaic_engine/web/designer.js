@@ -182,6 +182,8 @@
     protectedLayer.classList.add("protected-layer");
     const partialAidLayer = document.createElementNS(SVG_NS, "g");
     partialAidLayer.classList.add("partial-aid-layer");
+    const tileHitLayer = document.createElementNS(SVG_NS, "g");
+    tileHitLayer.classList.add("tile-hit-layer");
     for (const tile of geometry.tiles) {
       const polygon = document.createElementNS(SVG_NS, "polygon");
       polygon.id = tile.id;
@@ -190,11 +192,22 @@
       if (tile.border_owned) polygon.classList.add("border-owned");
       if (tile.artwork_available) polygon.classList.add("artwork-available");
       if (tile.editable) polygon.classList.add("editable");
+      if (tile.principal_grid) {
+        polygon.classList.add("principal-grid");
+        polygon.dataset.principalRow = tile.principal_row;
+        polygon.dataset.principalColumn = tile.principal_column;
+      }
       polygon.style.fill = tile.display_color;
       polygon.dataset.colorId = tile.color_id;
       polygon.setAttribute("points", tile.vertices_in.map((point) => point.join(",")).join(" "));
       polygon.setAttribute("aria-label", `${tile.piece_type} tile, row ${tile.row + 1}, column ${tile.column + 1}`);
       (tile.protected ? protectedLayer : baseLayer).appendChild(polygon);
+      const paintHit = document.createElementNS(SVG_NS, "polygon");
+      paintHit.classList.add("tile-paint-hit", "editable");
+      paintHit.dataset.tileId = tile.id;
+      paintHit.setAttribute("points", polygon.getAttribute("points"));
+      paintHit.setAttribute("aria-hidden", "true");
+      tileHitLayer.appendChild(paintHit);
       if (tile.piece_type !== "full" && tile.full_vertices_in) {
         const ghost = document.createElementNS(SVG_NS, "polygon");
         ghost.classList.add("partial-parent-ghost");
@@ -212,6 +225,10 @@
         partialAidLayer.append(ghost, hit);
       }
     }
+    // Parent-hex interaction aids sit below real physical polygons. Their
+    // uncovered area remains usable, while no aid can intercept a click on
+    // another visible piece.
+    svg.appendChild(partialAidLayer);
     svg.appendChild(baseLayer);
     svg.appendChild(protectedLayer);
     const boundary = document.createElementNS(SVG_NS, "rect");
@@ -221,11 +238,12 @@
     boundary.setAttribute("width", geometry.width_in);
     boundary.setAttribute("height", geometry.height_in);
     svg.appendChild(boundary);
-    // Interaction aids intentionally sit above tiles and the panel
-    // boundary, and may render beyond the physical panel viewport. Source
-    // artwork and its controls are appended afterward so they retain input
+    // Exact physical-piece hit geometry wins over the panel boundary and
+    // supplemental parent aids. Artwork controls are appended afterward and
+    // retain the highest interaction priority.
+    svg.appendChild(tileHitLayer);
+    // Source artwork and its controls are appended last so they retain input
     // priority wherever the layers overlap.
-    svg.appendChild(partialAidLayer);
     if (project.artwork?.edit_mode || !project.generated_artwork) {
       renderArtwork(svg, project.artwork);
       renderArtworkSelection(svg, project.artwork);
@@ -857,7 +875,7 @@
 
   function resolvePartialTarget(event, initialTarget = null) {
     let target = initialTarget || event.target.closest?.(
-      ".designer-tile.editable, .partial-parent-hit.editable",
+      ".tile-paint-hit.editable, .designer-tile.editable, .partial-parent-hit.editable",
     );
     if (target?.classList.contains("partial-parent-hit") && event.clientX !== undefined) {
       const svg = byId("mosaic-canvas");
@@ -942,7 +960,9 @@
     if (event.target.closest?.(
       ".artwork-handle-target, .artwork-selection-layer, .artwork-object",
     )) return;
-    const tile = event.target.closest?.(".designer-tile.editable, .partial-parent-hit.editable");
+    const tile = event.target.closest?.(
+      ".tile-paint-hit.editable, .designer-tile.editable, .partial-parent-hit.editable",
+    );
     if (!tile) return;
     event.preventDefault();
     paintStroke = {

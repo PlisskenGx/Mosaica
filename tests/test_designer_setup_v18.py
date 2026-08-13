@@ -4,6 +4,7 @@ from math import isclose
 
 import pytest
 
+from mosaic_engine.boundary import clip_polygon_to_rect, polygon_area
 from mosaic_engine.designer import (
     CANVAS_PRESETS, CUSTOM_GRID_MAX, TILE_PRESETS,
     DesignerProjectShell, MosaicDesignerApp,
@@ -212,17 +213,152 @@ def test_custom_configuration_has_dedicated_stage_and_bounded_schematic():
 
 
 @pytest.mark.parametrize("orientation", ("flat_top", "point_top"))
-@pytest.mark.parametrize("across,down", ((1, 1), (7, 4), (8, 5), (40, 24), (80, 3)))
+@pytest.mark.parametrize("across,down", (
+    (1, 1), (2, 2), (3, 3), (4, 4), (5, 5), (5, 3), (3, 5),
+    (6, 6), (10, 10), (10, 5), (5, 10), (40, 24),
+))
 def test_custom_grid_is_deterministic_vertex_constrained(orientation, across, down):
     first = DesignerProjectShell.create_custom("m", orientation, across, down)
     second = DesignerProjectShell.create_custom("m", orientation, across, down)
     assert first.geometry == second.geometry
     assert first.canvas_mode == "custom_grid"
     assert first.tiles_across == across and first.tiles_down == down
+    principal = [
+        placement for placement in first.geometry.placements
+        if placement.principal_grid
+    ]
+    assert len(principal) == across * down
+    assert all(placement.piece_type == "full" for placement in principal)
+    assert all(placement.vertices_in == placement.full_vertices_in for placement in principal)
+    assert {
+        (placement.principal_row, placement.principal_column)
+        for placement in principal
+    } == {
+        (row, column)
+        for row in range(down) for column in range(across)
+    }
+    assert all(
+        0 <= point[0] <= first.geometry.width_in
+        and 0 <= point[1] <= first.geometry.height_in
+        for placement in principal for point in placement.vertices_in
+    )
+    assert any(
+        placement.piece_type not in {"full", "outside"}
+        for placement in first.geometry.placements
+    )
     for placement in first.geometry.placements:
         if placement.piece_type not in {"full", "outside"}:
             assert any(isclose(placement.piece_fraction, value, abs_tol=1e-8) for value in (1/6, 1/2))
             assert all(any(isclose(point[0], vertex[0], abs_tol=1e-8) and isclose(point[1], vertex[1], abs_tol=1e-8) for vertex in placement.full_vertices_in) for point in placement.vertices_in)
+
+
+def test_flat_top_five_by_five_preserves_bottom_principal_positions():
+    shell = DesignerProjectShell.create_custom("l", "flat_top", 5, 5)
+    payload = shell.to_dict()
+    principal = {
+        tile["id"]: tile for tile in payload["geometry"]["tiles"]
+        if tile["principal_grid"]
+    }
+    assert len(principal) == 25
+    assert all(tile["piece_type"] == "full" for tile in principal.values())
+    assert {
+        (tile["principal_row"], tile["principal_column"])
+        for tile in principal.values()
+    } == {(row, column) for row in range(5) for column in range(5)}
+
+
+@pytest.mark.parametrize("orientation", ("flat_top", "point_top"))
+@pytest.mark.parametrize("across,down", (
+    (1, 1), (2, 2), (3, 3), (5, 3), (3, 5), (5, 5),
+    (10, 10), (10, 5), (5, 10), (40, 24),
+))
+def test_custom_grid_retains_every_positive_area_lattice_intersection(
+    orientation, across, down,
+):
+    geometry = DesignerProjectShell.create_custom(
+        "l", orientation, across, down,
+    ).geometry
+    panel = geometry.panel_bounds
+    intersecting = []
+    for placement in geometry.placements:
+        clipped = clip_polygon_to_rect(placement.full_vertices_in, panel)
+        if polygon_area(clipped) > 1e-10:
+            intersecting.append(placement)
+            assert placement.piece_type != "outside"
+            assert placement.vertices_in
+        else:
+            assert placement.piece_type == "outside"
+
+    assert len({(value.row, value.column) for value in intersecting}) == len(intersecting)
+    supplemental = [value for value in intersecting if not value.principal_grid]
+    assert all(
+        value.piece_type == "full"
+        or isclose(value.piece_fraction, 1 / 2, abs_tol=1e-8)
+        or isclose(value.piece_fraction, 1 / 6, abs_tol=1e-8)
+        for value in supplemental
+    )
+
+
+@pytest.mark.parametrize("orientation", ("flat_top", "point_top"))
+def test_principal_payload_preserves_logical_coordinates_and_rigid_centers(orientation):
+    shell = DesignerProjectShell.create_custom("l", orientation, 5, 5)
+    payload = shell.to_dict()
+    principal = [
+        tile for tile in payload["geometry"]["tiles"]
+        if tile["principal_grid"]
+    ]
+    assert {
+        (tile["principal_row"], tile["principal_column"])
+        for tile in principal
+    } == {(row, column) for row in range(5) for column in range(5)}
+    assert all(tile["center_in"] for tile in principal)
+    assert all(tile["full_vertices_in"] == tile["vertices_in"] for tile in principal)
+    assert all(
+        tile["principal_row"] is None and tile["principal_column"] is None
+        for tile in payload["geometry"]["tiles"]
+        if not tile["principal_grid"]
+    )
+
+    by_key = {
+        (tile["principal_row"], tile["principal_column"]): tile["center_in"]
+        for tile in principal
+    }
+    if orientation == "flat_top":
+        # Alternate columns share one rigid half-pitch vertical offset.
+        assert by_key[(0, 1)][1] > by_key[(0, 0)][1]
+        assert isclose(
+            by_key[(0, 1)][1] - by_key[(0, 0)][1],
+            by_key[(0, 3)][1] - by_key[(0, 2)][1],
+        )
+    else:
+        # Alternate rows share one rigid half-pitch horizontal offset.
+        assert by_key[(1, 0)][0] > by_key[(0, 0)][0]
+        assert isclose(
+            by_key[(1, 0)][0] - by_key[(0, 0)][0],
+            by_key[(3, 0)][0] - by_key[(2, 0)][0],
+        )
+
+
+@pytest.mark.parametrize("orientation", ("flat_top", "point_top"))
+def test_ten_by_ten_principal_union_is_contained_serialized_and_renderable(orientation):
+    shell = DesignerProjectShell.create_custom("l", orientation, 10, 10)
+    payload = shell.to_dict()
+    geometry = payload["geometry"]
+    principal = [tile for tile in geometry["tiles"] if tile["principal_grid"]]
+    assert len(principal) == 100
+    assert all(tile["piece_type"] == "full" for tile in principal)
+    assert all(tile["vertices_in"] == tile["full_vertices_in"] for tile in principal)
+    assert all(
+        0 <= x <= geometry["width_in"] and 0 <= y <= geometry["height_in"]
+        for tile in principal for x, y in tile["vertices_in"]
+    )
+    assert len({tile["id"] for tile in principal}) == 100
+
+    app = MosaicDesignerApp()
+    _, script = _request(app, "GET", "/designer.js")
+    assert 'polygon.classList.add("principal-grid")' in script
+    assert "polygon.dataset.principalRow = tile.principal_row" in script
+    assert "polygon.dataset.principalColumn = tile.principal_column" in script
 
 
 @pytest.mark.parametrize("value", (0, -1, 1.5, "x", CUSTOM_GRID_MAX + 1))

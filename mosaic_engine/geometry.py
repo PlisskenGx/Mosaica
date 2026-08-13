@@ -52,6 +52,9 @@ class TilePlacement:
 
     # Fraction of original tile area remaining.
     piece_fraction: float
+    principal_grid: bool = False
+    principal_row: int | None = None
+    principal_column: int | None = None
 
     @property
     def visible_centroid_in(
@@ -1077,6 +1080,184 @@ def vertex_constrained_panel_hex_geometry(
         height_in=height,
         placements=tuple(placements),
         panel_bounds=panel,
+        artwork_bounds=_artwork_bounds(width, height, config.artwork_inset_in),
+    )
+
+
+def custom_counted_hex_geometry(
+    config: MosaicConfig, tiles_across: int, tiles_down: int,
+) -> GridGeometry:
+    """Build an orientation-aware counted full-tile grid plus safe edge pieces."""
+    orientation = config.hex_orientation
+    if orientation not in {"point_top", "flat_top"}:
+        raise ValueError(f"Unsupported canonical hex orientation: {orientation}")
+    across_flats = config.tile_width_in
+    pitch = across_flats + config.grout_width_in
+    radius = across_flats / sqrt(3.0)
+    stagger = sqrt(3.0) / 2.0 * pitch
+    start_deg = 30.0 if orientation == "point_top" else 0.0
+
+    def raw_center(row: int, column: int) -> Point:
+        if orientation == "point_top":
+            return (column * pitch + (pitch / 2.0 if row % 2 else 0.0), row * stagger)
+        return (column * stagger, row * pitch + (pitch / 2.0 if column % 2 else 0.0))
+
+    principal_keys = {
+        (row, column)
+        for row in range(tiles_down) for column in range(tiles_across)
+    }
+    candidate_keys = {
+        (row, column)
+        for row in range(-2, tiles_down + 2)
+        for column in range(-2, tiles_across + 2)
+    }
+    raw_polygons = {
+        key: _polygon(*raw_center(*key), radius, start_deg)
+        for key in candidate_keys
+    }
+    principal_points = [
+        point for key in principal_keys for point in raw_polygons[key]
+    ]
+    principal_bounds = Rect(
+        min(point[0] for point in principal_points),
+        min(point[1] for point in principal_points),
+        max(point[0] for point in principal_points),
+        max(point[1] for point in principal_points),
+    )
+    x_vertices = sorted({point[0] for polygon in raw_polygons.values() for point in polygon})
+    y_vertices = sorted({point[1] for polygon in raw_polygons.values() for point in polygon})
+    lefts = [value for value in x_vertices if principal_bounds.left - pitch <= value <= principal_bounds.left]
+    rights = [value for value in x_vertices if principal_bounds.right <= value <= principal_bounds.right + pitch]
+    tops = [value for value in y_vertices if principal_bounds.top - pitch <= value <= principal_bounds.top]
+    bottoms = [value for value in y_vertices if principal_bounds.bottom <= value <= principal_bounds.bottom + pitch]
+
+    best = None
+    for left in lefts:
+        for right in rights:
+            for top in tops:
+                for bottom in bottoms:
+                    panel = Rect(left, top, right, bottom)
+                    supplemental = []
+                    valid = True
+                    for key, full in raw_polygons.items():
+                        if key in principal_keys:
+                            continue
+                        clipped = tuple(clip_polygon_to_rect(full, panel))
+                        piece_type, fraction = _piece_type(full, clipped)
+                        if piece_type == "outside":
+                            continue
+                        if piece_type == "full":
+                            supplemental.append((key, clipped, piece_type, fraction))
+                            continue
+                        vertex_only = all(any(
+                            abs(point[0] - vertex[0]) <= 1e-8
+                            and abs(point[1] - vertex[1]) <= 1e-8
+                            for vertex in full
+                        ) for point in clipped)
+                        standardized = any(
+                            abs(fraction - allowed) <= 1e-8
+                            for allowed in (1 / 6, 1 / 2)
+                        )
+                        if not vertex_only or not standardized:
+                            valid = False
+                            break
+                        supplemental.append((key, clipped, piece_type, fraction))
+                    if valid:
+                        score = (
+                            -((right - left) * (bottom - top)),
+                            len(supplemental),
+                            -left, -top, -right, -bottom,
+                        )
+                        if best is None or score > best[0]:
+                            best = (score, panel, supplemental)
+    if best is None:
+        raise RuntimeError("Custom grid has no vertex-constrained perimeter.")
+    _, raw_panel, supplemental = best
+
+    # Audit one additional lattice ring beyond the construction candidates.
+    # Every positive-area intersection must have been considered and retained;
+    # a touch at a vertex or edge has zero area and is not a physical piece.
+    retained_keys = principal_keys | {key for key, *_ in supplemental}
+    audit_keys = {
+        (row, column)
+        for row in range(-3, tiles_down + 3)
+        for column in range(-3, tiles_across + 3)
+    }
+    for key in audit_keys:
+        full = raw_polygons.get(key)
+        if full is None:
+            full = _polygon(*raw_center(*key), radius, start_deg)
+        clipped = tuple(clip_polygon_to_rect(full, raw_panel))
+        if polygon_area(clipped) > 1e-10 and key not in retained_keys:
+            raise RuntimeError(
+                "Custom grid omitted an intersecting supplemental lattice tile "
+                f"at row {key[0]}, column {key[1]}."
+            )
+
+    width = raw_panel.width
+    height = raw_panel.height
+    rows, columns = tiles_down + 4, tiles_across + 4
+    supplemental_by_key = {key: values for key, *values in supplemental}
+    placements = []
+    for grid_row in range(rows):
+        source_row = grid_row - 2
+        for grid_column in range(columns):
+            source_column = grid_column - 2
+            key = (source_row, source_column)
+            raw_full = raw_polygons[key]
+            full = tuple(
+                (point[0] - raw_panel.left, point[1] - raw_panel.top)
+                for point in raw_full
+            )
+            raw_x, raw_y = raw_center(*key)
+            if key in principal_keys:
+                vertices, piece_type, fraction, principal = full, "full", 1.0, True
+            elif key in supplemental_by_key:
+                raw_vertices, piece_type, fraction = supplemental_by_key[key]
+                vertices = tuple(
+                    (point[0] - raw_panel.left, point[1] - raw_panel.top)
+                    for point in raw_vertices
+                )
+                principal = False
+            else:
+                vertices, piece_type, fraction, principal = (), "outside", 0.0, False
+            placements.append(TilePlacement(
+                row=grid_row, column=grid_column,
+                center_x_in=raw_x - raw_panel.left,
+                center_y_in=raw_y - raw_panel.top,
+                full_vertices_in=full, vertices_in=vertices,
+                piece_type=piece_type, piece_fraction=fraction,
+                principal_grid=principal,
+                principal_row=source_row if principal else None,
+                principal_column=source_column if principal else None,
+            ))
+    final_principal = {
+        (value.principal_row, value.principal_column)
+        for value in placements if value.principal_grid
+    }
+    if final_principal != principal_keys:
+        raise RuntimeError("Custom grid did not preserve principal tile identity.")
+    if any(
+        value.piece_type != "full"
+        or value.vertices_in != value.full_vertices_in
+        for value in placements if value.principal_grid
+    ):
+        raise RuntimeError("Custom grid clipped a requested principal tile.")
+    containment_tolerance = 1e-9
+    if any(
+        point[0] < -containment_tolerance
+        or point[0] > width + containment_tolerance
+        or point[1] < -containment_tolerance
+        or point[1] > height + containment_tolerance
+        for value in placements if value.principal_grid
+        for point in value.full_vertices_in
+    ):
+        raise RuntimeError("Custom grid placed a principal tile outside the panel.")
+    panel = Rect(0.0, 0.0, width, height)
+    return GridGeometry(
+        shape="hex", orientation=orientation,
+        columns=columns, rows=rows, width_in=width, height_in=height,
+        placements=tuple(placements), panel_bounds=panel,
         artwork_bounds=_artwork_bounds(width, height, config.artwork_inset_in),
     )
 

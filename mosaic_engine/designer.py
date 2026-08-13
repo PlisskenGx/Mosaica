@@ -16,7 +16,7 @@ from wsgiref.simple_server import (
 )
 
 from .geometry import (
-    GridGeometry, vertex_constrained_panel_dimensions,
+    GridGeometry, custom_counted_hex_geometry, vertex_constrained_panel_dimensions,
     vertex_constrained_panel_hex_geometry,
 )
 from .model import MosaicConfig
@@ -202,26 +202,16 @@ class DesignerProjectShell:
             if not 1 <= value <= CUSTOM_GRID_MAX:
                 raise ValueError(f"{name} must be between 1 and {CUSTOM_GRID_MAX}.")
         tile = _TILES[tile_id]
-        pitch = tile.flat_to_flat_in + DESIGNER_GROUT_MM / MM_PER_INCH
-        radius = tile.flat_to_flat_in / sqrt(3.0)
-        stagger = sqrt(3.0) / 2.0 * pitch
-        # Counts describe principal full-tile spans; partial boundary pieces
-        # are not included. The staggered axis advances in complete parity
-        # pairs so every arbitrary count remains vertex-constrained.
-        if orientation == "point_top":
-            width, height = tiles_across * pitch, 2 * tiles_down * stagger - radius
-        elif orientation == "flat_top":
-            width, height = 2 * tiles_across * stagger - radius, tiles_down * pitch
-        else:
-            raise ValueError(f"Unsupported canonical hex orientation: {orientation}")
-        canvas = CanvasPreset("custom", "Custom", width, height)
         config = MosaicConfig(
             tile_shape="hex", tile_width_in=tile.flat_to_flat_in,
             tile_height_in=tile.flat_to_flat_in,
             grout_width_in=DESIGNER_GROUT_MM / MM_PER_INCH,
             hex_orientation=orientation,
         )
-        geometry = vertex_constrained_panel_hex_geometry(config, width, height)
+        geometry = custom_counted_hex_geometry(config, tiles_across, tiles_down)
+        canvas = CanvasPreset(
+            "custom", "Custom", geometry.width_in, geometry.height_in,
+        )
         return cls(
             canvas, tile, DESIGNER_GROUT_MM, geometry,
             canvas_mode="custom_grid", tiles_across=tiles_across,
@@ -342,10 +332,17 @@ class DesignerProjectShell:
                         "column": placement.column,
                         "piece_type": placement.piece_type,
                         "piece_fraction": placement.piece_fraction,
+                        "principal_grid": placement.principal_grid,
+                        "principal_row": placement.principal_row,
+                        "principal_column": placement.principal_column,
+                        "center_in": [
+                            placement.center_x_in, placement.center_y_in,
+                        ],
                         "vertices_in": [list(point) for point in placement.vertices_in],
                         "full_vertices_in": (
                             [list(point) for point in placement.full_vertices_in]
-                            if placement.piece_type != "full" else None
+                            if placement.piece_type != "full"
+                            or placement.principal_grid else None
                         ),
                         "parent_center_in": (
                             [placement.center_x_in, placement.center_y_in]

@@ -170,6 +170,8 @@ h1, h2, h3, p { margin-top: 0; }
 .designer-tile.border-owned { stroke: #53545a; stroke-width: .8px; }
 .designer-tile.cut { stroke: #6e6e73; stroke-width: 1.15px; stroke-dasharray: 2px 1px; }
 .panel-boundary { fill: none; stroke: #59595e; stroke-width: 1.5px; vector-effect: non-scaling-stroke; }
+.tile-hit-layer { pointer-events: none; }
+.tile-paint-hit { fill: transparent; stroke: none; pointer-events: none; }
 .artwork-object { cursor: move; touch-action: none; }
 .artwork-hit { fill: transparent; pointer-events: all; }
 .artwork-selection { fill: none; stroke: #1778d4; stroke-width: 1.5px; stroke-dasharray: 4px 3px; vector-effect: non-scaling-stroke; pointer-events: none; }
@@ -204,7 +206,9 @@ h1, h2, h3, p { margin-top: 0; }
 #mosaic-canvas.paint-active .designer-tile.editable { pointer-events: all; }
 #mosaic-canvas.paint-active .protected-layer,
 #mosaic-canvas.paint-active .partial-aid-layer,
-#mosaic-canvas.paint-active .partial-parent-hit { pointer-events: all; }
+#mosaic-canvas.paint-active .partial-parent-hit,
+#mosaic-canvas.paint-active .tile-hit-layer,
+#mosaic-canvas.paint-active .tile-paint-hit { pointer-events: all; }
 #mosaic-canvas.paint-active .designer-tile.editable:hover { stroke: #1778d4; stroke-width: 1.5px; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .artwork-control { padding: 1rem .1rem 1.2rem; border-top: 1px solid #e4e4e7; }

@@ -4,7 +4,7 @@ import json
 import pytest
 
 import mosaic_engine.designer_generation as generation_module
-from mosaic_engine.designer import MosaicDesignerApp
+from mosaic_engine.designer import DesignerProjectShell, MosaicDesignerApp
 
 
 def _request(app, method, path, body=None):
@@ -126,6 +126,65 @@ def test_every_visible_piece_is_editable_but_unknown_batch_is_atomic():
     assert app.paint_overrides == {
         valid: "project-color-2", protected: "project-color-2",
     }
+
+
+@pytest.mark.parametrize("orientation", ("flat_top", "point_top"))
+@pytest.mark.parametrize("across,down", (
+    (1, 1), (2, 2), (3, 3), (5, 5), (5, 3), (3, 5), (10, 10),
+))
+def test_every_custom_visible_piece_is_paint_resolvable(orientation, across, down):
+    payload = DesignerProjectShell.create_custom(
+        "l", orientation, across, down,
+    ).to_dict()
+    visible = payload["geometry"]["tiles"]
+    assert len(visible) == payload["geometry"]["visible_piece_count"]
+    assert len({tile["id"] for tile in visible}) == len(visible)
+    assert all(tile["editable"] is True for tile in visible)
+    assert sum(tile["principal_grid"] for tile in visible) == across * down
+    assert all(
+        tile["piece_type"] == "full"
+        for tile in visible if tile["principal_grid"]
+    )
+    assert sum(value["count"] for value in payload["color_counts"]) == len(visible)
+
+
+def test_flat_top_bold_custom_5_by_5_edge_pieces_paint_and_erase():
+    app = MosaicDesignerApp()
+    _request(app, "POST", "/api/designer/shape", {
+        "shape": "hexagon", "orientation": "flat_top",
+    })
+    _request(app, "POST", "/api/designer/tile", {
+        "tile_id": "l", "orientation": "flat_top",
+    })
+    _request(app, "POST", "/api/designer/canvas", {
+        "canvas_id": "custom", "tiles_across": 5, "tiles_down": 5,
+    })
+    _, initial = _request(app, "GET", "/api/designer")
+    visible = initial["project"]["geometry"]["tiles"]
+    assert len(visible) == 45
+    assert sum(tile["principal_grid"] for tile in visible) == 25
+    ids = [
+        tile["id"] for tile in visible
+        if tile["principal_grid"]
+        and tile["principal_row"] == 4
+        and tile["principal_column"] in {1, 3}
+    ]
+    assert len(ids) == 2
+    restored_bottom = [_tile(initial, tile_id) for tile_id in ids]
+    assert all(tile["piece_type"] == "full" for tile in restored_bottom)
+    assert all(tile["principal_grid"] for tile in restored_bottom)
+    assert all(tile["editable"] for tile in restored_bottom)
+
+    status, painted = _request(app, "POST", "/api/designer/paint", {
+        "placement_ids": ids, "mode": "paint", "color_id": "project-color-2",
+    })
+    assert status == "200 OK"
+    assert painted["paint"]["overrides"] == dict.fromkeys(ids, "project-color-2")
+    status, erased = _request(app, "POST", "/api/designer/paint", {
+        "placement_ids": ids, "mode": "restore",
+    })
+    assert status == "200 OK"
+    assert erased["paint"]["overrides"] == {}
 
 
 def test_manual_paint_has_precedence_across_every_border_change():
@@ -286,15 +345,36 @@ def test_paint_ui_uses_one_stroke_batch_with_rollback_and_no_geometry_math():
     assert "hex_geometry" not in script
 
 
-def test_parent_preview_is_topmost_unclipped_and_paint_gated():
+def test_parent_preview_is_below_physical_tiles_and_paint_gated():
     app = MosaicDesignerApp()
     _, script = _request(app, "GET", "/designer.js")
     _, stylesheet = _request(app, "GET", "/designer.css")
+    assert script.index("svg.appendChild(partialAidLayer)") < script.index(
+        "svg.appendChild(baseLayer)"
+    ) < script.index("svg.appendChild(protectedLayer)")
     assert script.index("svg.appendChild(boundary)") < script.index(
-        "svg.appendChild(partialAidLayer)"
-    )
+        "svg.appendChild(tileHitLayer)"
+    ) < script.index("renderArtwork(svg, project.artwork)")
     assert "overflow: visible" in stylesheet
     assert ".partial-parent-ghost { fill: none" in stylesheet
     assert "#mosaic-canvas.paint-active .partial-parent-ghost.visible" in stylesheet
     assert "if (paintTool === null || !tileId) return" in script
     assert "if (paintTool === null) return hidePartialPreview()" in script
+
+
+def test_every_visible_piece_gets_an_exact_top_level_paint_hit_polygon():
+    app = MosaicDesignerApp()
+    _, script = _request(app, "GET", "/designer.js")
+    _, stylesheet = _request(app, "GET", "/designer.css")
+    render = script[
+        script.index("function renderWorkspace()"):
+        script.index("function renderWorkspaceStatus")
+    ]
+    assert 'tileHitLayer.classList.add("tile-hit-layer")' in render
+    assert 'paintHit.classList.add("tile-paint-hit", "editable")' in render
+    assert "paintHit.dataset.tileId = tile.id" in render
+    assert 'paintHit.setAttribute("points", polygon.getAttribute("points"))' in render
+    assert "tileHitLayer.appendChild(paintHit)" in render
+    assert ".tile-paint-hit.editable" in script
+    assert ".tile-paint-hit { fill: transparent; stroke: none; pointer-events: none; }" in stylesheet
+    assert "#mosaic-canvas.paint-active .tile-paint-hit { pointer-events: all; }" in stylesheet
