@@ -821,7 +821,7 @@ def test_frontend_exposes_explicit_generation_without_client_classification():
     app = _app()
     status, html = _asset(app, "/")
     assert status == "200 OK"
-    assert "Generate Mosaic" in html and "Edit Artwork" in html
+    assert "Generate Mosaic" in html and '>Edit</button>' in html
     _, script = _asset(app, "/designer.js")
     assert '{ requireGenerated: true, name: "Generate Mosaic" }' in script
     assert 'artwork-generate' in script

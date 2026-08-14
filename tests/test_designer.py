@@ -2,11 +2,13 @@ from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO, StringIO
 import json
 from math import isclose, sqrt
+from pathlib import Path
 import sys
 from wsgiref.util import setup_testing_defaults
 
 import pytest
 
+from mosaic_engine import __version__
 import mosaic_engine.designer as designer_module
 from mosaic_engine.cli import main
 from mosaic_engine.designer import (
@@ -46,9 +48,9 @@ def _request(app, method, path, body=None):
 
 def test_all_canvas_presets_have_exact_fixed_dimensions():
     assert [(value.id, value.name, value.width_in, value.height_in) for value in CANVAS_PRESETS] == [
-        ("square", "Square", 36.0, 36.0),
-        ("portrait", "Portrait", 24.0, 36.0),
         ("landscape", "Landscape", 36.0, 24.0),
+        ("portrait", "Portrait", 24.0, 36.0),
+        ("square", "Square", 24.0, 24.0),
     ]
 
 
@@ -81,7 +83,9 @@ def test_canvas_presets_preserve_nominal_aspect_ratios():
             payload["preview_width_rem"] / payload["preview_height_rem"],
             payload["aspect_ratio"],
         )
-    assert [value["aspect_ratio"] for value in payloads] == [1.0, 2 / 3, 1.5]
+    assert [value["aspect_ratio"] for value in payloads] == [1.5, 2 / 3, 1.0]
+    assert payloads[2]["preview_width_rem"] < payloads[0]["preview_width_rem"]
+    assert payloads[2]["preview_height_rem"] == payloads[0]["preview_height_rem"]
 
 
 @pytest.mark.parametrize("canvas_id,tile_id", [
@@ -179,7 +183,7 @@ def test_designer_assets_use_backend_polygons_and_responsive_regions():
     status, html = _request(app, "GET", "/")
     assert status == "200 OK"
     assert "Mosaica" in html
-    assert "by Veradura Design" in html
+    assert "by Veradura Design" not in html
     assert "Mosaic Designer" not in html
     assert "<title>Mosaica</title>" in html
     assert "New mosaic" not in html
@@ -198,8 +202,9 @@ def test_designer_assets_use_backend_polygons_and_responsive_regions():
     assert '<div class="app-bar-left">' in html
     assert '<button id="back" class="back-navigation" type="button" aria-label="Back to canvas setup" hidden>‹</button>' in html
     assert "‹ Back" not in html
-    assert html.index('class="brand"') < html.index('id="back"')
-    assert html.index('id="back"') < html.index('id="document-title"')
+    assert html.index('id="back"') < html.index('class="brand"')
+    assert html.index('class="brand"') < html.index('id="document-title"')
+    assert html.index('id="back"') < html.index('id="workspace"')
     assert 'id="tiles-heading">Tiles<' in html
     assert "Physical canvas" not in html
     assert 'id="workspace-title"' not in html
@@ -210,7 +215,7 @@ def test_designer_assets_use_backend_polygons_and_responsive_regions():
     assert "Coming later" not in html
     assert '<span class="brand-mark" aria-hidden="true"></span>' in html
     assert '<span class="brand-copy">' in html
-    assert '<span class="brand-attribution">by Veradura Design</span>' in html
+    assert "brand-attribution" not in html
     assert '<svg class="brand-mark"' not in html
     assert "<polygon points=" not in html
 
@@ -255,7 +260,8 @@ def test_workspace_and_sidebar_polish_is_structurally_scoped():
     assert '>Erase</button>' not in html
     assert 'id="paint-assign"' not in html
     assert 'id="design-palette"' in html
-    assert '>Clear Edits</button>' in html
+    assert '>Clear</button>' in html
+    assert '>Clear Edits</button>' not in html
     assert " in actual`" not in script
     assert ".back-navigation" in stylesheet
     assert "font-size: .85rem" in stylesheet
@@ -294,10 +300,10 @@ def test_workspace_and_sidebar_polish_is_structurally_scoped():
     assert "border-radius: 38%" in stylesheet
     assert "transform: rotate(30deg)" in stylesheet
     assert ".app-bar-left { grid-column: 1" in stylesheet
-    assert ".brand-attribution" in stylesheet
-    assert ".brand-copy { display: flex; align-items: baseline" in stylesheet
+    assert ".brand-attribution" not in stylesheet
+    assert ".brand-copy { display: flex; align-items: center" in stylesheet
     assert ".brand-copy strong { font-size: 1.2rem; }" in stylesheet
-    assert ".brand-attribution { display: none; }" in stylesheet
+    assert ".workspace-navigation" not in stylesheet
     assert ".back-navigation" in stylesheet
     assert "border: 0" in stylesheet
     assert "background: transparent" in stylesheet
@@ -306,8 +312,26 @@ def test_workspace_and_sidebar_polish_is_structurally_scoped():
     assert ".quiet-button" not in stylesheet
 
 
+def test_workspace_status_uses_authoritative_version_and_two_part_layout():
+    app = MosaicDesignerApp()
+    _, payload = _request(app, "GET", "/api/designer")
+    _, script = _request(app, "GET", "/designer.js")
+    _, stylesheet = _request(app, "GET", "/designer.css")
+    metadata = Path("pyproject.toml").read_text()
+    assert __version__ == "1.9.5"
+    assert payload["app_version"] == __version__
+    assert 'dynamic = ["version"]' in metadata
+    assert 'version = {attr = "mosaic_engine.__version__"}' in metadata
+    assert 'version = "0.6.3"' not in metadata
+    assert "Copyright Veradura Design" not in script
+    assert "version.textContent = `v${state.app_version}`" in script
+    assert "grid-template-columns: minmax(0, 1fr) auto" in stylesheet
+    assert ".status-copyright" not in stylesheet
+    assert ".status-version { justify-self: end" in stylesheet
+
+
 @pytest.mark.parametrize("canvas_id,columns,rows,total", [
-    ("square", 4, 4, 16),
+    ("square", 3, 3, 9),
     ("portrait", 3, 4, 12),
     ("landscape", 4, 3, 12),
 ])

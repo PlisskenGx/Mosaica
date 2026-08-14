@@ -326,7 +326,8 @@ def test_paint_ui_uses_one_stroke_batch_with_rollback_and_no_geometry_math():
     assert 'id="design-palette"' in html
     assert 'id="tiles-heading">Tiles<' in html
     assert 'id="paint-clear"' in html
-    assert '>Clear Edits</button>' in html
+    assert '>Clear</button>' in html
+    assert '>Clear Edits</button>' not in html
     assert "window.confirm" not in script
     assert 'new Set()' in script
     assert '"/api/designer/paint"' in script
@@ -334,18 +335,21 @@ def test_paint_ui_uses_one_stroke_batch_with_rollback_and_no_geometry_math():
     assert "partial-parent-ghost" in script
     assert "partial-parent-hit" in script
     assert "full_vertices_in" in script
-    assert "elementsFromPoint" in script
-    assert "localeCompare" in script
+    assert "elementsFromPoint" not in script
+    assert "localeCompare" not in script
     assert "resolvePartialTarget" in script
-    assert "updatePartialPreview" in script
+    assert "updatePartialPreview" not in script
     assert "showPartialPreview" in script
+    assert 'addEventListener("pointermove", updatePartialPreview)' not in script
     assert "hidePartialPreview" in script
     assert 'addEventListener("pointerleave", hidePartialPreview)' in script
     assert "pointerup" in script
     assert "hex_geometry" not in script
     _, stylesheet = _request(app, "GET", "/designer.css")
     assert ".tile-color-swatch" in stylesheet
-    assert ".paint-colors.flat-top .tile-color-swatch" in stylesheet
+    assert ".paint-colors.flat-top .tile-color-swatch" not in stylesheet
+    tile_style = stylesheet[stylesheet.index(".tile-color-swatch {"):]
+    assert "border-radius: 50%" in tile_style[:tile_style.index("}")]
     assert '"flat-top", state.project.tile_orientation === "flat_top"' in script
 
 
@@ -493,7 +497,7 @@ def test_parent_preview_is_below_physical_tiles_and_paint_gated():
     assert ".partial-parent-ghost { fill: none" in stylesheet
     assert "#mosaic-canvas.paint-active .partial-parent-ghost.visible" in stylesheet
     assert "if (paintTool === null || !tileId) return" in script
-    assert "if (paintTool === null) return hidePartialPreview()" in script
+    assert "updatePartialPreview" not in script
     assert ".panel-boundary { fill: none" in stylesheet
     assert "pointer-events: none" in stylesheet[stylesheet.index(".panel-boundary"):stylesheet.index(".tile-hit-layer")]
 
@@ -521,17 +525,16 @@ def test_every_custom_clipped_piece_exposes_full_parent_hit_geometry(
     )
 
 
-def test_partial_target_resolution_prioritizes_physical_then_nearest_then_id():
+def test_partial_target_resolution_accepts_visible_and_full_parent_geometry():
     app = MosaicDesignerApp()
     _, script = _request(app, "GET", "/designer.js")
     resolver = script[
         script.index("function resolvePartialTarget"):
         script.index("function showPartialPreview")
     ]
-    assert "if (actual)" in resolver
-    assert "target = actual" in resolver
-    assert "leftDistance - rightDistance" in resolver
-    assert "left.dataset.tileId.localeCompare(right.dataset.tileId)" in resolver
+    assert ".tile-paint-hit.editable, .designer-tile.editable, .partial-parent-hit.editable" in resolver
+    assert "partial-parent-hit" in resolver
+    assert "elementsFromPoint" not in resolver
 
 
 def test_every_visible_piece_gets_an_exact_top_level_paint_hit_polygon():
@@ -548,5 +551,96 @@ def test_every_visible_piece_gets_an_exact_top_level_paint_hit_polygon():
     assert 'paintHit.setAttribute("points", polygon.getAttribute("points"))' in render
     assert "tileHitLayer.appendChild(paintHit)" in render
     assert ".tile-paint-hit.editable" in script
-    assert ".tile-paint-hit { fill: transparent; stroke: none; pointer-events: none; }" in stylesheet
-    assert "#mosaic-canvas.paint-active .tile-paint-hit { pointer-events: all; }" in stylesheet
+    assert ".tile-paint-hit { fill: transparent; stroke: none; pointer-events: all; }" in stylesheet
+    assert ".tile-hit-layer { pointer-events: all; }" in stylesheet
+
+
+def test_each_clipped_piece_gets_a_full_parent_hex_pointer_surface():
+    app = MosaicDesignerApp()
+    _, script = _request(app, "GET", "/designer.js")
+    _, stylesheet = _request(app, "GET", "/designer.css")
+    render = script[
+        script.index("function renderWorkspace()"):script.index("function renderWorkspaceStatus")
+    ]
+    assert 'hit.classList.add("partial-parent-hit", "editable")' in render
+    assert 'hit.setAttribute("points", ghost.getAttribute("points"))' in render
+    assert "partialAidLayer.append(ghost, hit)" in render
+    assert ".partial-aid-layer { pointer-events: all; }" in stylesheet
+    assert ".partial-parent-hit { fill: transparent; stroke: none; pointer-events: all; }" in stylesheet
+
+
+@pytest.mark.parametrize("edge", ("left", "right", "top", "bottom"))
+def test_custom_clipped_edge_tiles_expose_missing_full_hex_hit_regions(edge):
+    geometry = DesignerProjectShell.create_custom(
+        "m", "point_top", 10, 10,
+    ).to_dict()["geometry"]
+    epsilon = 1e-8
+    visible_boundaries = {
+        "left": lambda xs, ys: min(xs) <= epsilon,
+        "right": lambda xs, ys: max(xs) >= geometry["width_in"] - epsilon,
+        "top": lambda xs, ys: min(ys) <= epsilon,
+        "bottom": lambda xs, ys: max(ys) >= geometry["height_in"] - epsilon,
+    }
+    extends_outside = {
+        "left": lambda xs, ys: min(xs) < -epsilon,
+        "right": lambda xs, ys: max(xs) > geometry["width_in"] + epsilon,
+        "top": lambda xs, ys: min(ys) < -epsilon,
+        "bottom": lambda xs, ys: max(ys) > geometry["height_in"] + epsilon,
+    }
+    pieces = []
+    for tile in geometry["tiles"]:
+        if tile["piece_type"] == "full":
+            continue
+        xs = [point[0] for point in tile["vertices_in"]]
+        ys = [point[1] for point in tile["vertices_in"]]
+        if visible_boundaries[edge](xs, ys):
+            pieces.append(tile)
+    assert pieces
+    assert all(tile["vertices_in"] != tile["full_vertices_in"] for tile in pieces)
+    assert any(
+        extends_outside[edge](
+            [point[0] for point in tile["full_vertices_in"]],
+            [point[1] for point in tile["full_vertices_in"]],
+        )
+        for tile in pieces
+    )
+
+
+def test_custom_corner_pieces_keep_full_hex_hit_regions_past_applicable_edges():
+    geometry = DesignerProjectShell.create_custom(
+        "m", "point_top", 10, 10,
+    ).to_dict()["geometry"]
+    epsilon = 1e-8
+    corners = (
+        (0, 0), (geometry["width_in"], 0),
+        (0, geometry["height_in"]),
+        (geometry["width_in"], geometry["height_in"]),
+    )
+    for corner_x, corner_y in corners:
+        matching = [
+            tile for tile in geometry["tiles"]
+            if tile["piece_type"] != "full" and any(
+                abs(x - corner_x) <= epsilon and abs(y - corner_y) <= epsilon
+                for x, y in tile["vertices_in"]
+            )
+        ]
+        assert len(matching) == 1
+        full_x = [point[0] for point in matching[0]["full_vertices_in"]]
+        full_y = [point[1] for point in matching[0]["full_vertices_in"]]
+        extends_x = min(full_x) < -epsilon if corner_x == 0 else max(full_x) > corner_x + epsilon
+        extends_y = min(full_y) < -epsilon if corner_y == 0 else max(full_y) > corner_y + epsilon
+        assert extends_x or extends_y
+
+
+def test_tile_hover_toggles_real_polygon_without_rerendering():
+    app = MosaicDesignerApp()
+    _, script = _request(app, "GET", "/designer.js")
+    _, stylesheet = _request(app, "GET", "/designer.css")
+    assert "function updateTileHover(event)" in script
+    assert 'byId(hoveredTileId)?.classList.add("hovered")' in script
+    assert 'byId(hoveredTileId)?.classList.remove("hovered")' in script
+    assert 'addEventListener("pointermove", updateTileHover)' in script
+    assert 'addEventListener("pointerleave", clearTileHover)' in script
+    assert ".designer-tile.editable.hovered" in stylesheet
+    hover = script[script.index("function updateTileHover"):script.index("function clearTileHover")]
+    assert "renderWorkspace" not in hover

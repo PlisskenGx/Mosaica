@@ -276,6 +276,15 @@ def test_frontend_uses_vector_pointer_interaction_and_four_corner_handles():
     assert 'id="artwork-replace"' not in html
     assert ">Replace<" not in html
     assert 'id="artwork-preview-image"' in html
+    assert 'class="artwork-info-preview"' in html
+    loaded = html[html.index('id="artwork-loaded"'):html.index('id="artwork-colors"')]
+    assert loaded.index('id="artwork-filename"') < loaded.index('id="artwork-preview-image"')
+    assert loaded.index('id="artwork-size"') < loaded.index('id="artwork-selection-state"')
+    assert loaded.index('id="artwork-selection-state"') < loaded.index('id="artwork-generation-state"')
+    assert loaded.index('id="artwork-generation-state"') < loaded.index('id="artwork-generate"')
+    assert loaded.index('id="artwork-generate"') < loaded.index('class="artwork-actions"')
+    actions = loaded[loaded.index('class="artwork-actions"'):]
+    assert actions.index('id="artwork-edit"') < actions.index('id="artwork-reset"') < actions.index('id="artwork-remove"')
     _, script = _asset_request(app, "/designer.js")
     assert "DOMParser" in script
     assert "artwork.sanitized_svg" in script
@@ -308,6 +317,11 @@ def test_frontend_uses_vector_pointer_interaction_and_four_corner_handles():
     assert "touch-action: none" in css
     assert ".artwork-preview img" in css
     assert "object-fit: contain" in css
+    assert "grid-template-columns: minmax(0, 1fr) 4rem" in css
+    assert ".artwork-preview { display: grid; place-items: center; width: 4rem; height: 4rem" in css
+    assert ".artwork-actions { display: grid; grid-template-columns: repeat(3" in css
+    assert 'byId("artwork-filename").title = artwork.source_filename' in script
+    assert 'byId("artwork-edit").disabled = artwork.edit_mode' in script
 
 
 def test_side_resize_math_has_independent_axes_anchors_and_minimums():

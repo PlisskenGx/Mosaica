@@ -219,7 +219,7 @@ def test_changing_tile_before_recreating_custom_canvas_does_not_open_workspace()
 
 def test_three_primary_canvas_choices_and_dedicated_custom_action():
     assert [value.name for value in CANVAS_PRESETS] == [
-        "Square", "Portrait", "Landscape",
+        "Landscape", "Portrait", "Square",
     ]
     app = MosaicDesignerApp()
     _, html = _request(app, "GET", "/")
@@ -296,6 +296,9 @@ def test_canvas_cards_use_common_larger_illustration_region():
     assert ".canvas-card { min-height: 17rem; }" in css
     assert ".canvas-preview-wrap { display: grid; height: 10.5rem" in css
     assert "height: min(8rem, 82%)" in css
+    assert "aspect-ratio: var(--aspect)" in css
+    assert ".custom-lattice" in css and "transform: translateX(20px)" in css
+    assert ".custom-lattice { transform: none; }" in css
 
 
 def test_orientation_belongs_to_shape_and_tile_cards_are_size_only():

@@ -418,9 +418,14 @@ def test_toolbox_swatch_actions_and_upload_cta_use_quiet_canonical_treatment():
     assert 'id="grout-color" class="text-action compact-color-action"' in html
     resting = stylesheet[stylesheet.index(".tile-color-swatch {"):]
     resting = resting[:resting.index("}")]
-    assert "drop-shadow" in resting
-    assert "drop-shadow(0 0" not in resting
+    assert "border-radius: 50%" in resting
+    assert "clip-path" not in resting and "drop-shadow" not in resting
+    assert "width: 2rem" in resting and "height: 2rem" in resting
     assert '.tile-color-swatch[aria-pressed="true"]' in stylesheet
+    shared = stylesheet[stylesheet.index(".border-color-swatch, .artwork-color-swatch") :]
+    shared = shared[:shared.index("}")]
+    assert "border-radius: 50%" in shared
+    assert "clip-path" not in shared
     assert ".text-action" in stylesheet
     assert 'color.color_id === "project-color-5"' in script
     assert '"--artwork-cta-color", canonicalCta.display_color' in script

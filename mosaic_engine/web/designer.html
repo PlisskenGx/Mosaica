@@ -9,14 +9,13 @@
 <body>
   <header class="app-bar">
     <div class="app-bar-left">
+      <button id="back" class="back-navigation" type="button" aria-label="Back to canvas setup" hidden>‹</button>
       <div class="brand">
         <span class="brand-mark" aria-hidden="true"></span>
         <span class="brand-copy">
           <strong>Mosaica</strong>
-          <span class="brand-attribution">by Veradura Design</span>
         </span>
       </div>
-      <button id="back" class="back-navigation" type="button" aria-label="Back to canvas setup" hidden>‹</button>
     </div>
     <div id="document-title" class="document-title" aria-label="Document title">
       <span id="document-name">Untitled</span><span id="document-edited" hidden>Edited</span>
@@ -101,7 +100,7 @@
           <div id="paint-tools">
             <div id="paint-colors" class="paint-colors" aria-label="Tile colors"></div>
             <div class="paint-actions" aria-label="Tiles actions">
-              <button id="paint-clear" class="text-action danger-text" type="button">Clear Edits</button>
+              <button id="paint-clear" class="text-action danger-text" type="button">Clear</button>
               <button id="grout-color" class="text-action compact-color-action" type="button" aria-label="Set Grout color"><span>Set Grout</span><span class="current-color-dot" aria-hidden="true"></span></button>
             </div>
           </div>
@@ -116,28 +115,28 @@
         <section class="artwork-control" aria-labelledby="artwork-heading">
           <div class="artwork-control-heading">
             <strong id="artwork-heading">Artwork</strong>
-            <span id="artwork-selection-state"></span>
           </div>
           <input id="artwork-file" class="visually-hidden" type="file" accept=".svg,image/svg+xml">
           <div id="artwork-empty">
             <button id="artwork-upload" class="inspector-action primary" type="button">Upload SVG</button>
           </div>
           <div id="artwork-loaded" hidden>
-            <div class="artwork-preview" aria-label="Artwork preview">
-              <img id="artwork-preview-image" alt="">
+            <div class="artwork-info-preview">
+              <div class="artwork-file-row">
+                <span id="artwork-filename"></span>
+                <span id="artwork-size"></span>
+                <span id="artwork-selection-state"></span>
+                <span id="artwork-generation-state"></span>
+              </div>
+              <div class="artwork-preview" aria-label="Artwork preview">
+                <img id="artwork-preview-image" alt="">
+              </div>
             </div>
-            <div class="artwork-file-row">
-              <span id="artwork-filename"></span>
-              <span id="artwork-size"></span>
-            </div>
+            <button id="artwork-generate" class="inspector-action primary" type="button">Generate Mosaic</button>
             <div class="artwork-actions">
+              <button id="artwork-edit" class="inspector-action" type="button">Edit</button>
               <button id="artwork-reset" class="inspector-action" type="button">Reset</button>
               <button id="artwork-remove" class="inspector-action danger-text" type="button">Remove</button>
-            </div>
-            <div class="artwork-generation">
-              <span id="artwork-generation-state"></span>
-              <button id="artwork-generate" class="inspector-action primary" type="button">Generate Mosaic</button>
-              <button id="artwork-edit" class="inspector-action" type="button" hidden>Edit Artwork</button>
             </div>
             <div id="artwork-colors" class="artwork-colors" aria-label="Artwork colors"></div>
           </div>

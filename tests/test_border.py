@@ -56,6 +56,9 @@ def test_curated_border_preset_definitions_are_fixed_and_deterministic():
     assert [value.id for value in BORDER_PRESETS] == [
         "none", "solid", "double", "alternating",
     ]
+    assert [value.name for value in BORDER_PRESETS] == [
+        "None", "Solid", "Double", "Alternate",
+    ]
     assert [value.depth for value in BORDER_PRESETS] == [0, 1, 2, 1]
     assert BORDER_PRESETS[1].pattern_roles == ("border_primary",)
     assert BORDER_PRESETS[2].pattern_roles == (

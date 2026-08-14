@@ -15,6 +15,8 @@ from wsgiref.simple_server import (
     make_server,
 )
 
+from . import __version__
+
 from .geometry import (
     GridGeometry, custom_counted_hex_geometry, vertex_constrained_panel_dimensions,
     vertex_constrained_panel_hex_geometry,
@@ -129,9 +131,9 @@ class TilePreset:
 
 
 CANVAS_PRESETS = (
-    CanvasPreset("square", "Square", 36.0, 36.0),
-    CanvasPreset("portrait", "Portrait", 24.0, 36.0),
     CanvasPreset("landscape", "Landscape", 36.0, 24.0),
+    CanvasPreset("portrait", "Portrait", 24.0, 36.0),
+    CanvasPreset("square", "Square", 24.0, 24.0),
 )
 
 TILE_PRESETS = (
@@ -970,6 +972,7 @@ class MosaicDesignerApp:
                     "width_in": width, "height_in": height,
                 }
         return {
+            "app_version": __version__,
             "stage": (
                 "workspace" if self.project is not None
                 else "canvas" if self.tile_id is not None

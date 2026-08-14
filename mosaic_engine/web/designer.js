@@ -10,6 +10,7 @@
   let activeTileColorId = null;
   let paintStroke = null;
   let activePartialPreviewId = null;
+  let hoveredTileId = null;
   let paletteSelectionHandler = null;
   let paletteInvoker = null;
   let selectedShapeOrientation = "point_top";
@@ -331,18 +332,16 @@
         const hit = document.createElementNS(SVG_NS, "polygon");
         hit.classList.add("partial-parent-hit", "editable");
         hit.dataset.tileId = tile.id;
-        [hit.dataset.centerX, hit.dataset.centerY] = tile.parent_center_in;
         hit.setAttribute("points", ghost.getAttribute("points"));
-        hit.setAttribute("aria-label", `Edit ${tile.piece_type} tile, row ${tile.row + 1}, column ${tile.column + 1}`);
+        hit.setAttribute("aria-hidden", "true");
         polygon.setAttribute("tabindex", "0");
         polygon.addEventListener("focus", () => showPartialPreview(tile.id));
         polygon.addEventListener("blur", hidePartialPreview);
         partialAidLayer.append(ghost, hit);
       }
     }
-    // Parent-hex interaction aids sit below real physical polygons. Their
-    // uncovered area remains usable, while no aid can intercept a click on
-    // another visible piece.
+    // Full parent hexes remain interactive beneath the real visible pieces,
+    // including their clipped continuation beyond the finished panel.
     svg.appendChild(partialAidLayer);
     svg.appendChild(baseLayer);
     svg.appendChild(protectedLayer);
@@ -369,12 +368,14 @@
   }
 
   function renderWorkspaceStatus(project) {
-    const geometry = project.geometry;
     const orientationName = orientationLabel(project.tile_orientation);
     const canvasSummary = project.canvas_mode === "custom_grid"
       ? `${project.custom_grid.tiles_across} × ${project.custom_grid.tiles_down} tiles`
       : `${project.canvas_preset.width_in} × ${project.canvas_preset.height_in} in`;
     const statusBar = byId("workspace-status");
+    const version = document.createElement("span");
+    version.className = "status-version";
+    version.textContent = `v${state.app_version}`;
     statusBar.replaceChildren(
       createStatusGroup("status-project-summary", [
         tileShapeLabel(project.tile_shape),
@@ -382,6 +383,7 @@
         project.tile_preset.title,
         canvasSummary,
       ]),
+      version,
     );
   }
 
@@ -606,14 +608,15 @@
     if (artwork) {
       const transform = previewTransform || artwork.transform;
       byId("artwork-filename").textContent = artwork.source_filename;
+      byId("artwork-filename").title = artwork.source_filename;
       byId("artwork-size").textContent = (
         `${transform.width_in.toFixed(2)} × ${transform.height_in.toFixed(2)} in`
       );
       byId("artwork-generate").textContent = generated ? "Regenerate Mosaic" : "Generate Mosaic";
-      byId("artwork-edit").hidden = !generated || artwork.edit_mode;
+      byId("artwork-edit").disabled = artwork.edit_mode;
       byId("artwork-generation-state").textContent = generated?.needs_regeneration
         ? "Needs update"
-        : generated ? "Mosaic generated" : "";
+        : generated ? "Mosaic Generated" : "";
     }
     const channels = byId("artwork-colors");
     channels.replaceChildren();
@@ -663,7 +666,7 @@
       (color) => color.color_id === "project-color-5",
     );
     if (canonicalCta) {
-      byId("artwork-upload").style.setProperty(
+      document.querySelector(".artwork-control").style.setProperty(
         "--artwork-cta-color", canonicalCta.display_color,
       );
     }
@@ -1102,40 +1105,23 @@
   }
 
   function resolvePartialTarget(event, initialTarget = null) {
-    let target = initialTarget || event.target.closest?.(
+    return initialTarget || event.target.closest?.(
       ".tile-paint-hit.editable, .designer-tile.editable, .partial-parent-hit.editable",
     );
-    if (target?.classList.contains("partial-parent-hit") && event.clientX !== undefined) {
-      const svg = byId("mosaic-canvas");
-      const point = svg.createSVGPoint();
-      point.x = event.clientX;
-      point.y = event.clientY;
-      const physical = point.matrixTransform(svg.getScreenCTM().inverse());
-      const actual = document.elementsFromPoint(event.clientX, event.clientY).find(
-        (element) => element.classList?.contains("designer-tile")
-          && element.classList.contains("cut"),
-      );
-      if (actual) {
-        target = actual;
-      } else {
-        const candidates = document.elementsFromPoint(event.clientX, event.clientY).filter(
-          (element) => element.classList?.contains("partial-parent-hit"),
-        );
-        target = candidates.sort((left, right) => {
-          const leftDistance = Math.hypot(
-            Number(left.dataset.centerX) - physical.x,
-            Number(left.dataset.centerY) - physical.y,
-          );
-          const rightDistance = Math.hypot(
-            Number(right.dataset.centerX) - physical.x,
-            Number(right.dataset.centerY) - physical.y,
-          );
-          return leftDistance - rightDistance
-            || left.dataset.tileId.localeCompare(right.dataset.tileId);
-        })[0] || target;
-      }
-    }
-    return target;
+  }
+
+  function updateTileHover(event) {
+    const target = resolvePartialTarget(event);
+    const tileId = target?.dataset.tileId || target?.id || null;
+    if (tileId === hoveredTileId) return;
+    if (hoveredTileId) byId(hoveredTileId)?.classList.remove("hovered");
+    hoveredTileId = tileId;
+    if (hoveredTileId) byId(hoveredTileId)?.classList.add("hovered");
+  }
+
+  function clearTileHover() {
+    if (hoveredTileId) byId(hoveredTileId)?.classList.remove("hovered");
+    hoveredTileId = null;
   }
 
   function showPartialPreview(tileId) {
@@ -1154,15 +1140,6 @@
       `.partial-parent-ghost[data-tile-id="${activePartialPreviewId}"]`,
     )?.classList.remove("visible");
     activePartialPreviewId = null;
-  }
-
-  function updatePartialPreview(event) {
-    if (paintTool === null) return hidePartialPreview();
-    const target = resolvePartialTarget(event);
-    const tileId = target?.dataset.tileId || target?.id;
-    const stateTile = state.project.geometry.tiles.find((value) => value.id === tileId);
-    if (stateTile?.piece_type !== "full") showPartialPreview(tileId);
-    else hidePartialPreview();
   }
 
   function paintTileFromEvent(event) {
@@ -1413,14 +1390,16 @@
   byId("mosaic-canvas").addEventListener("pointerdown", beginArtworkInteraction);
   byId("mosaic-canvas").addEventListener("pointerdown", beginPaintStroke);
   byId("mosaic-canvas").addEventListener("pointermove", moveArtworkInteraction);
-  byId("mosaic-canvas").addEventListener("pointermove", updatePartialPreview);
+  byId("mosaic-canvas").addEventListener("pointermove", updateTileHover);
   byId("mosaic-canvas").addEventListener("pointermove", movePaintStroke);
   byId("mosaic-canvas").addEventListener("pointerleave", hidePartialPreview);
+  byId("mosaic-canvas").addEventListener("pointerleave", clearTileHover);
   byId("mosaic-canvas").addEventListener("pointerup", finishArtworkInteraction);
   byId("mosaic-canvas").addEventListener("pointerup", finishPaintStroke);
   byId("mosaic-canvas").addEventListener("pointercancel", finishArtworkInteraction);
   byId("mosaic-canvas").addEventListener("pointercancel", finishPaintStroke);
   byId("mosaic-canvas").addEventListener("dragstart", (event) => event.preventDefault());
+  // TODO(keyboard): add Artwork rotation controls with the planned keyboard support.
   window.addEventListener("resize", fitToWorkspace);
 
   request("/api/designer", undefined, "Initial Designer load").then((payload) => {

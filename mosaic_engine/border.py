@@ -35,7 +35,7 @@ BORDER_PRESETS = (
         ("border_primary", "border_secondary"), "double",
     ),
     BorderPreset(
-        "alternating", "Alternating", 1,
+        "alternating", "Alternate", 1,
         ("border_primary", "border_secondary"), "alternating",
     ),
 )
