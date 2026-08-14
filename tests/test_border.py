@@ -65,6 +65,57 @@ def test_curated_border_preset_definitions_are_fixed_and_deterministic():
     assert all(not hasattr(value, "user_width") for value in BORDER_PRESETS)
 
 
+@pytest.mark.parametrize("preset_id, expected", (
+    ("none", 0), ("solid", 1), ("double", 2), ("alternating", 2),
+))
+def test_designer_border_channel_count_matches_preset_roles(preset_id, expected):
+    app = MosaicDesignerApp()
+    _request(app, "POST", "/api/designer/canvas", {"canvas_id": "square-s"})
+    _request(app, "POST", "/api/designer/tile", {"tile_id": "m"})
+    _request(app, "POST", "/api/designer/border", {"preset_id": preset_id})
+    _, payload = _request(app, "GET", "/api/designer")
+    assert len(payload["project"]["border"]["color_channels"]) == expected
+
+
+def test_border_channel_recolor_is_compact_independent_and_preserves_topology():
+    app = MosaicDesignerApp()
+    _request(app, "POST", "/api/designer/canvas", {"canvas_id": "square-s"})
+    _request(app, "POST", "/api/designer/tile", {"tile_id": "m"})
+    _request(app, "POST", "/api/designer/border", {"preset_id": "alternating"})
+    _, before = _request(app, "GET", "/api/designer")
+    project = before["project"]
+    primary_ids = {
+        item["tile_id"] for item in project["border"]["assignments"]
+        if item["color_role"] == "border_primary"
+    }
+    secondary_ids = {
+        item["tile_id"] for item in project["border"]["assignments"]
+        if item["color_role"] == "border_secondary"
+    }
+    paint_id = next(
+        tile["id"] for tile in project["geometry"]["tiles"]
+        if tile["id"] not in primary_ids | secondary_ids
+    )
+    _request(app, "POST", "/api/designer/paint", {
+        "placement_ids": [paint_id], "mode": "paint", "slot_id": "paint-slot-4",
+    })
+    geometry = app.project.geometry
+    paint = dict(app.paint_overrides)
+    status, changed = _request(app, "POST", "/api/designer/border/color", {
+        "channel_id": "border_primary", "color_id": "project-color-5",
+    })
+    assert status == "200 OK"
+    assert "geometry" not in changed
+    assert app.project.geometry is geometry
+    assert app.paint_overrides == paint
+    assert changed["document"]["dirty"] is True
+    assert set(changed["border"]["border_owned_placement_ids"]) == (
+        primary_ids | secondary_ids
+    )
+    assert {item["id"] for item in changed["tile_updates"]} == primary_ids
+    assert all(item["color_id"] == "project-color-5" for item in changed["tile_updates"])
+
+
 def test_none_protects_only_clipped_perimeter_with_edge_role():
     shell = _shell()
     state = build_border_layer(shell.geometry, "none")
@@ -259,8 +310,9 @@ def test_border_inspector_and_frontend_use_backend_membership():
     assert ".border-preview.alternating" in stylesheet
     assert "var(--border-primary)" in stylesheet
     assert "var(--border-secondary)" in stylesheet
-    assert 'role_to_color_id.border_primary' in script
-    assert 'role_to_color_id.border_secondary' in script
+    assert 'channel.channel_id === "border_primary"' in script
+    assert 'channel.channel_id === "border_secondary"' in script
+    assert 'id="border-colors"' in html
     assert ".border-control { container-type: inline-size" in stylesheet
     assert "@container (max-width: 16.5rem)" in stylesheet
     assert ".border-presets { grid-template-columns: minmax(0, 1fr); }" in stylesheet

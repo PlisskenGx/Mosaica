@@ -260,7 +260,7 @@ def test_custom_stage_copy_controls_and_paint_action_row():
     assert "Counts refer to the full-tile grid. Edge pieces are added automatically." in html
     assert "Finished size" in html and "Create Canvas" in html
     paint_actions = html[html.index('class="paint-actions"'):html.index("</div>", html.index('class="paint-actions"'))]
-    assert "paint-mode-restore" in paint_actions
+    assert "paint-assign" not in paint_actions
     assert "paint-clear" in paint_actions
     assert ".paint-actions { display: flex; align-items: center" in css
 

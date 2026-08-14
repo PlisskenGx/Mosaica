@@ -1,12 +1,44 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from typing import Iterable
 
 from PIL import ImageColor
 
 
 MAX_DESIGN_COLORS = 32
+
+CURATED_MOSAICA_PALETTE = (
+    ("Ivory", "#FAF9F6"), ("Black", "#000000"),
+    ("Gray", "#808080"), ("Clay", "#B56F52"),
+    ("Denim", "#466984"), ("Warm White", "#EEE9DF"),
+    ("Sand", "#D8C9B5"), ("Charcoal", "#303033"),
+    ("Slate", "#555A60"), ("Mist", "#B8B9B5"),
+    ("Espresso", "#49362D"), ("Walnut", "#765543"),
+    ("Camel", "#A8825E"),
+    ("Brick", "#9B493D"), ("Garnet", "#762F3A"),
+    ("Coral", "#C86A5A"), ("Terracotta", "#C4774D"),
+    ("Ochre", "#B88935"), ("Gold", "#D1A84A"),
+    ("Sage", "#829276"), ("Olive", "#687044"),
+    ("Forest", "#315B46"), ("Moss", "#55745B"),
+    ("Navy", "#263E59"),
+    ("Sky", "#7EA3B5"), ("Teal", "#347577"),
+    ("Sea Glass", "#6E9B91"), ("Plum", "#66445F"),
+    ("Lavender", "#8B7694"), ("Rose", "#A85E70"),
+    ("Blush", "#D09A9C"), ("Dusty Pink", "#B77B82"),
+)
+
+LEGACY_PAINT_SLOTS = (
+    ("paint-slot-1", "project-color-1"),
+    ("paint-slot-2", "project-color-2"),
+    ("paint-slot-3", "project-color-3"),
+    ("paint-slot-4", "project-color-4"),
+    ("paint-slot-5", "project-color-5"),
+)
+
+# Import compatibility for integrations that referenced the transitional
+# v1.9.1 slot table. New Designer state does not use Paint slots.
+DEFAULT_PAINT_SLOTS = LEGACY_PAINT_SLOTS
 
 
 @dataclass(frozen=True)
@@ -45,8 +77,8 @@ class DesignerColorResolution:
             raise ValueError("A Designer project requires at least one design color.")
         if len(self.colors) > MAX_DESIGN_COLORS:
             raise ValueError(
-                "This artwork uses more than 32 distinct colors. Simplify the "
-                "artwork or reduce its colors before generating."
+                "This project has reached the current 32-color limit. Remove "
+                "an unused color or simplify the artwork before adding another."
             )
         color_ids = [value.color_id for value in self.colors]
         orders = [value.order for value in self.colors]
@@ -128,6 +160,72 @@ class DesignerColorResolution:
             next_order += 1
         return DesignerColorResolution(tuple(appended), dict(self.role_to_color_id))
 
+    def add_color(self, display_color: str, name: str | None = None) -> DesignerColorResolution:
+        normalized = self.normalize(display_color)
+        if self.color_id_for_rgb(ImageColor.getrgb(normalized)) is not None:
+            raise ValueError("This color already exists in the project.")
+        if len(self.colors) >= MAX_DESIGN_COLORS:
+            raise ValueError(
+                "This project has reached the current 32-color limit. Remove "
+                "an unused color or simplify the artwork before adding another."
+            )
+        next_number = max(
+            (
+                int(value.color_id.rsplit("-", 1)[-1])
+                for value in self.colors
+                if value.color_id.startswith("project-color-")
+                and value.color_id.rsplit("-", 1)[-1].isdigit()
+            ),
+            default=0,
+        ) + 1
+        next_order = max(value.order for value in self.colors) + 1
+        clean_name = name.strip() if isinstance(name, str) else ""
+        if not clean_name:
+            custom_count = sum(value.origin == "manual" for value in self.colors) + 1
+            clean_name = f"Custom {custom_count}"
+        added = DesignColor(
+            f"project-color-{next_number}", normalized, clean_name,
+            next_order, "manual",
+        )
+        return DesignerColorResolution(
+            (*self.colors, added), dict(self.role_to_color_id),
+        )
+
+    def update_color(
+        self, color_id: str, *, display_color: str, name: str,
+    ) -> DesignerColorResolution:
+        current = self.by_id(color_id)
+        if current.origin == "canonical":
+            raise ValueError("Canonical Mosaica design colors cannot be edited.")
+        clean_name = name.strip() if isinstance(name, str) else ""
+        if not clean_name:
+            raise ValueError("Color name cannot be empty.")
+        normalized = self.normalize(display_color)
+        duplicate = next((
+            value for value in self.colors
+            if value.color_id != color_id
+            and self.normalize(value.display_color) == normalized
+        ), None)
+        if duplicate is not None:
+            raise ValueError("This color already exists in the project.")
+        updated = tuple(
+            replace(value, display_color=normalized, name=clean_name)
+            if value.color_id == color_id else value
+            for value in self.colors
+        )
+        if current.display_color == normalized and current.name == clean_name:
+            return self
+        return DesignerColorResolution(updated, dict(self.role_to_color_id))
+
+    def remove_color(self, color_id: str) -> DesignerColorResolution:
+        current = self.by_id(color_id)
+        if current.origin == "canonical":
+            raise ValueError("Canonical Mosaica design colors cannot be removed.")
+        if color_id in self.role_to_color_id.values():
+            raise ValueError("This color is required by the project and cannot be removed.")
+        remaining = tuple(value for value in self.colors if value.color_id != color_id)
+        return DesignerColorResolution(remaining, dict(self.role_to_color_id))
+
     def count_visible(
         self,
         placements: Iterable[tuple[str, str]],
@@ -175,12 +273,18 @@ class DesignerColorResolution:
         }
 
 
+CANONICAL_MOSAICA_COLORS = tuple(
+    DesignColor(
+        f"project-color-{index}", display_color, name, index - 1, "canonical",
+    )
+    for index, (name, display_color) in enumerate(
+        CURATED_MOSAICA_PALETTE, start=1,
+    )
+)
+
+
 DEFAULT_DESIGNER_COLORS = DesignerColorResolution(
-    colors=(
-        DesignColor("project-color-1", "#FAF9F6", "Ivory", 0, "semantic"),
-        DesignColor("project-color-2", "#000000", "Black", 1, "semantic"),
-        DesignColor("project-color-3", "#808080", "Gray", 2, "semantic"),
-    ),
+    colors=CANONICAL_MOSAICA_COLORS,
     role_to_color_id={
         "background": "project-color-1",
         "edge": "project-color-1",

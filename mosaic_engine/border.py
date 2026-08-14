@@ -6,6 +6,7 @@ from math import atan2, pi
 from .geometry import GridGeometry
 from .model import MosaicConfig
 from .processing import tile_neighbors
+from .designer_colors import DEFAULT_DESIGNER_COLORS
 
 
 Coordinate = tuple[int, int]
@@ -41,13 +42,10 @@ BORDER_PRESETS = (
 
 _PRESETS = {value.id: value for value in BORDER_PRESETS}
 
-# These are shared Designer project roles, not a separate border palette.
-# Preview colors are temporary UI mappings until the Colors milestone.
+# Compatibility metadata derived from the one canonical Designer palette.
 PROJECT_COLOR_ROLES = {
-    "background": {"preview_hex": "#FAF9F6"},
-    "edge": {"preview_hex": "#D8D6CF"},
-    "border_primary": {"preview_hex": "#34373D"},
-    "border_secondary": {"preview_hex": "#A87655"},
+    role: {"preview_hex": DEFAULT_DESIGNER_COLORS.resolve(role).display_color}
+    for role in ("background", "edge", "border_primary", "border_secondary")
 }
 
 @dataclass(frozen=True)

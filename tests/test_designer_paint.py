@@ -77,7 +77,7 @@ def test_batch_paint_uses_stable_ids_without_artwork_and_returns_compact_state()
     assert counts["project-color-2"] == 2
 
 
-def test_restore_and_clear_reveal_lower_assignment_and_mark_dirty_only_on_change():
+def test_explicit_ivory_assignment_and_clear_reveal_lower_assignment():
     app = _app()
     _, initial = _request(app, "GET", "/api/designer")
     tile_id = _full(initial)["id"]
@@ -87,17 +87,17 @@ def test_restore_and_clear_reveal_lower_assignment_and_mark_dirty_only_on_change
     app.document_dirty = False
 
     _, restored = _request(app, "POST", "/api/designer/paint", {
-        "placement_ids": [tile_id], "mode": "restore",
+        "placement_ids": [tile_id], "mode": "paint", "color_id": "project-color-1",
     })
     update = next(value for value in restored["tile_updates"] if value["id"] == tile_id)
-    assert update["manual_override"] is None
+    assert update["manual_override"] == "project-color-1"
     assert update["color_id"] == update["lower_color_id"] == "project-color-1"
     assert restored["document"]["dirty"] is True
 
     app.document_dirty = False
     _, cleared = _request(app, "POST", "/api/designer/paint/clear", {})
     assert cleared["paint"]["override_count"] == 0
-    assert cleared["document"]["dirty"] is False
+    assert cleared["document"]["dirty"] is True
 
 
 def test_every_visible_piece_is_editable_but_unknown_batch_is_atomic():
@@ -120,7 +120,8 @@ def test_every_visible_piece_is_editable_but_unknown_batch_is_atomic():
     assert painted["paint"]["override_count"] == 2
 
     status, _ = _request(app, "POST", "/api/designer/paint", {
-        "placement_ids": [valid, "missing"], "mode": "restore",
+        "placement_ids": [valid, "missing"], "mode": "paint",
+        "color_id": "project-color-1",
     })
     assert status == "400 Bad Request"
     assert app.paint_overrides == {
@@ -180,9 +181,7 @@ def test_flat_top_bold_custom_5_by_5_edge_pieces_paint_and_erase():
     })
     assert status == "200 OK"
     assert painted["paint"]["overrides"] == dict.fromkeys(ids, "project-color-2")
-    status, erased = _request(app, "POST", "/api/designer/paint", {
-        "placement_ids": ids, "mode": "restore",
-    })
+    status, erased = _request(app, "POST", "/api/designer/paint/clear", {})
     assert status == "200 OK"
     assert erased["paint"]["overrides"] == {}
 
@@ -216,9 +215,7 @@ def test_manual_paint_has_precedence_across_every_border_change():
     assert tile["manual_override"] == "project-color-3"
     assert tile["color_id"] == "project-color-3"
 
-    _request(app, "POST", "/api/designer/paint", {
-        "placement_ids": [border_tile["id"]], "mode": "restore",
-    })
+    _request(app, "POST", "/api/designer/paint/clear", {})
     _, restored = _request(app, "GET", "/api/designer")
     assert _tile(restored, border_tile["id"])["color_id"] == "project-color-2"
 
@@ -276,10 +273,10 @@ def test_half_and_triangle_perimeter_pieces_paint_erase_and_clear(orientation):
     )
 
     _request(app, "POST", "/api/designer/paint", {
-        "placement_ids": [half["id"]], "mode": "restore",
+        "placement_ids": [half["id"]], "mode": "paint", "color_id": "project-color-1",
     })
     _, erased = _request(app, "GET", "/api/designer")
-    assert _tile(erased, half["id"])["manual_override"] is None
+    assert _tile(erased, half["id"])["manual_override"] == "project-color-1"
     assert _tile(erased, triangle["id"])["manual_override"] == "project-color-2"
     _request(app, "POST", "/api/designer/paint/clear", {})
     assert app.paint_overrides == {}
@@ -323,8 +320,11 @@ def test_paint_ui_uses_one_stroke_batch_with_rollback_and_no_geometry_math():
     _, script = _request(app, "GET", "/designer.js")
     assert 'id="paint-toggle"' not in html
     assert 'id="paint-mode-color"' not in html
-    assert 'id="paint-mode-restore"' in html
-    assert '>Erase</button>' in html
+    assert 'id="paint-mode-restore"' not in html
+    assert '>Erase</button>' not in html
+    assert 'id="paint-assign"' not in html
+    assert 'id="design-palette"' in html
+    assert 'id="tiles-heading">Tiles<' in html
     assert 'id="paint-clear"' in html
     assert '>Clear Edits</button>' in html
     assert "window.confirm" not in script
@@ -343,6 +343,140 @@ def test_paint_ui_uses_one_stroke_batch_with_rollback_and_no_geometry_math():
     assert 'addEventListener("pointerleave", hidePartialPreview)' in script
     assert "pointerup" in script
     assert "hex_geometry" not in script
+    _, stylesheet = _request(app, "GET", "/designer.css")
+    assert ".tile-color-swatch" in stylesheet
+    assert ".paint-colors.flat-top .tile-color-swatch" in stylesheet
+    assert '"flat-top", state.project.tile_orientation === "flat_top"' in script
+
+
+def test_tiles_exposes_exactly_32_canonical_colors_without_slots_or_restore():
+    app = _app()
+    _, payload = _request(app, "GET", "/api/designer")
+    paint = payload["project"]["paint"]
+    assert "slots" not in paint
+    assert len(paint["curated_palette"]) == 32
+    assert [color["color_id"] for color in paint["curated_palette"]] == [
+        f"project-color-{index}" for index in range(1, 33)
+    ]
+    assert len({color["display_color"] for color in paint["curated_palette"]}) == 32
+    assert payload["project"]["color_counts"] == [{
+        "color_id": "project-color-1",
+        "display_color": "#FAF9F6",
+        "name": "Ivory",
+        "count": payload["project"]["geometry"]["visible_piece_count"],
+        "order": 0,
+    }]
+
+
+def test_direct_canonical_assignment_is_compact_and_updates_counts():
+    app = _app()
+    _, initial = _request(app, "GET", "/api/designer")
+    ids = [tile["id"] for tile in initial["project"]["geometry"]["tiles"][:2]]
+    _request(app, "POST", "/api/designer/paint", {
+        "placement_ids": ids, "mode": "paint", "color_id": "project-color-5",
+    })
+    assert app.paint_overrides == dict.fromkeys(ids, "project-color-5")
+    before_geometry = app.project.geometry
+    status, changed = _request(app, "POST", "/api/designer/paint", {
+        "placement_ids": ids, "mode": "paint", "color_id": "project-color-1",
+    })
+    assert status == "200 OK"
+    assert "geometry" not in changed
+    assert app.project.geometry is before_geometry
+    assert app.paint_overrides == dict.fromkeys(ids, "project-color-1")
+    assert {update["id"] for update in changed["tile_updates"]} == set(ids)
+    assert all(update["display_color"] == "#FAF9F6" for update in changed["tile_updates"])
+    counts = {value["display_color"]: value["count"] for value in changed["color_counts"]}
+    assert "#466984" not in counts
+
+
+def test_direct_tile_assignment_does_not_recolor_border():
+    app = _app()
+    _request(app, "POST", "/api/designer/border", {"preset_id": "alternating"})
+    _, initial = _request(app, "GET", "/api/designer")
+    gray_border = next(
+        tile for tile in initial["project"]["geometry"]["tiles"]
+        if tile["border_owned"] and tile["color_id"] == "project-color-3"
+    )
+    painted = next(
+        tile for tile in initial["project"]["geometry"]["tiles"]
+        if not tile["border_owned"]
+    )
+    _request(app, "POST", "/api/designer/paint", {
+        "placement_ids": [painted["id"]], "mode": "paint",
+        "color_id": "project-color-5",
+    })
+    _, current = _request(app, "GET", "/api/designer")
+    assert _tile(current, painted["id"])["display_color"] == "#466984"
+    assert _tile(current, gray_border["id"])["display_color"] == "#808080"
+    assert _tile(current, gray_border["id"])["manual_override"] is None
+
+
+def test_legacy_slot_override_resolves_but_new_edit_is_direct_canonical_color():
+    app = _app()
+    _, initial = _request(app, "GET", "/api/designer")
+    tile_id = _full(initial)["id"]
+    app.paint_overrides[tile_id] = "paint-slot-3"
+    _, legacy = _request(app, "GET", "/api/designer")
+    assert _tile(legacy, tile_id)["color_id"] == "project-color-3"
+    assert _tile(legacy, tile_id)["manual_override"] == "project-color-3"
+    assert legacy["project"]["paint"]["overrides"][tile_id] == "project-color-3"
+    status, _ = _request(app, "POST", "/api/designer/paint", {
+        "placement_ids": [tile_id], "mode": "paint", "color_id": "project-color-5",
+    })
+    assert status == "200 OK"
+    assert app.paint_overrides[tile_id] == "project-color-5"
+
+
+def test_manual_ivory_overrides_artwork_until_clear_edits(monkeypatch):
+    monkeypatch.setattr(generation_module, "SVG_RASTER_WIDTH", 256)
+    app = _app()
+    svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10" fill="#000"/></svg>'
+    _request(app, "POST", "/api/designer/artwork/upload", {
+        "filename": "black.svg", "svg_content": svg,
+    })
+    _request(app, "POST", "/api/designer/artwork/generate", {})
+    _, generated = _request(app, "GET", "/api/designer")
+    tile = next(
+        value for value in generated["project"]["geometry"]["tiles"]
+        if value["generated_artwork"] and value["color_id"] != "project-color-1"
+    )
+    artwork_color = tile["color_id"]
+    _request(app, "POST", "/api/designer/paint", {
+        "placement_ids": [tile["id"]], "mode": "paint",
+        "color_id": "project-color-1",
+    })
+    _, white = _request(app, "GET", "/api/designer")
+    assert _tile(white, tile["id"])["manual_override"] == "project-color-1"
+    assert _tile(white, tile["id"])["color_id"] == "project-color-1"
+    _request(app, "POST", "/api/designer/paint/clear", {})
+    _, cleared = _request(app, "GET", "/api/designer")
+    assert _tile(cleared, tile["id"])["color_id"] == artwork_color
+
+
+def test_custom_mid_side_piece_accepts_direct_canonical_assignment():
+    app = MosaicDesignerApp()
+    _request(app, "POST", "/api/designer/shape", {
+        "shape": "hexagon", "orientation": "point_top",
+    })
+    _request(app, "POST", "/api/designer/tile", {
+        "tile_id": "m", "orientation": "point_top",
+    })
+    _request(app, "POST", "/api/designer/canvas", {
+        "canvas_id": "custom", "tiles_across": 10, "tiles_down": 10,
+    })
+    _, initial = _request(app, "GET", "/api/designer")
+    piece = next(
+        tile for tile in initial["project"]["geometry"]["tiles"]
+        if tile["piece_type"] == "edge_cut"
+        and not any(abs(tile["piece_fraction"] - fraction) < 1e-6 for fraction in (1 / 6, 1 / 2))
+    )
+    status, _ = _request(app, "POST", "/api/designer/paint", {
+        "placement_ids": [piece["id"]], "mode": "paint",
+        "color_id": "project-color-4",
+    })
+    assert status == "200 OK"
+    assert app.paint_overrides[piece["id"]] == "project-color-4"
 
 
 def test_parent_preview_is_below_physical_tiles_and_paint_gated():

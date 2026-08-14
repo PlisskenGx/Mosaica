@@ -200,12 +200,13 @@ def test_designer_assets_use_backend_polygons_and_responsive_regions():
     assert "‹ Back" not in html
     assert html.index('class="brand"') < html.index('id="back"')
     assert html.index('id="back"') < html.index('id="document-title"')
-    assert 'id="paint-heading">Paint<' in html
+    assert 'id="tiles-heading">Tiles<' in html
     assert "Physical canvas" not in html
     assert 'id="workspace-title"' not in html
     assert "Paint / Edit" not in html
     assert "Enter Paint" not in html
-    assert "Colors" not in html
+    assert 'id="colors-heading"' not in html
+    assert 'id="paint-assign"' not in html
     assert "Coming later" not in html
     assert '<span class="brand-mark" aria-hidden="true"></span>' in html
     assert '<span class="brand-copy">' in html
@@ -244,14 +245,16 @@ def test_workspace_and_sidebar_polish_is_structurally_scoped():
     _, html = _request(app, "GET", "/")
     _, script = _request(app, "GET", "/designer.js")
     _, stylesheet = _request(app, "GET", "/designer.css")
-    assert html.index('id="artwork-heading"') < html.index('id="paint-heading"')
-    assert html.index('id="paint-heading"') < html.index('id="border-heading"')
+    assert html.index('id="tiles-heading"') < html.index('id="border-heading"')
+    assert html.index('id="border-heading"') < html.index('id="artwork-heading"')
     for removed in (
         "Physical canvas", "Paint / Edit", "Enter Paint", "Restore",
         "Clear Paint Edits", "Coming later",
     ):
         assert removed not in html
-    assert '>Erase</button>' in html
+    assert '>Erase</button>' not in html
+    assert 'id="paint-assign"' not in html
+    assert 'id="design-palette"' in html
     assert '>Clear Edits</button>' in html
     assert " in actual`" not in script
     assert ".back-navigation" in stylesheet
