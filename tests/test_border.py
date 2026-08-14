@@ -293,9 +293,10 @@ def test_border_inspector_and_frontend_use_backend_membership():
     status, html = _request(app, "GET", "/")
     assert status == "200 OK"
     assert 'id="border-presets"' in html
-    assert 'id="border-lock-state"' in html
+    assert 'id="border-lock-state"' not in html
     assert "Coming later</span></div>" not in html
     _, script = _request(app, "GET", "/designer.js")
+    assert "border pieces" not in script
     assert 'performDesignerMutation("/api/designer/border"' in script
     assert "tile.border_owned" in script
     assert "tile.artwork_available" in script
@@ -314,7 +315,8 @@ def test_border_inspector_and_frontend_use_backend_membership():
     assert 'channel.channel_id === "border_secondary"' in script
     assert 'id="border-colors"' in html
     assert ".border-control { container-type: inline-size" in stylesheet
-    assert "@container (max-width: 16.5rem)" in stylesheet
-    assert ".border-presets { grid-template-columns: minmax(0, 1fr); }" in stylesheet
-    assert ".border-preset > span:last-child { min-width: 0; overflow-wrap: anywhere; }" in stylesheet
+    assert "grid-template-columns: repeat(4, minmax(0, 1fr))" in stylesheet
+    assert "@container (max-width: 12rem)" in stylesheet
+    assert "grid-template-columns: repeat(2, minmax(0, 1fr))" in stylesheet
+    assert ".border-preset > span:last-child { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }" in stylesheet
     assert "min-width: 1.55rem; flex: none" in stylesheet

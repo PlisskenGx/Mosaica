@@ -275,9 +275,13 @@ def test_frontend_uses_vector_pointer_interaction_and_four_corner_handles():
         assert action in html
     assert 'id="artwork-replace"' not in html
     assert ">Replace<" not in html
+    assert 'id="artwork-preview-image"' in html
     _, script = _asset_request(app, "/designer.js")
     assert "DOMParser" in script
     assert "artwork.sanitized_svg" in script
+    assert "function renderArtworkPreview(artwork)" in script
+    assert "URL.createObjectURL(new Blob" in script
+    assert "URL.revokeObjectURL(artworkPreviewUrl)" in script
     assert 'addEventListener("pointerdown"' in script
     assert 'addEventListener("pointermove"' in script
     assert 'addEventListener("pointerup"' in script
@@ -302,6 +306,8 @@ def test_frontend_uses_vector_pointer_interaction_and_four_corner_handles():
     assert 'data-handle="left"' in css and "ew-resize" in css
     assert 'data-handle="top"' in css and "ns-resize" in css
     assert "touch-action: none" in css
+    assert ".artwork-preview img" in css
+    assert "object-fit: contain" in css
 
 
 def test_side_resize_math_has_independent_axes_anchors_and_minimums():

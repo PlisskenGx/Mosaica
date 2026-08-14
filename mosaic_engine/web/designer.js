@@ -15,6 +15,8 @@
   let selectedShapeOrientation = "point_top";
   let customAcross = 40;
   let customDown = 24;
+  let artworkPreviewUrl = null;
+  let artworkPreviewSource = null;
   const byId = (id) => document.getElementById(id);
   const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
   const orientationLabel = (orientation) => (
@@ -575,9 +577,6 @@
       button.addEventListener("click", () => chooseBorder(preset.id));
       container.appendChild(button);
     }
-    byId("border-lock-state").textContent = (
-      `${state.project.border.counts.border_owned.toLocaleString()} border pieces`
-    );
     const channels = byId("border-colors");
     channels.replaceChildren();
     for (const channel of state.project.border.color_channels) {
@@ -603,6 +602,7 @@
     byId("artwork-empty").hidden = Boolean(artwork);
     byId("artwork-loaded").hidden = !artwork;
     byId("artwork-selection-state").textContent = artwork?.selected ? "Selected" : "";
+    renderArtworkPreview(artwork);
     if (artwork) {
       const transform = previewTransform || artwork.transform;
       byId("artwork-filename").textContent = artwork.source_filename;
@@ -636,9 +636,37 @@
     }
   }
 
+  function renderArtworkPreview(artwork) {
+    const image = byId("artwork-preview-image");
+    if (!artwork) {
+      if (artworkPreviewUrl) URL.revokeObjectURL(artworkPreviewUrl);
+      artworkPreviewUrl = null;
+      artworkPreviewSource = null;
+      image.removeAttribute("src");
+      image.alt = "";
+      return;
+    }
+    image.alt = `${artwork.source_filename} preview`;
+    if (artwork.sanitized_svg === artworkPreviewSource) return;
+    if (artworkPreviewUrl) URL.revokeObjectURL(artworkPreviewUrl);
+    artworkPreviewSource = artwork.sanitized_svg;
+    artworkPreviewUrl = URL.createObjectURL(new Blob(
+      [artwork.sanitized_svg], { type: "image/svg+xml" },
+    ));
+    image.src = artworkPreviewUrl;
+  }
+
   function renderPaintInspector() {
     if (!state.project) return;
     const paint = state.project.paint;
+    const canonicalCta = paint.curated_palette.find(
+      (color) => color.color_id === "project-color-5",
+    );
+    if (canonicalCta) {
+      byId("artwork-upload").style.setProperty(
+        "--artwork-cta-color", canonicalCta.display_color,
+      );
+    }
     if (activeTileColorId !== null && !paint.curated_palette.some(
       (color) => color.color_id === activeTileColorId
     )) {

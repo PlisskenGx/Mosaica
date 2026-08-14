@@ -101,15 +101,14 @@
           <div id="paint-tools">
             <div id="paint-colors" class="paint-colors" aria-label="Tile colors"></div>
             <div class="paint-actions" aria-label="Tiles actions">
-              <button id="paint-clear" class="inspector-action danger-text" type="button">Clear Edits</button>
-              <button id="grout-color" class="compact-color-action" type="button" aria-label="Set Grout color"><span>Set Grout</span><span class="current-color-dot" aria-hidden="true"></span></button>
+              <button id="paint-clear" class="text-action danger-text" type="button">Clear Edits</button>
+              <button id="grout-color" class="text-action compact-color-action" type="button" aria-label="Set Grout color"><span>Set Grout</span><span class="current-color-dot" aria-hidden="true"></span></button>
             </div>
           </div>
         </section>
         <section class="border-control" aria-labelledby="border-heading">
           <div class="border-control-heading">
             <strong id="border-heading">Border</strong>
-            <span id="border-lock-state"></span>
           </div>
           <div id="border-presets" class="border-presets"></div>
           <div id="border-colors" class="border-colors" aria-label="Border colors"></div>
@@ -124,6 +123,9 @@
             <button id="artwork-upload" class="inspector-action primary" type="button">Upload SVG</button>
           </div>
           <div id="artwork-loaded" hidden>
+            <div class="artwork-preview" aria-label="Artwork preview">
+              <img id="artwork-preview-image" alt="">
+            </div>
             <div class="artwork-file-row">
               <span id="artwork-filename"></span>
               <span id="artwork-size"></span>

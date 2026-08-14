@@ -407,3 +407,21 @@ def test_api_keeps_counts_while_normal_ui_hides_them():
     assert ".status-group" in stylesheet
     assert "flex-wrap: wrap" in stylesheet
     assert "white-space: nowrap" in stylesheet
+
+
+def test_toolbox_swatch_actions_and_upload_cta_use_quiet_canonical_treatment():
+    app = MosaicDesignerApp()
+    _, html = _request(app, "GET", "/")
+    _, script = _request(app, "GET", "/designer.js")
+    _, stylesheet = _request(app, "GET", "/designer.css")
+    assert 'id="paint-clear" class="text-action danger-text"' in html
+    assert 'id="grout-color" class="text-action compact-color-action"' in html
+    resting = stylesheet[stylesheet.index(".tile-color-swatch {"):]
+    resting = resting[:resting.index("}")]
+    assert "drop-shadow" in resting
+    assert "drop-shadow(0 0" not in resting
+    assert '.tile-color-swatch[aria-pressed="true"]' in stylesheet
+    assert ".text-action" in stylesheet
+    assert 'color.color_id === "project-color-5"' in script
+    assert '"--artwork-cta-color", canonicalCta.display_color' in script
+    assert "#artwork-upload" in stylesheet
