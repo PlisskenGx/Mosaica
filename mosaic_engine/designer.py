@@ -25,7 +25,10 @@ from .border import (
     build_border_layer,
     border_preset,
 )
-from .designer_colors import DEFAULT_DESIGNER_COLORS, DesignerColorResolution
+from .designer_colors import (
+    CURATED_MOSAICA_PALETTE, DEFAULT_DESIGNER_COLORS, LEGACY_PAINT_SLOTS,
+    DesignerColorResolution,
+)
 from .artwork import (
     DesignerArtwork,
     create_artwork,
@@ -157,6 +160,11 @@ class DesignerProjectShell:
     grout_mm: float
     geometry: GridGeometry
     color_system: DesignerColorResolution = DEFAULT_DESIGNER_COLORS
+    grout_color_id: str = "project-color-1"
+    border_channels: tuple[tuple[str, str], ...] = (
+        ("border_primary", "project-color-2"),
+        ("border_secondary", "project-color-3"),
+    )
     border_preset_id: str = "none"
     canvas_mode: str = "preset"
     tiles_across: int | None = None
@@ -227,12 +235,30 @@ class DesignerProjectShell:
     ) -> DesignerProjectShell:
         return replace(self, color_system=color_system)
 
+    def with_grout_color(self, color_id: str) -> DesignerProjectShell:
+        self.color_system.by_id(color_id)
+        return replace(self, grout_color_id=color_id)
+
+    def with_border_channel(
+        self, channel_id: str, color_id: str,
+    ) -> DesignerProjectShell:
+        preset = border_preset(self.border_preset_id)
+        if channel_id not in set(preset.pattern_roles):
+            raise ValueError(f"Unknown channel for this Border: {channel_id}")
+        self.color_system.by_id(color_id)
+        channels = dict(self.border_channels)
+        channels[channel_id] = color_id
+        return replace(self, border_channels=tuple(channels.items()))
+
     def to_dict(
         self,
         generated_artwork: DesignerGeneratedArtwork | None = None,
         paint_overrides: dict[str, str] | None = None,
     ) -> dict:
-        paint_overrides = paint_overrides or {}
+        paint_overrides = {
+            tile_id: dict(LEGACY_PAINT_SLOTS).get(color_id, color_id)
+            for tile_id, color_id in (paint_overrides or {}).items()
+        }
         visible = tuple(
             value for value in self.geometry.placements
             if value.piece_type != "outside"
@@ -256,11 +282,16 @@ class DesignerProjectShell:
             value.tile_id: value
             for value in generated_artwork.assignments
         } if generated_artwork is not None else {}
+        border_color_ids = dict(self.border_channels)
         lower_color_ids = {
             tile_id: (
-                generated_assignments[tile_id].color_id
+                generated_artwork.remapped_color_id(
+                    generated_assignments[tile_id].color_id
+                )
                 if tile_id in generated_assignments and tile_id in available
-                else self.color_system.resolve(role).color_id
+                else border_color_ids.get(
+                    role, self.color_system.resolve(role).color_id,
+                )
             )
             for tile_id, role in effective_roles.items()
         }
@@ -293,11 +324,51 @@ class DesignerProjectShell:
             "grout_mm": self.grout_mm,
             "color_system": effective_resolution.to_dict(),
             "color_counts": [value.to_dict() for value in color_counts],
+            "grout": {
+                "color_id": self.grout_color_id,
+                "display_color": effective_resolution.by_id(
+                    self.grout_color_id
+                ).display_color,
+                "width_mm": self.grout_mm,
+            },
             "paint": {
                 "overrides": dict(sorted(paint_overrides.items())),
                 "override_count": len(paint_overrides),
+                "curated_palette": [
+                    {
+                        "color_id": effective_resolution.color_id_for_rgb(
+                            tuple(int(color[index:index + 2], 16) for index in (1, 3, 5))
+                        ),
+                        "name": name,
+                        "display_color": color,
+                    }
+                    for name, color in CURATED_MOSAICA_PALETTE
+                ],
             },
-            "border": border.to_dict(),
+            "border": {
+                **border.to_dict(),
+                "channel_mappings": [
+                    {
+                        "channel_id": role,
+                        "color_id": color_id,
+                        "display_color": self.color_system.by_id(color_id).display_color,
+                    }
+                    for role, color_id in self.border_channels
+                ],
+                "color_channels": [
+                    {
+                        "channel_id": role,
+                        "color_id": border_color_ids[role],
+                        "display_color": self.color_system.by_id(
+                            border_color_ids[role]
+                        ).display_color,
+                    }
+                    for role in (
+                        border_preset(self.border_preset_id).pattern_roles
+                        if self.border_preset_id != "none" else ()
+                    )
+                ],
+            },
             "generated_artwork": (
                 {
                     **generated_artwork.to_dict(),
@@ -529,6 +600,127 @@ class MosaicDesignerApp:
                     start_response, "200 OK",
                     self._design_state_payload(previous_project),
                 )
+            if method == "POST" and path == "/api/designer/grout":
+                project = self._require_project()
+                previous_project = project.to_dict(
+                    self.generated_artwork, self.paint_overrides,
+                )
+                color_id = self._request_json(environ).get("color_id")
+                updated = project.with_grout_color(color_id)
+                changed = updated != project
+                self.project = updated
+                self.document_dirty = self.document_dirty or changed
+                return self._json(
+                    start_response, "200 OK",
+                    self._design_state_payload(previous_project),
+                )
+            if method == "POST" and path == "/api/designer/border/color":
+                project = self._require_project()
+                previous_project = project.to_dict(
+                    self.generated_artwork, self.paint_overrides,
+                )
+                body = self._request_json(environ)
+                color_id = body.get("color_id")
+                project.color_system.by_id(color_id)
+                updated = project.with_border_channel(
+                    body.get("channel_id"), color_id,
+                )
+                changed = updated != project
+                self.project = updated
+                self.document_dirty = self.document_dirty or changed
+                return self._json(
+                    start_response, "200 OK",
+                    self._design_state_payload(previous_project),
+                )
+            if method == "POST" and path == "/api/designer/artwork/color":
+                project = self._require_project()
+                if self.generated_artwork is None:
+                    raise ValueError("Generate Artwork before remapping its colors.")
+                previous_project = project.to_dict(
+                    self.generated_artwork, self.paint_overrides,
+                )
+                body = self._request_json(environ)
+                updated = self.generated_artwork.with_channel_color(
+                    body.get("channel_id"), body.get("color_id"),
+                )
+                changed = updated != self.generated_artwork
+                self.generated_artwork = updated
+                self.document_dirty = self.document_dirty or changed
+                return self._json(
+                    start_response, "200 OK",
+                    self._design_state_payload(previous_project),
+                )
+            if method == "POST" and path == "/api/designer/colors/add":
+                project = self._require_project()
+                previous_project = project.to_dict(
+                    self.generated_artwork, self.paint_overrides,
+                )
+                body = self._request_json(environ)
+                updated = project.color_system.add_color(
+                    body.get("display_color"), body.get("name"),
+                )
+                self.project = project.with_color_system(updated)
+                if self.generated_artwork is not None:
+                    self.generated_artwork = replace(
+                        self.generated_artwork, design_colors=updated.colors,
+                    )
+                self.document_dirty = True
+                return self._json(
+                    start_response, "200 OK",
+                    self._design_state_payload(previous_project),
+                )
+            if method == "POST" and path == "/api/designer/colors/update":
+                project = self._require_project()
+                previous_project = project.to_dict(
+                    self.generated_artwork, self.paint_overrides,
+                )
+                body = self._request_json(environ)
+                color_id = body.get("color_id")
+                updated = project.color_system.update_color(
+                    color_id, display_color=body.get("display_color"),
+                    name=body.get("name"),
+                )
+                changed = updated != project.color_system
+                self.project = project.with_color_system(updated)
+                if changed and self.generated_artwork is not None:
+                    self.generated_artwork = replace(
+                        self.generated_artwork, design_colors=updated.colors,
+                    )
+                self.document_dirty = self.document_dirty or changed
+                return self._json(
+                    start_response, "200 OK",
+                    self._design_state_payload(previous_project),
+                )
+            if method == "POST" and path == "/api/designer/colors/remove":
+                project = self._require_project()
+                previous_project = project.to_dict(
+                    self.generated_artwork, self.paint_overrides,
+                )
+                color_id = self._request_json(environ).get("color_id")
+                visible_count = next((
+                    value["count"] for value in previous_project["color_counts"]
+                    if value["color_id"] == color_id
+                ), 0)
+                referenced_by_generation = self.generated_artwork is not None and any(
+                    value.color_id == color_id
+                    for value in self.generated_artwork.assignments
+                )
+                referenced_by_paint = color_id in self.paint_overrides.values()
+                if visible_count or referenced_by_generation or referenced_by_paint:
+                    raise ValueError(
+                        f"This color is used by {visible_count} visible pieces and cannot be removed."
+                    )
+                updated = project.color_system.remove_color(color_id)
+                self.project = project.with_color_system(updated)
+                if self.generated_artwork is not None:
+                    self.generated_artwork = replace(
+                        self.generated_artwork, design_colors=updated.colors,
+                    )
+                self.document_dirty = True
+                return self._json(
+                    start_response, "200 OK",
+                    self._design_state_payload(previous_project),
+                )
             if method == "POST" and path == "/api/designer/paint":
                 project = self._require_project()
                 previous_project = project.to_dict(
@@ -540,9 +732,9 @@ class MosaicDesignerApp:
                 if not isinstance(placement_ids, list) or not all(
                     isinstance(value, str) for value in placement_ids
                 ):
-                    raise ValueError("Paint requires a list of placement IDs.")
-                if mode not in {"paint", "restore"}:
-                    raise ValueError("Paint mode must be paint or restore.")
+                    raise ValueError("Tiles requires a list of placement IDs.")
+                if mode != "paint":
+                    raise ValueError("Tiles only accepts direct color assignments.")
                 unique_ids = tuple(dict.fromkeys(placement_ids))
                 border = build_border_layer(
                     project.geometry, project.border_preset_id,
@@ -555,18 +747,15 @@ class MosaicDesignerApp:
                 invalid = [value for value in unique_ids if value not in visible]
                 if invalid:
                     raise ValueError(
-                        "Paint tiles must be visible physical placements: "
+                        "Tile edits must target visible physical placements: "
                         + ", ".join(invalid)
                     )
                 color_id = body.get("color_id")
-                if mode == "paint":
-                    project.color_system.by_id(color_id)
+                if color_id is None and body.get("slot_id") is not None:
+                    color_id = dict(LEGACY_PAINT_SLOTS).get(body.get("slot_id"))
+                project.color_system.by_id(color_id)
                 updated = dict(self.paint_overrides)
-                if mode == "paint":
-                    updated.update({value: color_id for value in unique_ids})
-                else:
-                    for value in unique_ids:
-                        updated.pop(value, None)
+                updated.update({value: color_id for value in unique_ids})
                 changed = updated != self.paint_overrides
                 self.paint_overrides = updated
                 self.document_dirty = self.document_dirty or changed
@@ -702,6 +891,19 @@ class MosaicDesignerApp:
                     artwork, project.geometry, border,
                     project.color_system, revision,
                 )
+                if self.generated_artwork is not None:
+                    previous_remaps = dict(self.generated_artwork.color_remaps)
+                    generated_color_ids = {
+                        assignment.color_id for assignment in generated.assignments
+                    }
+                    generated = replace(
+                        generated,
+                        color_remaps=tuple(sorted(
+                            (source_id, target_id)
+                            for source_id, target_id in previous_remaps.items()
+                            if source_id in generated_color_ids
+                        )),
+                    )
                 self.project = project.with_color_system(
                     DesignerColorResolution(
                         generated.design_colors,
@@ -889,6 +1091,7 @@ class MosaicDesignerApp:
                 if self.artwork is not None else None
             ),
             "generated_artwork": generated_summary,
+            "grout": project["grout"],
             "border": project["border"],
             "color_system": project["color_system"],
             "color_counts": project["color_counts"],

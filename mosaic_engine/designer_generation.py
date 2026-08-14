@@ -23,6 +23,7 @@ DESIGNER_SAMPLES_PER_AXIS = 24
 SVG_RASTER_WIDTH = 4096
 _SHAPES = {"path", "polygon", "polyline", "rect", "circle", "ellipse", "line"}
 _NON_RENDERED = {"defs", "clipPath", "mask", "linearGradient", "radialGradient"}
+MAX_EFFECTIVE_SOURCE_COLORS = 64
 
 
 @dataclass(frozen=True)
@@ -54,12 +55,14 @@ class DesignerGeneratedArtwork:
     design_colors: tuple[DesignColor, ...]
     source_signature: str
     border_preset_id: str
+    color_remaps: tuple[tuple[str, str], ...] = ()
     coverage_threshold: float = DESIGNER_COVERAGE_THRESHOLD
     samples_per_axis: int = DESIGNER_SAMPLES_PER_AXIS
     stale: bool = False
     stale_reason: str | None = None
 
     def to_dict(self) -> dict:
+        channels = self.color_channels()
         return {
             "exists": True,
             "revision": self.revision,
@@ -70,12 +73,51 @@ class DesignerGeneratedArtwork:
             "design_colors": [value.to_dict() for value in self.design_colors],
             "source_signature": self.source_signature,
             "border_preset_id": self.border_preset_id,
+            "color_channels": channels,
+            "color_channel_count": len(channels),
             "coverage_threshold": self.coverage_threshold,
             "samples_per_axis": self.samples_per_axis,
             "current": not self.stale,
             "needs_regeneration": self.stale,
             "stale_reason": self.stale_reason,
         }
+
+    def color_channels(self) -> list[dict]:
+        """Return stable generated-color channels, independent of manual edits."""
+
+        remaps = dict(self.color_remaps)
+        used_color_ids = tuple(dict.fromkeys(
+            assignment.color_id for assignment in self.assignments
+        ))
+        colors = {color.color_id: color for color in self.design_colors}
+        return [
+            {
+                "channel_id": f"artwork-channel-{index}",
+                "generated_color_id": generated_color_id,
+                "color_id": remaps.get(generated_color_id, generated_color_id),
+                "display_color": colors[
+                    remaps.get(generated_color_id, generated_color_id)
+                ].display_color,
+            }
+            for index, generated_color_id in enumerate(used_color_ids, start=1)
+        ]
+
+    def remapped_color_id(self, generated_color_id: str) -> str:
+        return dict(self.color_remaps).get(generated_color_id, generated_color_id)
+
+    def with_channel_color(self, channel_id: str, color_id: str) -> DesignerGeneratedArtwork:
+        channels = {value["channel_id"]: value for value in self.color_channels()}
+        if channel_id not in channels:
+            raise ValueError(f"Unknown Artwork color channel: {channel_id}")
+        if color_id not in {color.color_id for color in self.design_colors}:
+            raise ValueError(f"Unknown Mosaica color: {color_id}")
+        generated_color_id = channels[channel_id]["generated_color_id"]
+        remaps = dict(self.color_remaps)
+        if color_id == generated_color_id:
+            remaps.pop(generated_color_id, None)
+        else:
+            remaps[generated_color_id] = color_id
+        return replace(self, color_remaps=tuple(sorted(remaps.items())))
 
     @property
     def physical_colors(self) -> tuple[DesignColor, ...]:
@@ -237,11 +279,61 @@ def _allocate_colors(
     source_colors: tuple[tuple[int, int, int], ...],
     resolution: DesignerColorResolution,
 ) -> tuple[dict[tuple[int, int, int], str], DesignerColorResolution]:
-    updated = resolution.with_artwork_colors(source_colors)
+    palette = tuple(resolution.colors)
     return {
-        source: updated.color_id_for_rgb(source)
+        source: _closest_palette_color_id(source, palette)
         for source in source_colors
-    }, updated
+    }, resolution
+
+
+def _srgb_to_lab(rgb: tuple[int, int, int]) -> tuple[float, float, float]:
+    """Convert sRGB to CIE L*a*b* using D65, deterministically."""
+
+    channels = []
+    for component in rgb:
+        value = component / 255.0
+        channels.append(
+            value / 12.92 if value <= 0.04045
+            else ((value + 0.055) / 1.055) ** 2.4
+        )
+    red, green, blue = channels
+    x = (red * 0.4124564 + green * 0.3575761 + blue * 0.1804375) / 0.95047
+    y = red * 0.2126729 + green * 0.7151522 + blue * 0.0721750
+    z = (red * 0.0193339 + green * 0.1191920 + blue * 0.9503041) / 1.08883
+
+    def pivot(value: float) -> float:
+        delta = 6 / 29
+        return value ** (1 / 3) if value > delta ** 3 else (
+            value / (3 * delta ** 2) + 4 / 29
+        )
+
+    fx, fy, fz = pivot(x), pivot(y), pivot(z)
+    return 116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)
+
+
+def _closest_palette_color_id(
+    source: tuple[int, int, int], palette: tuple[DesignColor, ...],
+) -> str:
+    exact = next((
+        color.color_id for color in palette
+        if ImageColor.getrgb(color.display_color) == source
+    ), None)
+    if exact is not None:
+        return exact
+    source_lab = _srgb_to_lab(source)
+    return min(
+        palette,
+        key=lambda color: (
+            sum(
+                (left - right) ** 2
+                for left, right in zip(
+                    source_lab, _srgb_to_lab(ImageColor.getrgb(color.display_color)),
+                )
+            ),
+            color.order,
+            color.color_id,
+        ),
+    ).color_id
 
 
 def _signature(artwork: DesignerArtwork, border: BorderLayerState) -> str:
@@ -263,6 +355,11 @@ def generate_designer_artwork(
     declared = _declared_source_colors(artwork.sanitized_svg)
     image = _rasterize_svg(artwork.sanitized_svg)
     source_colors = _effective_source_colors(image, declared)
+    if len(source_colors) > MAX_EFFECTIVE_SOURCE_COLORS:
+        raise ValueError(
+            "This artwork contains more than 64 colors. Simplify it to 64 "
+            "colors or fewer and try again."
+        )
     available = set(border.available_artwork_placement_ids)
     pixels = image.load()
     transform = artwork.transform

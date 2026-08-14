@@ -7,9 +7,11 @@
   let generationInFlight = false;
   let mutationQueue = Promise.resolve();
   let paintTool = null;
-  let activePaintColorId = null;
+  let activeTileColorId = null;
   let paintStroke = null;
   let activePartialPreviewId = null;
+  let paletteSelectionHandler = null;
+  let paletteInvoker = null;
   let selectedShapeOrientation = "point_top";
   let customAcross = 40;
   let customDown = 24;
@@ -279,6 +281,14 @@
     svg.replaceChildren();
     svg.setAttribute("viewBox", `0 0 ${geometry.width_in} ${geometry.height_in}`);
     svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    const groutField = document.createElementNS(SVG_NS, "rect");
+    groutField.classList.add("grout-field");
+    groutField.setAttribute("x", "0");
+    groutField.setAttribute("y", "0");
+    groutField.setAttribute("width", geometry.width_in);
+    groutField.setAttribute("height", geometry.height_in);
+    groutField.style.fill = project.grout.display_color;
+    svg.appendChild(groutField);
     const baseLayer = document.createElementNS(SVG_NS, "g");
     baseLayer.classList.add("base-tile-layer");
     const protectedLayer = document.createElementNS(SVG_NS, "g");
@@ -321,7 +331,7 @@
         hit.dataset.tileId = tile.id;
         [hit.dataset.centerX, hit.dataset.centerY] = tile.parent_center_in;
         hit.setAttribute("points", ghost.getAttribute("points"));
-        hit.setAttribute("aria-label", `Paint ${tile.piece_type} tile, row ${tile.row + 1}, column ${tile.column + 1}`);
+        hit.setAttribute("aria-label", `Edit ${tile.piece_type} tile, row ${tile.row + 1}, column ${tile.column + 1}`);
         polygon.setAttribute("tabindex", "0");
         polygon.addEventListener("focus", () => showPartialPreview(tile.id));
         polygon.addEventListener("blur", hidePartialPreview);
@@ -361,7 +371,7 @@
     const orientationName = orientationLabel(project.tile_orientation);
     const canvasSummary = project.canvas_mode === "custom_grid"
       ? `${project.custom_grid.tiles_across} × ${project.custom_grid.tiles_down} tiles`
-      : `≈ ${project.canvas_preset.width_in} × ${project.canvas_preset.height_in} in`;
+      : `${project.canvas_preset.width_in} × ${project.canvas_preset.height_in} in`;
     const statusBar = byId("workspace-status");
     statusBar.replaceChildren(
       createStatusGroup("status-project-summary", [
@@ -369,10 +379,8 @@
         orientationName,
         project.tile_preset.title,
         canvasSummary,
-        `${geometry.visible_piece_count.toLocaleString()} pieces`,
       ]),
     );
-    renderColorCounts(statusBar, project.color_counts);
   }
 
   function refreshArtworkLayers() {
@@ -402,6 +410,9 @@
       polygon.dataset.colorId = tile.color_id;
       (tile.protected ? protectedLayer : baseLayer).appendChild(polygon);
     }
+    const groutField = svg.querySelector(".grout-field");
+    if (!groutField) throw new Error("Mosaica cannot find the physical grout field.");
+    groutField.style.fill = state.project.grout.display_color;
   }
 
   function renderCompactWorkspace(updateTiles = false) {
@@ -412,6 +423,7 @@
     renderBorderInspector();
     renderArtworkInspector();
     renderPaintInspector();
+    renderGroutInspector();
     requestAnimationFrame(fitToWorkspace);
   }
 
@@ -541,26 +553,6 @@
     return group;
   }
 
-  function renderColorCounts(statusBar, colorCounts) {
-    const group = document.createElement("span");
-    group.className = "status-group status-colors physical-color-counts";
-    group.setAttribute("aria-label", "Visible pieces by design color");
-    for (const color of colorCounts) {
-      const item = document.createElement("span");
-      item.className = "physical-color-count";
-      item.setAttribute("aria-label", `${color.name}, ${color.count.toLocaleString()} pieces`);
-      const swatch = document.createElement("span");
-      swatch.className = "physical-color-swatch";
-      swatch.style.backgroundColor = color.display_color;
-      swatch.setAttribute("aria-hidden", "true");
-      const count = document.createElement("strong");
-      count.textContent = color.count.toLocaleString();
-      item.append(swatch, count);
-      group.appendChild(item);
-    }
-    statusBar.appendChild(group);
-  }
-
   function renderBorderInspector() {
     if (!state.project) return;
     const selected = state.project.border.preset_id;
@@ -571,11 +563,11 @@
       button.type = "button";
       button.className = "border-preset";
       button.setAttribute("aria-pressed", String(preset.id === selected));
-      const primary = state.project.color_system.design_colors.find(
-        (color) => color.color_id === state.project.color_system.role_to_color_id.border_primary,
+      const primary = state.project.border.channel_mappings.find(
+        (channel) => channel.channel_id === "border_primary",
       );
-      const secondary = state.project.color_system.design_colors.find(
-        (color) => color.color_id === state.project.color_system.role_to_color_id.border_secondary,
+      const secondary = state.project.border.channel_mappings.find(
+        (channel) => channel.channel_id === "border_secondary",
       );
       button.style.setProperty("--border-primary", primary.display_color);
       button.style.setProperty("--border-secondary", secondary.display_color);
@@ -586,6 +578,22 @@
     byId("border-lock-state").textContent = (
       `${state.project.border.counts.border_owned.toLocaleString()} border pieces`
     );
+    const channels = byId("border-colors");
+    channels.replaceChildren();
+    for (const channel of state.project.border.color_channels) {
+      const swatch = document.createElement("button");
+      swatch.type = "button";
+      swatch.className = "paint-swatch border-color-swatch";
+      swatch.style.backgroundColor = channel.display_color;
+      swatch.setAttribute("aria-label", `Change ${channel.channel_id.split("_").join(" ")}`);
+      swatch.addEventListener("click", () => openDesignPalette(swatch, async (color) => {
+        await performDesignerMutation("/api/designer/border/color", {
+          channel_id: channel.channel_id,
+          color_id: color.color_id,
+        }, { name: "Assign Border color" });
+      }));
+      channels.appendChild(swatch);
+    }
   }
 
   function renderArtworkInspector(previewTransform = null) {
@@ -607,33 +615,119 @@
         ? "Needs update"
         : generated ? "Mosaic generated" : "";
     }
+    const channels = byId("artwork-colors");
+    channels.replaceChildren();
+    const generatedChannels = generated?.color_channels || [];
+    if (generatedChannels.length >= 1 && generatedChannels.length <= 6) {
+      for (const channel of generatedChannels) {
+        const swatch = document.createElement("button");
+        swatch.type = "button";
+        swatch.className = "artwork-color-swatch";
+        swatch.style.backgroundColor = channel.display_color;
+        swatch.setAttribute("aria-label", `Remap Artwork color ${channel.channel_id.split("-").at(-1)}`);
+        swatch.addEventListener("click", () => openDesignPalette(swatch, async (color) => {
+          await performDesignerMutation("/api/designer/artwork/color", {
+            channel_id: channel.channel_id,
+            color_id: color.color_id,
+          }, { name: "Remap Artwork color" });
+        }));
+        channels.appendChild(swatch);
+      }
+    }
   }
 
   function renderPaintInspector() {
     if (!state.project) return;
-    const colors = state.project.color_system.design_colors;
-    if (!colors.some((color) => color.color_id === activePaintColorId)) {
-      activePaintColorId = colors[0]?.color_id || null;
+    const paint = state.project.paint;
+    if (activeTileColorId !== null && !paint.curated_palette.some(
+      (color) => color.color_id === activeTileColorId
+    )) {
+      activeTileColorId = null;
+      paintTool = null;
     }
-    byId("paint-mode-restore").setAttribute("aria-pressed", String(paintTool === "restore"));
     byId("mosaic-canvas").classList.toggle("paint-active", paintTool !== null);
     byId("paint-clear").disabled = !state.project.paint?.override_count;
     const palette = byId("paint-colors");
+    palette.classList.toggle(
+      "flat-top", state.project.tile_orientation === "flat_top",
+    );
+    palette.classList.toggle(
+      "point-top", state.project.tile_orientation !== "flat_top",
+    );
     palette.replaceChildren();
-    for (const color of colors) {
+    for (const color of paint.curated_palette) {
       const swatch = document.createElement("button");
       swatch.type = "button";
-      swatch.className = "paint-swatch";
+      swatch.className = "paint-swatch tile-color-swatch";
       swatch.style.backgroundColor = color.display_color;
-      swatch.setAttribute("aria-label", `Paint with ${color.name}`);
-      swatch.setAttribute("aria-pressed", String(color.color_id === activePaintColorId));
+      swatch.dataset.colorId = color.color_id;
+      swatch.setAttribute("aria-label", color.name);
+      swatch.title = color.name;
+      swatch.setAttribute("aria-pressed", String(color.color_id === activeTileColorId));
       swatch.addEventListener("click", () => {
-        activePaintColorId = color.color_id;
+        activeTileColorId = color.color_id;
         paintTool = "paint";
+        hideDesignPalette();
         renderPaintInspector();
       });
       palette.appendChild(swatch);
     }
+  }
+
+  function renderGroutInspector() {
+    if (!state.project) return;
+    const swatch = byId("grout-color");
+    swatch.style.setProperty("--current-color", state.project.grout.display_color);
+    swatch.dataset.colorId = state.project.grout.color_id;
+  }
+
+  function hideDesignPalette() {
+    const chooser = byId("design-palette");
+    chooser.hidden = true;
+    chooser.replaceChildren();
+    paletteInvoker?.setAttribute("aria-expanded", "false");
+    paletteInvoker?.classList.remove("palette-active");
+    paletteSelectionHandler = null;
+    paletteInvoker = null;
+  }
+
+  function openDesignPalette(invoker, onSelect) {
+    if (paletteInvoker && paletteInvoker !== invoker) hideDesignPalette();
+    paletteSelectionHandler = onSelect;
+    paletteInvoker = invoker;
+    invoker.setAttribute("aria-expanded", "true");
+    invoker.classList.add("palette-active");
+    const chooser = byId("design-palette");
+    chooser.replaceChildren();
+    for (const color of state.project.paint.curated_palette) {
+      const swatch = document.createElement("button");
+      swatch.type = "button";
+      swatch.className = "paint-palette-swatch";
+      swatch.style.backgroundColor = color.display_color;
+      swatch.setAttribute("aria-label", color.name);
+      swatch.title = color.name;
+      swatch.addEventListener("click", async () => {
+        const handler = paletteSelectionHandler;
+        const returnFocus = paletteInvoker;
+        hideDesignPalette();
+        returnFocus?.focus();
+        if (handler) await handler(color);
+      });
+      chooser.appendChild(swatch);
+    }
+    chooser.hidden = false;
+    const anchor = invoker.getBoundingClientRect();
+    const popup = chooser.getBoundingClientRect();
+    const margin = 8;
+    const preferredLeft = anchor.right - popup.width;
+    const left = Math.max(margin, Math.min(preferredLeft, innerWidth - popup.width - margin));
+    const below = anchor.bottom + margin;
+    const top = below + popup.height <= innerHeight - margin
+      ? below
+      : Math.max(margin, anchor.top - popup.height - margin);
+    chooser.style.left = `${left}px`;
+    chooser.style.top = `${top}px`;
+    chooser.querySelector("button")?.focus();
   }
 
   function validateDesignerState(payload, requireGenerated = false) {
@@ -654,6 +748,7 @@
         || !payload.document
         || !hasOwn(payload, "artwork")
         || !hasOwn(payload, "generated_artwork")
+        || !payload.grout
         || !payload.border
         || !payload.color_system
         || !Array.isArray(payload.color_counts)
@@ -682,6 +777,7 @@
       !project
       || !hasOwn(project, "artwork")
       || !hasOwn(project, "generated_artwork")
+      || !project.grout
       || !Array.isArray(project.geometry?.tiles)
       || !Array.isArray(project.color_counts)
       || (requireGenerated && !project.generated_artwork)
@@ -734,6 +830,7 @@
           ...state.project,
           artwork: payload.artwork,
           generated_artwork: payload.generated_artwork,
+          grout: payload.grout,
           border: payload.border,
           color_system: payload.color_system,
           color_counts: payload.color_counts,
@@ -1048,14 +1145,10 @@
     paintStroke.ids.add(tileId);
     const stateTile = state.project.geometry.tiles.find((value) => value.id === tileId);
     paintStroke.originalFills.set(tileId, stateTile.display_color);
-    if (paintStroke.mode === "paint") {
-      const color = state.project.color_system.design_colors.find(
-        (value) => value.color_id === paintStroke.colorId,
-      );
-      if (color) tile.style.fill = color.display_color;
-    } else {
-      tile.style.fill = stateTile.lower_display_color;
-    }
+    const color = state.project.paint.curated_palette.find(
+      (value) => value.color_id === paintStroke.colorId,
+    );
+    if (color) tile.style.fill = color.display_color;
   }
 
   function beginPaintStroke(event) {
@@ -1073,7 +1166,7 @@
       ids: new Set(),
       originalFills: new Map(),
       mode: paintTool,
-      colorId: activePaintColorId,
+      colorId: activeTileColorId,
     };
     byId("mosaic-canvas").setPointerCapture(event.pointerId);
     paintTileFromEvent(event);
@@ -1096,10 +1189,10 @@
       "/api/designer/paint",
       {
         mode: stroke.mode,
-        color_id: stroke.mode === "paint" ? stroke.colorId : null,
+        color_id: stroke.colorId,
         placement_ids: [...stroke.ids],
       },
-      { name: stroke.mode === "paint" ? "Paint tiles" : "Erase paint" },
+      { name: "Assign tile colors" },
     );
     if (!response) {
       for (const [id, fill] of stroke.originalFills) byId(id).style.fill = fill;
@@ -1150,6 +1243,7 @@
     renderBorderInspector();
     renderArtworkInspector();
     renderPaintInspector();
+    renderGroutInspector();
     if (state.stage === "workspace" && !viewportObserver && "ResizeObserver" in window) {
       viewportObserver = new ResizeObserver(() => fitToWorkspace());
       viewportObserver.observe(byId("canvas-viewport"));
@@ -1262,15 +1356,31 @@
   byId("artwork-reset").addEventListener("click", () => artworkAction("/api/designer/artwork/reset", {}, "Reset artwork"));
   byId("artwork-generate").addEventListener("click", generateArtwork);
   byId("artwork-edit").addEventListener("click", () => artworkAction("/api/designer/artwork/edit", {}, "Edit artwork"));
-  byId("paint-mode-restore").addEventListener("click", () => {
-    paintTool = "restore";
-    renderPaintInspector();
-  });
   byId("paint-clear").addEventListener("click", async () => {
     if (!state.project.paint?.override_count) return;
     await performDesignerMutation(
       "/api/designer/paint/clear", {}, { name: "Clear Edits" },
     );
+  });
+  byId("grout-color").addEventListener("click", (event) => {
+    openDesignPalette(event.currentTarget, async (color) => {
+      await performDesignerMutation("/api/designer/grout", {
+        color_id: color.color_id,
+      }, { name: "Assign Grout color" });
+    });
+  });
+  document.addEventListener("pointerdown", (event) => {
+    const chooser = byId("design-palette");
+    if (chooser.hidden || chooser.contains(event.target) || paletteInvoker?.contains(event.target)) return;
+    const invoker = paletteInvoker;
+    hideDesignPalette();
+    invoker?.focus();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || byId("design-palette").hidden) return;
+    const invoker = paletteInvoker;
+    hideDesignPalette();
+    invoker?.focus();
   });
   byId("mosaic-canvas").addEventListener("pointerdown", beginArtworkInteraction);
   byId("mosaic-canvas").addEventListener("pointerdown", beginPaintStroke);

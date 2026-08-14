@@ -201,32 +201,36 @@ def test_eight_color_artwork_generates_with_stable_project_ids():
     artwork_ids = {
         value["color_id"] for value in generated["assignments"]
     }
-    assert len(artwork_ids) == 8
+    assert 1 <= len(artwork_ids) <= 8
     assert all(value.startswith("project-color-") for value in artwork_ids)
-    assert len(payload["project"]["color_system"]["design_colors"]) == 11
+    assert len(payload["project"]["color_system"]["design_colors"]) == 32
     assert sum(
         value["count"] for value in payload["project"]["color_counts"]
     ) == payload["project"]["geometry"]["visible_piece_count"]
 
 
-def test_32_color_safety_limit_is_not_a_manufacturing_limit():
+def test_source_colors_quantize_without_expanding_canonical_palette():
     new_colors = tuple(
         (index + 1, (index * 37 + 11) % 256, (index * 71 + 19) % 256)
         for index in range(30)
     )
-    colors = ((250, 249, 246), (0, 0, 0), (128, 128, 128), *new_colors[:29])
+    colors = (
+        (250, 249, 246), (0, 0, 0), (128, 128, 128), (181, 111, 82),
+        (70, 105, 132), *new_colors[:27],
+    )
     mapping, resolution = generation_module._allocate_colors(
         colors, DEFAULT_DESIGNER_COLORS,
     )
     assert len(mapping) == 32
     assert len(resolution.colors) == 32
-    with pytest.raises(ValueError, match="more than 32 distinct colors"):
-        generation_module._allocate_colors(
-            (*colors, new_colors[29]), DEFAULT_DESIGNER_COLORS,
-        )
+    expanded, same_resolution = generation_module._allocate_colors(
+        (*colors, new_colors[28]), DEFAULT_DESIGNER_COLORS,
+    )
+    assert len(expanded) == 33
+    assert same_resolution is DEFAULT_DESIGNER_COLORS
 
 
-def test_project_color_ids_reuse_equivalents_and_append_on_regeneration():
+def test_project_canonical_palette_is_unchanged_on_regeneration():
     app = _app()
     _upload(app, _svg(
         '<rect width="50" height="100" fill="#ff0000"/>'
@@ -234,7 +238,6 @@ def test_project_color_ids_reuse_equivalents_and_append_on_regeneration():
     ))
     _generate(app)
     first_colors = app.project.color_system.colors
-    first_by_hex = {value.display_color: value.color_id for value in first_colors}
 
     _request(app, "POST", "/api/designer/artwork/replace", {
         "filename": "replacement.svg",
@@ -245,17 +248,12 @@ def test_project_color_ids_reuse_equivalents_and_append_on_regeneration():
     })
     _generate(app)
     second = app.project.color_system
-    second_by_hex = {value.display_color: value.color_id for value in second.colors}
-    assert second_by_hex["#FF0000"] == first_by_hex["#FF0000"]
-    assert second_by_hex["#0066CC"] == first_by_hex["#0066CC"]
-    assert second_by_hex["#00FF00"] == f"project-color-{len(first_colors) + 1}"
-    assert [value.color_id for value in second.colors[:len(first_colors)]] == [
+    assert [value.color_id for value in second.colors] == [
         value.color_id for value in first_colors
     ]
-    counts = app.payload()["project"]["color_counts"]
-    assert first_by_hex["#0066CC"] not in {
-        value["color_id"] for value in counts
-    }
+    assert [value.display_color for value in second.colors] == [
+        value.display_color for value in first_colors
+    ]
 
 
 def test_failed_regeneration_does_not_mutate_palette_or_previous_result(
@@ -304,7 +302,7 @@ def test_source_color_without_generated_tiles_does_not_enter_palette():
     assert status == "200 OK"
     assert payload["project"]["generated_artwork"]["assignment_count"] == 0
     assert payload["project"]["generated_artwork"]["source_color_count"] == 0
-    assert len(payload["project"]["color_system"]["design_colors"]) == 3
+    assert len(payload["project"]["color_system"]["design_colors"]) == 32
 
 
 def test_transparency_and_equivalent_color_syntax_are_normalized():
@@ -317,6 +315,64 @@ def test_transparency_and_equivalent_color_syntax_are_normalized():
     status, payload = _generate(app)
     assert status == "200 OK"
     assert payload["project"]["generated_artwork"]["source_colors"] == [[255, 0, 0]]
+
+
+def test_equivalent_white_encodings_count_as_one_declared_color():
+    colors = generation_module._declared_source_colors(_svg(
+        '<rect width="25" height="100" fill="#fff"/>'
+        '<rect x="25" width="25" height="100" fill="#ffffff"/>'
+        '<rect x="50" width="25" height="100" fill="rgb(255,255,255)"/>'
+        '<rect x="75" width="25" height="100" style="fill:white"/>'
+    ))
+    assert colors == ((255, 255, 255),)
+
+
+@pytest.mark.parametrize("count, accepted", ((1, True), (32, True), (33, True), (64, True), (65, False)))
+def test_effective_svg_source_color_complexity_guard(count, accepted):
+    app = _app()
+    columns = 8
+    cells = []
+    for index in range(count):
+        red = (index * 47 + 1) % 256
+        green = (index * 83 + 3) % 256
+        blue = (index * 131 + 7) % 256
+        cells.append(
+            f'<rect x="{index % columns}" y="{index // columns}" width="1" height="1" '
+            f'fill="#{red:02x}{green:02x}{blue:02x}"/>'
+        )
+    rows = (count + columns - 1) // columns
+    _upload(app, _svg("".join(cells), f"0 0 {columns} {rows}"))
+    before = app.payload()
+    status, payload = _generate(app)
+    assert (status == "200 OK") is accepted
+    if accepted:
+        assert len(app.project.color_system.colors) == 32
+    else:
+        assert payload["error"] == (
+            "This artwork contains more than 64 colors. Simplify it to 64 "
+            "colors or fewer and try again."
+        )
+        assert app.generated_artwork is None
+        assert app.payload()["project"] == before["project"]
+
+
+def test_lab_quantization_is_exact_deterministic_and_canonical():
+    exact = generation_module._closest_palette_color_id(
+        (181, 111, 82), DEFAULT_DESIGNER_COLORS.colors,
+    )
+    near = generation_module._closest_palette_color_id(
+        (183, 109, 80), DEFAULT_DESIGNER_COLORS.colors,
+    )
+    assert exact == near == "project-color-4"
+    mapping, resolution = generation_module._allocate_colors(
+        ((181, 111, 82), (183, 109, 80)), DEFAULT_DESIGNER_COLORS,
+    )
+    assert set(mapping.values()) == {"project-color-4"}
+    assert resolution is DEFAULT_DESIGNER_COLORS
+    # This dark blue is closer to black in raw RGB but perceptually closer to Navy.
+    assert generation_module._closest_palette_color_id(
+        (0, 0, 51), DEFAULT_DESIGNER_COLORS.colors,
+    ) == "project-color-24"
 
 
 def test_active_gradient_is_rejected_without_quantization():
@@ -340,7 +396,7 @@ def test_alternating_border_and_multicolor_artwork_have_independent_ids():
     status, payload = _generate(app)
     assert status == "200 OK"
     colors = payload["project"]["color_system"]["design_colors"]
-    assert len(colors) == 5
+    assert len(colors) == 32
     assert payload["project"]["color_system"]["role_to_color_id"] == {
         "background": "project-color-1",
         "border_primary": "project-color-2",
@@ -350,6 +406,20 @@ def test_alternating_border_and_multicolor_artwork_have_independent_ids():
     assert [value["display_color"] for value in colors[:3]] == [
         "#FAF9F6", "#000000", "#808080",
     ]
+
+
+def test_border_channel_recolor_does_not_mutate_generated_artwork():
+    app = _app("solid")
+    _upload(app, _svg(f'<rect width="100" height="100" fill="{BLUE}"/>'))
+    _generate(app)
+    generated = app.generated_artwork
+    assignments = generated.assignments
+    status, _ = _request(app, "POST", "/api/designer/border/color", {
+        "channel_id": "border_primary", "color_id": "project-color-5",
+    })
+    assert status == "200 OK"
+    assert app.generated_artwork is generated
+    assert app.generated_artwork.assignments is assignments
 
 
 def test_strongest_qualifying_source_color_wins_one_tile_deterministically():
@@ -660,10 +730,12 @@ def test_semantic_color_identities_are_immutable_when_generating_under_solid():
     assert colors["project-color-1"]["display_color"] == "#FAF9F6"
     assert colors["project-color-2"]["display_color"] == "#000000"
     assert colors["project-color-3"]["display_color"] == "#808080"
-    assert colors["project-color-4"]["display_color"] == BLUE
+    blue_id = generation_module._closest_palette_color_id(
+        (0, 102, 204), DEFAULT_DESIGNER_COLORS.colors,
+    )
     assert {
         value.color_id for value in app.generated_artwork.assignments
-    } == {"project-color-4"}
+    } == {blue_id}
 
     _request(app, "POST", "/api/designer/border", {"preset_id": "none"})
     none = app.payload()["project"]
@@ -1130,6 +1202,89 @@ def test_large_canvas_generate_response_remains_smaller_than_full_state():
     full_size = len(json.dumps(app.payload()).encode())
     assert compact_size < full_size / 2
     assert "vertices_in" not in json.dumps(response)
+
+
+def test_artwork_channels_are_actual_generated_colors_and_ui_cutoff_is_six():
+    app = _app()
+    _upload(app, _stripe_svg(7))
+    _, payload = _generate(app)
+    generated = payload["project"]["generated_artwork"]
+    actual_ids = list(dict.fromkeys(
+        value["color_id"] for value in generated["assignments"]
+    ))
+    assert generated["color_channel_count"] == len(actual_ids)
+    assert [value["generated_color_id"] for value in generated["color_channels"]] == actual_ids
+    _, script = _asset(app, "/designer.js")
+    assert "generatedChannels.length >= 1 && generatedChannels.length <= 6" in script
+    assert "generated?.color_channels || []" in script
+
+
+def test_artwork_channel_remap_is_compact_isolated_and_allows_duplicates():
+    app = _app("solid")
+    _request(app, "POST", "/api/designer/grout", {"color_id": "project-color-5"})
+    _upload(app, _stripe_svg(3))
+    _, full = _generate(app)
+    generated = full["project"]["generated_artwork"]
+    assert generated["color_channel_count"] >= 2
+    first, second = generated["color_channels"][:2]
+    target_ids = {
+        assignment["tile_id"] for assignment in generated["assignments"]
+        if assignment["color_id"] == first["generated_color_id"]
+    }
+    manual_id = next(iter(target_ids))
+    _request(app, "POST", "/api/designer/paint", {
+        "placement_ids": [manual_id], "color_id": "project-color-4",
+    })
+    before = app.payload()["project"]
+    border_channels = before["border"]["channel_mappings"]
+    status, changed = _request(app, "POST", "/api/designer/artwork/color", {
+        "channel_id": first["channel_id"], "color_id": second["color_id"],
+    })
+    assert status == "200 OK"
+    assert "project" not in changed and "geometry" not in changed
+    assert changed["document"]["dirty"] is True
+    after = app.payload()["project"]
+    tiles = {value["id"]: value for value in after["geometry"]["tiles"]}
+    assert tiles[manual_id]["color_id"] == "project-color-4"
+    assert all(
+        tiles[tile_id]["color_id"] == second["color_id"]
+        for tile_id in target_ids - {manual_id}
+    )
+    assert after["grout"] == before["grout"]
+    assert after["border"]["channel_mappings"] == border_channels
+    channels = after["generated_artwork"]["color_channels"]
+    assert channels[0]["color_id"] == channels[1]["color_id"]
+    _request(app, "POST", "/api/designer/artwork/color", {
+        "channel_id": first["channel_id"], "color_id": "project-color-6",
+    })
+    channels = app.payload()["project"]["generated_artwork"]["color_channels"]
+    assert channels[0]["color_id"] == "project-color-6"
+    assert channels[1]["color_id"] == second["color_id"]
+
+
+def test_artwork_regeneration_reconciles_only_matching_generated_channels():
+    app = _app()
+    _upload(app, _stripe_svg(3))
+    _, first = _generate(app)
+    channel = first["project"]["generated_artwork"]["color_channels"][0]
+    _request(app, "POST", "/api/designer/artwork/color", {
+        "channel_id": channel["channel_id"], "color_id": "project-color-10",
+    })
+    _, repeated = _generate(app)
+    matching = next(
+        value for value in repeated["project"]["generated_artwork"]["color_channels"]
+        if value["generated_color_id"] == channel["generated_color_id"]
+    )
+    assert matching["color_id"] == "project-color-10"
+
+    _request(app, "POST", "/api/designer/artwork/remove", {})
+    assert app.generated_artwork is None
+    _upload(app, _svg('<rect width="100" height="100" fill="#ffffff"/>'))
+    _, replacement = _generate(app)
+    assert all(
+        value["color_id"] == value["generated_color_id"]
+        for value in replacement["project"]["generated_artwork"]["color_channels"]
+    )
 
 
 def _asset(app, path):

@@ -94,7 +94,26 @@
       </div>
 
       <aside class="inspector" aria-label="Design inspector">
-        <div class="inspector-heading"><p class="eyebrow">Design</p><h2>Build your mosaic</h2></div>
+        <section class="paint-control" aria-labelledby="tiles-heading">
+          <div class="paint-control-heading">
+            <strong id="tiles-heading">Tiles</strong>
+          </div>
+          <div id="paint-tools">
+            <div id="paint-colors" class="paint-colors" aria-label="Tile colors"></div>
+            <div class="paint-actions" aria-label="Tiles actions">
+              <button id="paint-clear" class="inspector-action danger-text" type="button">Clear Edits</button>
+              <button id="grout-color" class="compact-color-action" type="button" aria-label="Set Grout color"><span>Set Grout</span><span class="current-color-dot" aria-hidden="true"></span></button>
+            </div>
+          </div>
+        </section>
+        <section class="border-control" aria-labelledby="border-heading">
+          <div class="border-control-heading">
+            <strong id="border-heading">Border</strong>
+            <span id="border-lock-state"></span>
+          </div>
+          <div id="border-presets" class="border-presets"></div>
+          <div id="border-colors" class="border-colors" aria-label="Border colors"></div>
+        </section>
         <section class="artwork-control" aria-labelledby="artwork-heading">
           <div class="artwork-control-heading">
             <strong id="artwork-heading">Artwork</strong>
@@ -118,31 +137,14 @@
               <button id="artwork-generate" class="inspector-action primary" type="button">Generate Mosaic</button>
               <button id="artwork-edit" class="inspector-action" type="button" hidden>Edit Artwork</button>
             </div>
+            <div id="artwork-colors" class="artwork-colors" aria-label="Artwork colors"></div>
           </div>
-        </section>
-        <section class="paint-control" aria-labelledby="paint-heading">
-          <div class="paint-control-heading">
-            <strong id="paint-heading">Paint</strong>
-          </div>
-          <div id="paint-tools">
-            <div id="paint-colors" class="paint-colors" aria-label="Project paint colors"></div>
-            <div class="paint-actions" aria-label="Paint actions">
-              <button id="paint-mode-restore" class="inspector-action" type="button" aria-pressed="false">Erase</button>
-              <button id="paint-clear" class="inspector-action danger-text" type="button">Clear Edits</button>
-            </div>
-          </div>
-        </section>
-        <section class="border-control" aria-labelledby="border-heading">
-          <div class="border-control-heading">
-            <strong id="border-heading">Border</strong>
-            <span id="border-lock-state"></span>
-          </div>
-          <div id="border-presets" class="border-presets"></div>
         </section>
       </aside>
       <footer id="workspace-status" class="workspace-status" aria-label="Project physical status"></footer>
     </section>
   </main>
+  <div id="design-palette" class="paint-palette" role="dialog" aria-label="Mosaica color palette" hidden></div>
   <div id="status" role="status" aria-live="polite"></div>
   <script src="/designer.js"></script>
 </body>

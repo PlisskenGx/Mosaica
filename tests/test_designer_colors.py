@@ -5,9 +5,11 @@ import pytest
 
 from mosaic_engine.designer import DesignerProjectShell, MosaicDesignerApp
 from mosaic_engine.designer_colors import (
+    CANONICAL_MOSAICA_COLORS, CURATED_MOSAICA_PALETTE,
     DEFAULT_DESIGNER_COLORS,
     DesignColor,
     DesignerColorResolution,
+    MAX_DESIGN_COLORS,
     PhysicalColor,
 )
 
@@ -89,16 +91,33 @@ def test_default_border_roles_are_black_and_gray_project_colors():
     assert (secondary.name, secondary.display_color) == ("Gray", "#808080")
 
 
-def test_equivalent_colors_reuse_ids_and_new_colors_append():
-    updated = DEFAULT_DESIGNER_COLORS.with_artwork_colors((
-        (250, 249, 246),
-        (0, 0, 0),
-        (0, 102, 204),
-    ))
-    assert len(updated.colors) == 4
-    assert updated.color_id_for_rgb((250, 249, 246)) == "project-color-1"
-    assert updated.color_id_for_rgb((0, 0, 0)) == "project-color-2"
-    assert updated.color_id_for_rgb((0, 102, 204)) == "project-color-4"
+def test_default_project_palette_has_32_stable_ordered_canonical_colors():
+    values = [
+        (value.color_id, value.name, value.display_color, value.order)
+        for value in DEFAULT_DESIGNER_COLORS.colors
+    ]
+    assert len(values) == 32
+    assert values[:5] == [
+        ("project-color-1", "Ivory", "#FAF9F6", 0),
+        ("project-color-2", "Black", "#000000", 1),
+        ("project-color-3", "Gray", "#808080", 2),
+        ("project-color-4", "Clay", "#B56F52", 3),
+        ("project-color-5", "Denim", "#466984", 4),
+    ]
+    assert [value[0] for value in values] == [
+        f"project-color-{index}" for index in range(1, 33)
+    ]
+    assert [value[3] for value in values] == list(range(32))
+    assert DEFAULT_DESIGNER_COLORS.colors is CANONICAL_MOSAICA_COLORS
+    assert [value[2] for value in values] == [
+        display_color for _, display_color in CURATED_MOSAICA_PALETTE
+    ]
+
+
+def test_canonical_equivalent_colors_reuse_ids_without_append():
+    assert DEFAULT_DESIGNER_COLORS.color_id_for_rgb((250, 249, 246)) == "project-color-1"
+    assert DEFAULT_DESIGNER_COLORS.color_id_for_rgb((0, 0, 0)) == "project-color-2"
+    assert len(DEFAULT_DESIGNER_COLORS.colors) == 32
 
 
 def test_three_roles_merge_and_outside_placements_are_excluded():
@@ -224,7 +243,117 @@ def test_more_than_four_distinct_design_colors_are_supported():
     assert len(resolution.colors) == 8
 
 
-def test_api_and_status_ui_render_backend_counts_without_inference():
+def _workspace_app():
+    app = MosaicDesignerApp()
+    _request(app, "POST", "/api/designer/canvas", {"canvas_id": "square-s"})
+    _request(app, "POST", "/api/designer/tile", {"tile_id": "m"})
+    return app
+
+
+def test_arbitrary_color_add_is_rejected_by_fixed_canonical_palette():
+    app = _workspace_app()
+    status, payload = _request(app, "POST", "/api/designer/colors/add", {
+        "display_color": "rgb(22, 88, 144)", "name": "Lake",
+    })
+    assert status == "400 Bad Request"
+    assert "32-color limit" in payload["error"]
+    assert app.document_dirty is False
+
+
+def test_duplicate_add_and_update_are_atomic():
+    app = _workspace_app()
+    before = app.payload()["project"]["color_system"]
+    status, error = _request(app, "POST", "/api/designer/colors/add", {
+        "display_color": "black",
+    })
+    assert status == "400 Bad Request"
+    assert error["error"] == "This color already exists in the project."
+    assert app.payload()["project"]["color_system"] == before
+
+    status, error = _request(app, "POST", "/api/designer/colors/update", {
+        "color_id": "project-color-4", "display_color": "#808080",
+        "name": "Duplicate Gray",
+    })
+    assert status == "400 Bad Request"
+    assert error["error"] == "Canonical Mosaica design colors cannot be edited."
+    assert app.payload()["project"]["color_system"] == before
+
+
+def test_canonical_color_update_is_rejected_atomically():
+    app = _workspace_app()
+    before = app.payload()["project"]
+    ivory_count = next(
+        value["count"] for value in before["color_counts"]
+        if value["color_id"] == "project-color-1"
+    )
+    status, payload = _request(app, "POST", "/api/designer/colors/update", {
+        "color_id": "project-color-1", "display_color": "#F2E2C4",
+        "name": "Warm Ivory",
+    })
+    assert status == "400 Bad Request"
+    assert "cannot be edited" in payload["error"]
+    after = app.payload()["project"]
+    assert after["color_system"] == before["color_system"]
+    assert next(
+        value["count"] for value in after["color_counts"]
+        if value["color_id"] == "project-color-1"
+    ) == ivory_count
+
+
+def test_canonical_colors_cannot_be_removed():
+    app = _workspace_app()
+    status, error = _request(app, "POST", "/api/designer/colors/remove", {
+        "color_id": "project-color-6",
+    })
+    assert status == "400 Bad Request"
+    assert "Canonical" in error["error"]
+
+
+def test_tiles_assignment_uses_direct_canonical_identity():
+    app = _workspace_app()
+    tile_id = app.payload()["project"]["geometry"]["tiles"][0]["id"]
+    status, payload = _request(app, "POST", "/api/designer/paint", {
+        "placement_ids": [tile_id], "mode": "paint",
+        "color_id": "project-color-20",
+    })
+    assert status == "200 OK"
+    assert app.paint_overrides[tile_id] == "project-color-20"
+    assert payload["paint"]["overrides"][tile_id] == "project-color-20"
+
+
+def test_color_limit_rejects_thirty_third_without_mutation():
+    colors = tuple(
+        DesignColor(
+            f"project-color-{index + 1}", f"#{index:02X}0101",
+            f"Color {index + 1}", index,
+        )
+        for index in range(MAX_DESIGN_COLORS)
+    )
+    resolution = DesignerColorResolution(colors, {"background": "project-color-1"})
+    with pytest.raises(ValueError, match="32-color limit"):
+        resolution.add_color("#FEFEFE")
+    assert len(resolution.colors) == MAX_DESIGN_COLORS
+
+
+def test_colors_tool_is_removed_and_tiles_owns_the_canonical_palette():
+    app = MosaicDesignerApp()
+    _, html = _request(app, "GET", "/")
+    _, script = _request(app, "GET", "/designer.js")
+    assert 'id="colors-heading"' not in html
+    assert 'id="project-colors"' not in html
+    assert 'id="color-add-picker"' not in html
+    assert 'id="color-error"' not in html
+    assert 'id="paint-assign"' not in html
+    assert 'id="tiles-heading">Tiles<' in html
+    assert 'id="design-palette"' in html
+    assert "/api/designer/paint/slot" not in script
+    assert "/api/designer/border/color" in script
+    assert script.count("function openDesignPalette") == 1
+    assert script.count("state.project.paint.curated_palette") >= 1
+    assert "window.alert" not in script and "window.confirm" not in script
+
+
+def test_api_keeps_counts_while_normal_ui_hides_them():
     app = MosaicDesignerApp()
     _request(app, "POST", "/api/designer/canvas", {"canvas_id": "square-s"})
     _, payload = _request(app, "POST", "/api/designer/tile", {"tile_id": "m"})
@@ -233,16 +362,16 @@ def test_api_and_status_ui_render_backend_counts_without_inference():
     assert payload["project"]["geometry"]["clipped_piece_count"] > 0
     assert payload["project"]["border"]["counts"]["protected"] > 0
     _, script = _request(app, "GET", "/designer.js")
-    assert "project.color_counts" in script
-    assert "renderColorCounts" in script
-    assert "physical-color-swatch" in script
-    assert "Visible pieces by design color" in script
+    assert "color_counts" in script
+    assert "renderColorCounts" not in script
+    assert 'countLabel.className = "tile-color-count"' not in script
+    assert "physical-color-swatch" not in script
+    assert "Visible pieces by design color" not in script
     assert "color.name" in script
-    assert "color.count" in script
     start = script.index("function renderWorkspaceStatus(project)")
     status_rendering = script[start:script.index("function refreshArtworkLayers", start)]
-    color_start = script.index("function renderColorCounts")
-    color_rendering = script[color_start:script.index("function renderBorderInspector", color_start)]
+    color_start = script.index("function renderPaintInspector")
+    color_rendering = script[color_start:script.index("function renderGroutInspector", color_start)]
     assert "querySelectorAll" not in status_rendering + color_rendering
     assert ".reduce(" not in status_rendering + color_rendering
     assert "tile.color_role" not in status_rendering + color_rendering
@@ -253,8 +382,8 @@ def test_api_and_status_ui_render_backend_counts_without_inference():
     assert "project.canvas_preset.height_in" in status_rendering
     assert "project.custom_grid.tiles_across" in status_rendering
     assert "project.custom_grid.tiles_down" in status_rendering
-    assert "geometry.visible_piece_count" in status_rendering
-    assert "project.color_counts" in status_rendering
+    assert "geometry.visible_piece_count" not in status_rendering
+    assert "project.color_counts" not in status_rendering
     assert "geometry.width_in" not in status_rendering
     assert "geometry.height_in" not in status_rendering
     assert "project.tile_preset.id" not in status_rendering
@@ -267,11 +396,13 @@ def test_api_and_status_ui_render_backend_counts_without_inference():
     assert "protected" not in status_rendering
     assert "status-project-summary" in status_rendering
     _, stylesheet = _request(app, "GET", "/designer.css")
-    assert ".physical-color-counts" in stylesheet
-    assert ".physical-color-count" in stylesheet
-    assert ".physical-color-swatch" in stylesheet
-    assert "flex-wrap: wrap" in stylesheet
-    assert "flex: 1 1 auto" in stylesheet
+    assert ".physical-color-counts" not in stylesheet
+    assert ".physical-color-count" not in stylesheet
+    assert ".physical-color-swatch" not in stylesheet
+    assert ".tile-color-count" not in stylesheet
+    assert ".tile-color-swatch[aria-pressed=\"true\"]" in stylesheet
+    assert ".tile-color-swatch.count-light" not in stylesheet
+    assert ".tile-color-swatch.count-dark" not in stylesheet
     assert ".workspace-status" in stylesheet
     assert ".status-group" in stylesheet
     assert "flex-wrap: wrap" in stylesheet
