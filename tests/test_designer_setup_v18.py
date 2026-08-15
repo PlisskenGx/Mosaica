@@ -219,7 +219,7 @@ def test_changing_tile_before_recreating_custom_canvas_does_not_open_workspace()
 
 def test_three_primary_canvas_choices_and_dedicated_custom_action():
     assert [value.name for value in CANVAS_PRESETS] == [
-        "Landscape", "Portrait", "Square",
+        "Square", "Portrait", "Landscape",
     ]
     app = MosaicDesignerApp()
     _, html = _request(app, "GET", "/")
@@ -292,11 +292,12 @@ def test_canvas_cards_use_common_larger_illustration_region():
     app = MosaicDesignerApp()
     _, script = _request(app, "GET", "/designer.js")
     _, css = _request(app, "GET", "/designer.css")
-    assert 'style="--aspect:${preset.aspect_ratio}"' in script
+    assert "--preview-width:${preset.preview_width_rem}rem" in script
+    assert "--preview-height:${preset.preview_height_rem}rem" in script
     assert ".canvas-card { min-height: 17rem; }" in css
     assert ".canvas-preview-wrap { display: grid; height: 10.5rem" in css
-    assert "height: min(8rem, 82%)" in css
-    assert "aspect-ratio: var(--aspect)" in css
+    assert "width: var(--preview-width)" in css
+    assert "height: var(--preview-height)" in css
     assert ".custom-lattice" in css and "transform: translateX(20px)" in css
     assert ".custom-lattice { transform: none; }" in css
 
@@ -335,6 +336,9 @@ def test_custom_configuration_has_dedicated_stage_and_bounded_schematic():
     assert "c0 r0" in html and "c4 r2" in html
     assert ".custom-lattice.flat_top" in css
     assert ".measure.across" in css and ".measure.down" in css
+    assert "#custom-lattice.flat_top > span.measure.down { left: 0.25rem; }" in css
+    assert "#custom-lattice.flat_top > span.measure.across { left: 5.6rem; }" in css
+    assert "#custom-lattice.flat_top > div { inset: -10px 1rem 1.5rem 6.25rem; }" in css
     assert "height: calc(100dvh - var(--app-bar-height))" in css
     assert 'byId("setup-viewport").dataset.stage = stage' in script
 

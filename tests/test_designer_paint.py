@@ -5,6 +5,7 @@ import pytest
 
 import mosaic_engine.designer_generation as generation_module
 from mosaic_engine.designer import DesignerProjectShell, MosaicDesignerApp
+from mosaic_engine.engine import _point_in_polygon
 
 
 def _request(app, method, path, body=None):
@@ -564,7 +565,8 @@ def test_each_clipped_piece_gets_a_full_parent_hex_pointer_surface():
     ]
     assert 'hit.classList.add("partial-parent-hit", "editable")' in render
     assert 'hit.setAttribute("points", ghost.getAttribute("points"))' in render
-    assert "partialAidLayer.append(ghost, hit)" in render
+    assert "partialAidLayer.appendChild(ghost)" in render
+    assert "partialAidLayer.appendChild(hit)" in render
     assert ".partial-aid-layer { pointer-events: all; }" in stylesheet
     assert ".partial-parent-hit { fill: transparent; stroke: none; pointer-events: all; }" in stylesheet
 
@@ -606,6 +608,58 @@ def test_custom_clipped_edge_tiles_expose_missing_full_hex_hit_regions(edge):
     )
 
 
+@pytest.mark.parametrize("edge", ("left", "right", "top", "bottom"))
+def test_off_panel_pointer_coordinate_is_inside_original_hex_for_each_edge(edge):
+    geometry = DesignerProjectShell.create_custom(
+        "m", "point_top", 10, 10,
+    ).to_dict()["geometry"]
+    width, height = geometry["width_in"], geometry["height_in"]
+    matches = []
+    for tile in geometry["tiles"]:
+        if tile["piece_type"] == "full":
+            continue
+        center_x, center_y = tile["parent_center_in"]
+        for vertex_x, vertex_y in tile["full_vertices_in"]:
+            point = (
+                .9 * vertex_x + .1 * center_x,
+                .9 * vertex_y + .1 * center_y,
+            )
+            x, y = point
+            outside = {
+                "left": x < 0 and 0 < y < height,
+                "right": x > width and 0 < y < height,
+                "top": y < 0 and 0 < x < width,
+                "bottom": y > height and 0 < x < width,
+            }[edge]
+            if outside and _point_in_polygon(x, y, tile["full_vertices_in"]):
+                matches.append((tile, point))
+    assert matches
+    assert all(
+        not _point_in_polygon(x, y, tile["vertices_in"])
+        for tile, (x, y) in matches
+    )
+
+
+def test_viewport_receives_off_canvas_hover_and_paint_and_resolves_full_geometry():
+    app = MosaicDesignerApp()
+    _, script = _request(app, "GET", "/designer.js")
+    resolver = script[
+        script.index("function resolvePartialTarget"):
+        script.index("function updateTileHover")
+    ]
+    assert "svg.getScreenCTM()" in resolver
+    assert "pointer.matrixTransform(matrix.inverse())" in resolver
+    assert "tile.full_vertices_in || tile.vertices_in" in resolver
+    assert "pointInPolygon(" in resolver
+    assert 'const canvasViewport = byId("canvas-viewport")' in script
+    assert 'canvasViewport.addEventListener("pointerdown", beginPaintStroke)' in script
+    assert 'canvasViewport.addEventListener("pointermove", updateTileHover)' in script
+    assert 'canvasViewport.addEventListener("pointermove", movePaintStroke)' in script
+    assert 'byId("canvas-viewport").setPointerCapture(event.pointerId)' in script
+    assert "function fullHexInteractionBounds(geometry)" in script
+    assert "interaction.maxX - interaction.minX" in script
+
+
 def test_custom_corner_pieces_keep_full_hex_hit_regions_past_applicable_edges():
     geometry = DesignerProjectShell.create_custom(
         "m", "point_top", 10, 10,
@@ -642,5 +696,23 @@ def test_tile_hover_toggles_real_polygon_without_rerendering():
     assert 'addEventListener("pointermove", updateTileHover)' in script
     assert 'addEventListener("pointerleave", clearTileHover)' in script
     assert ".designer-tile.editable.hovered" in stylesheet
+    assert ".partial-parent-ghost.hover-visible { opacity: .72; }" in stylesheet
+    assert 'classList.add("hover-visible")' in script
+    assert 'classList.remove("hover-visible")' in script
     hover = script[script.index("function updateTileHover"):script.index("function clearTileHover")]
     assert "renderWorkspace" not in hover
+
+
+def test_every_tile_hover_outline_uses_original_full_hex_geometry():
+    app = MosaicDesignerApp()
+    _, script = _request(app, "GET", "/designer.js")
+    render = script[
+        script.index("function renderWorkspace()"):script.index("function renderWorkspaceStatus")
+    ]
+    ghost = render[render.index('const ghost = document.createElementNS'):]
+    assert 'ghost.classList.add("partial-parent-ghost")' in ghost
+    assert "tile.full_vertices_in || tile.vertices_in" in ghost
+    assert "partialAidLayer.appendChild(ghost)" in ghost
+    assert ghost.index("partialAidLayer.appendChild(ghost)") < ghost.index(
+        'if (tile.piece_type !== "full" && tile.full_vertices_in)'
+    )

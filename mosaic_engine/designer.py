@@ -48,7 +48,7 @@ MM_PER_INCH = 25.4
 DESIGNER_GROUT_MM = 1.8
 P1S_BUILD_AREA_MM = 256.0
 CUSTOM_GRID_MAX = 200
-CANVAS_PREVIEW_REM_PER_INCH = 0.10
+CANVAS_PREVIEW_REM_PER_INCH = 0.20
 _TRANSPORT_LOG = logging.getLogger("mosaic_engine.designer.transport")
 if not _TRANSPORT_LOG.handlers:
     _transport_handler = logging.StreamHandler()
@@ -131,9 +131,9 @@ class TilePreset:
 
 
 CANVAS_PRESETS = (
-    CanvasPreset("landscape", "Landscape", 36.0, 24.0),
-    CanvasPreset("portrait", "Portrait", 24.0, 36.0),
     CanvasPreset("square", "Square", 24.0, 24.0),
+    CanvasPreset("portrait", "Portrait", 24.0, 36.0),
+    CanvasPreset("landscape", "Landscape", 36.0, 24.0),
 )
 
 TILE_PRESETS = (

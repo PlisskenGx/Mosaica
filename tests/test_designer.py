@@ -48,9 +48,9 @@ def _request(app, method, path, body=None):
 
 def test_all_canvas_presets_have_exact_fixed_dimensions():
     assert [(value.id, value.name, value.width_in, value.height_in) for value in CANVAS_PRESETS] == [
-        ("landscape", "Landscape", 36.0, 24.0),
-        ("portrait", "Portrait", 24.0, 36.0),
         ("square", "Square", 24.0, 24.0),
+        ("portrait", "Portrait", 24.0, 36.0),
+        ("landscape", "Landscape", 36.0, 24.0),
     ]
 
 
@@ -83,9 +83,17 @@ def test_canvas_presets_preserve_nominal_aspect_ratios():
             payload["preview_width_rem"] / payload["preview_height_rem"],
             payload["aspect_ratio"],
         )
-    assert [value["aspect_ratio"] for value in payloads] == [1.5, 2 / 3, 1.0]
-    assert payloads[2]["preview_width_rem"] < payloads[0]["preview_width_rem"]
-    assert payloads[2]["preview_height_rem"] == payloads[0]["preview_height_rem"]
+    assert [value["aspect_ratio"] for value in payloads] == [1.0, 2 / 3, 1.5]
+    assert payloads[0]["preview_width_rem"] == payloads[1]["preview_width_rem"]
+    assert payloads[0]["preview_height_rem"] == payloads[2]["preview_height_rem"]
+    assert isclose(
+        payloads[1]["preview_height_rem"],
+        1.5 * payloads[0]["preview_height_rem"],
+    )
+    assert isclose(
+        payloads[2]["preview_width_rem"],
+        1.5 * payloads[0]["preview_width_rem"],
+    )
 
 
 @pytest.mark.parametrize("canvas_id,tile_id", [

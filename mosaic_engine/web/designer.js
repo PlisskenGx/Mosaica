@@ -250,7 +250,7 @@
       card.type = "button";
       card.setAttribute("aria-label", `${preset.name}, ${preset.width_in} by ${preset.height_in} inches`);
       card.innerHTML = `
-        <span class="canvas-preview-wrap"><span class="canvas-preview" style="--aspect:${preset.aspect_ratio}"></span></span>
+        <span class="canvas-preview-wrap"><span class="canvas-preview" style="--preview-width:${preset.preview_width_rem}rem;--preview-height:${preset.preview_height_rem}rem"></span></span>
         <strong class="choice-title">${preset.name}</strong>
         <span class="choice-meta">≈ ${preset.width_in} × ${preset.height_in} in</span>`;
       card.addEventListener("click", () => chooseCanvas(preset.id));
@@ -324,11 +324,14 @@
       paintHit.setAttribute("points", polygon.getAttribute("points"));
       paintHit.setAttribute("aria-hidden", "true");
       tileHitLayer.appendChild(paintHit);
+      const ghost = document.createElementNS(SVG_NS, "polygon");
+      ghost.classList.add("partial-parent-ghost");
+      ghost.dataset.tileId = tile.id;
+      ghost.setAttribute("points", (tile.full_vertices_in || tile.vertices_in).map(
+        (point) => point.join(","),
+      ).join(" "));
+      partialAidLayer.appendChild(ghost);
       if (tile.piece_type !== "full" && tile.full_vertices_in) {
-        const ghost = document.createElementNS(SVG_NS, "polygon");
-        ghost.classList.add("partial-parent-ghost");
-        ghost.dataset.tileId = tile.id;
-        ghost.setAttribute("points", tile.full_vertices_in.map((point) => point.join(",")).join(" "));
         const hit = document.createElementNS(SVG_NS, "polygon");
         hit.classList.add("partial-parent-hit", "editable");
         hit.dataset.tileId = tile.id;
@@ -337,7 +340,7 @@
         polygon.setAttribute("tabindex", "0");
         polygon.addEventListener("focus", () => showPartialPreview(tile.id));
         polygon.addEventListener("blur", hidePartialPreview);
-        partialAidLayer.append(ghost, hit);
+        partialAidLayer.appendChild(hit);
       }
     }
     // Full parent hexes remain interactive beneath the real visible pieces,
@@ -1105,22 +1108,67 @@
   }
 
   function resolvePartialTarget(event, initialTarget = null) {
-    return initialTarget || event.target.closest?.(
+    const direct = initialTarget || event.target.closest?.(
       ".tile-paint-hit.editable, .designer-tile.editable, .partial-parent-hit.editable",
     );
+    if (direct) return direct;
+    if (event.clientX === undefined || event.clientY === undefined) return null;
+    const svg = byId("mosaic-canvas");
+    const matrix = svg.getScreenCTM();
+    if (!matrix) return null;
+    const pointer = svg.createSVGPoint();
+    pointer.x = event.clientX;
+    pointer.y = event.clientY;
+    const physical = pointer.matrixTransform(matrix.inverse());
+    const matched = state.project.geometry.tiles.find((tile) => (
+      tile.editable && pointInPolygon(
+        physical.x, physical.y, tile.full_vertices_in || tile.vertices_in,
+      )
+    ));
+    return matched ? byId(matched.id) : null;
+  }
+
+  function pointInPolygon(x, y, vertices) {
+    let inside = false;
+    for (let index = 0, previous = vertices.length - 1; index < vertices.length; previous = index++) {
+      const [x1, y1] = vertices[index];
+      const [x2, y2] = vertices[previous];
+      const crosses = (y1 > y) !== (y2 > y)
+        && x < ((x2 - x1) * (y - y1)) / (y2 - y1) + x1;
+      if (crosses) inside = !inside;
+    }
+    return inside;
   }
 
   function updateTileHover(event) {
-    const target = resolvePartialTarget(event);
+    const blocked = event.target.closest?.(
+      ".artwork-handle-target, .artwork-selection-layer, .artwork-object",
+    );
+    const target = blocked ? null : resolvePartialTarget(event);
     const tileId = target?.dataset.tileId || target?.id || null;
     if (tileId === hoveredTileId) return;
-    if (hoveredTileId) byId(hoveredTileId)?.classList.remove("hovered");
+    if (hoveredTileId) {
+      byId(hoveredTileId)?.classList.remove("hovered");
+      document.querySelector(
+        `.partial-parent-ghost[data-tile-id="${hoveredTileId}"]`,
+      )?.classList.remove("hover-visible");
+    }
     hoveredTileId = tileId;
-    if (hoveredTileId) byId(hoveredTileId)?.classList.add("hovered");
+    if (hoveredTileId) {
+      byId(hoveredTileId)?.classList.add("hovered");
+      document.querySelector(
+        `.partial-parent-ghost[data-tile-id="${hoveredTileId}"]`,
+      )?.classList.add("hover-visible");
+    }
   }
 
   function clearTileHover() {
-    if (hoveredTileId) byId(hoveredTileId)?.classList.remove("hovered");
+    if (hoveredTileId) {
+      byId(hoveredTileId)?.classList.remove("hovered");
+      document.querySelector(
+        `.partial-parent-ghost[data-tile-id="${hoveredTileId}"]`,
+      )?.classList.remove("hover-visible");
+    }
     hoveredTileId = null;
   }
 
@@ -1161,9 +1209,7 @@
     if (event.target.closest?.(
       ".artwork-handle-target, .artwork-selection-layer, .artwork-object",
     )) return;
-    const tile = event.target.closest?.(
-      ".tile-paint-hit.editable, .designer-tile.editable, .partial-parent-hit.editable",
-    );
+    const tile = resolvePartialTarget(event);
     if (!tile) return;
     event.preventDefault();
     paintStroke = {
@@ -1173,20 +1219,19 @@
       mode: paintTool,
       colorId: activeTileColorId,
     };
-    byId("mosaic-canvas").setPointerCapture(event.pointerId);
+    byId("canvas-viewport").setPointerCapture(event.pointerId);
     paintTileFromEvent(event);
   }
 
   function movePaintStroke(event) {
     if (!paintStroke || event.pointerId !== paintStroke.pointerId) return;
-    const element = document.elementFromPoint(event.clientX, event.clientY);
-    paintTileFromEvent({ target: element });
+    paintTileFromEvent(event);
   }
 
   async function finishPaintStroke(event) {
     if (!paintStroke || event.pointerId !== paintStroke.pointerId) return;
-    const svg = byId("mosaic-canvas");
-    if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
+    const viewport = byId("canvas-viewport");
+    if (viewport.hasPointerCapture(event.pointerId)) viewport.releasePointerCapture(event.pointerId);
     const stroke = paintStroke;
     paintStroke = null;
     if (!stroke.ids.size) return;
@@ -1218,6 +1263,21 @@
     };
   }
 
+  function fullHexInteractionBounds(geometry) {
+    const bounds = {
+      minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity,
+    };
+    for (const tile of geometry.tiles) {
+      for (const [x, y] of tile.full_vertices_in || tile.vertices_in) {
+        bounds.minX = Math.min(bounds.minX, x);
+        bounds.maxX = Math.max(bounds.maxX, x);
+        bounds.minY = Math.min(bounds.minY, y);
+        bounds.maxY = Math.max(bounds.maxY, y);
+      }
+    }
+    return bounds;
+  }
+
   function fitToWorkspace() {
     if (!state?.project) return;
     const viewport = byId("canvas-viewport");
@@ -1226,17 +1286,25 @@
     const horizontalPadding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
     const verticalPadding = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
     const geometry = state.project.geometry;
+    const interaction = fullHexInteractionBounds(geometry);
     const fitted = calculateFitSize(
       viewport.clientWidth,
       viewport.clientHeight,
-      geometry.width_in,
-      geometry.height_in,
+      interaction.maxX - interaction.minX,
+      interaction.maxY - interaction.minY,
       horizontalPadding,
       verticalPadding,
     );
     if (fitted.scale > 0 && Number.isFinite(fitted.scale)) {
-      svg.style.width = `${fitted.width}px`;
-      svg.style.height = `${fitted.height}px`;
+      svg.style.width = `${geometry.width_in * fitted.scale}px`;
+      svg.style.height = `${geometry.height_in * fitted.scale}px`;
+      const offsetX = (
+        (interaction.minX + interaction.maxX - geometry.width_in) / 2
+      ) * fitted.scale;
+      const offsetY = (
+        (interaction.minY + interaction.maxY - geometry.height_in) / 2
+      ) * fitted.scale;
+      svg.style.transform = `translate(${-offsetX}px, ${-offsetY}px)`;
     }
   }
 
@@ -1387,18 +1455,19 @@
     hideDesignPalette();
     invoker?.focus();
   });
+  const canvasViewport = byId("canvas-viewport");
   byId("mosaic-canvas").addEventListener("pointerdown", beginArtworkInteraction);
-  byId("mosaic-canvas").addEventListener("pointerdown", beginPaintStroke);
   byId("mosaic-canvas").addEventListener("pointermove", moveArtworkInteraction);
-  byId("mosaic-canvas").addEventListener("pointermove", updateTileHover);
-  byId("mosaic-canvas").addEventListener("pointermove", movePaintStroke);
-  byId("mosaic-canvas").addEventListener("pointerleave", hidePartialPreview);
-  byId("mosaic-canvas").addEventListener("pointerleave", clearTileHover);
   byId("mosaic-canvas").addEventListener("pointerup", finishArtworkInteraction);
-  byId("mosaic-canvas").addEventListener("pointerup", finishPaintStroke);
   byId("mosaic-canvas").addEventListener("pointercancel", finishArtworkInteraction);
-  byId("mosaic-canvas").addEventListener("pointercancel", finishPaintStroke);
   byId("mosaic-canvas").addEventListener("dragstart", (event) => event.preventDefault());
+  canvasViewport.addEventListener("pointerdown", beginPaintStroke);
+  canvasViewport.addEventListener("pointermove", updateTileHover);
+  canvasViewport.addEventListener("pointermove", movePaintStroke);
+  canvasViewport.addEventListener("pointerleave", hidePartialPreview);
+  canvasViewport.addEventListener("pointerleave", clearTileHover);
+  canvasViewport.addEventListener("pointerup", finishPaintStroke);
+  canvasViewport.addEventListener("pointercancel", finishPaintStroke);
   // TODO(keyboard): add Artwork rotation controls with the planned keyboard support.
   window.addEventListener("resize", fitToWorkspace);
 

@@ -127,9 +127,8 @@ h1, h2, h3, p { margin-top: 0; }
 .canvas-preview-wrap { display: grid; height: 10.5rem; place-items: center; margin-bottom: 1.1rem; }
 .canvas-preview {
   display: block;
-  height: min(8rem, 82%);
-  width: auto;
-  aspect-ratio: var(--aspect);
+  width: var(--preview-width);
+  height: var(--preview-height);
   border: 1px solid #b8b8bd;
   border-radius: .3rem;
   background: #e9e9ec;
@@ -160,6 +159,9 @@ h1, h2, h3, p { margin-top: 0; }
 .lattice-hex.r2 { --point-y: 3.5rem; --flat-y: 4.6rem; --row-shift: 0rem; }
 .custom-lattice.point_top .lattice-hex { left: calc(var(--point-x) + var(--row-shift)); top: var(--point-y); }
 .custom-lattice.flat_top .lattice-hex { left: var(--flat-x); top: calc(var(--flat-y) + var(--column-shift)); transform: rotate(30deg); }
+#custom-lattice.flat_top > span.measure.down { left: 0.25rem; }
+#custom-lattice.flat_top > span.measure.across { left: 5.6rem; }
+#custom-lattice.flat_top > div { inset: -10px 1rem 1.5rem 6.25rem; }
 .measure { position: absolute; color: #626267; font-size: .72rem; font-weight: 600; }
 .measure.across { left: 6.25rem; bottom: .2rem; width: 10rem; text-align: center; }.measure.down { left: .35rem; top: 3.25rem; }
 
@@ -224,6 +226,7 @@ h1, h2, h3, p { margin-top: 0; }
 .partial-parent-ghost { fill: none; stroke: #1778d4; stroke-width: 1px; stroke-dasharray: 3px 2px; opacity: 0; vector-effect: non-scaling-stroke; pointer-events: none; }
 .partial-parent-ghost.visible { opacity: 0; }
 #mosaic-canvas.paint-active .partial-parent-ghost.visible { opacity: .72; }
+.partial-parent-ghost.hover-visible { opacity: .72; }
 .partial-parent-hit { fill: transparent; stroke: none; pointer-events: all; }
 .designer-tile.cut { pointer-events: all; }
 .inspector { min-height: 0; padding: 1.5rem; overflow: auto; border-left: 1px solid #dddde1; background: #fbfbfc; }
