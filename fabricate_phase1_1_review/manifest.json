@@ -1,0 +1,2451 @@
+{
+  "application_version": "1.9.5",
+  "artifact_name": "Mosaica Fabricate Phase 1.1 Review",
+  "artwork_height_mm": 101.72911743121205,
+  "artwork_width_mm": 130.8,
+  "bodies": [
+    {
+      "body_id": "panel-a1-base",
+      "bounds_mm": [
+        0.0,
+        0.0,
+        0.0,
+        130.8,
+        101.72911743121205,
+        2.0
+      ],
+      "geometry_signature_sha256": "26b708109a7e9e5ee2ac728c0c666129268700fecfd00c777af5b8c5963e3daf",
+      "logical_channel": "base",
+      "mesh_validation": {
+        "degenerate_faces": 0,
+        "face_count": 12,
+        "nonmanifold_edges": 0,
+        "normals_consistent": true,
+        "triangle_count": 12,
+        "vertex_count": 8,
+        "watertight": true,
+        "winding_errors": 0
+      },
+      "name": "A1 Base",
+      "spatial_validation": null,
+      "stl_filename": "Review_Base.stl",
+      "stl_round_trip": {
+        "bounds_mm": [
+          0.0,
+          0.0,
+          0.0,
+          130.8,
+          101.729117431,
+          2.0
+        ],
+        "face_count": 12,
+        "maximum_triangle_edge_mm": 165.70290683415965,
+        "mesh_validation": {
+          "degenerate_faces": 0,
+          "face_count": 12,
+          "nonmanifold_edges": 0,
+          "normals_consistent": true,
+          "triangle_count": 12,
+          "vertex_count": 8,
+          "watertight": true,
+          "winding_errors": 0
+        },
+        "valid": true
+      },
+      "stl_sha256": "afd8eaae833eceee29c8c2aa1bf8eb742446f745cf18459b97702f22910660be",
+      "tile_ids": []
+    },
+    {
+      "body_id": "panel-a1-grout-thinset",
+      "bounds_mm": [
+        0.0,
+        0.0,
+        2.0,
+        130.8,
+        101.72911743121205,
+        3.0
+      ],
+      "geometry_signature_sha256": "b525e82a017ba39b1cbeb500faf76e2974ec2d02eacb47f48d1fb23650cd8f59",
+      "logical_channel": "grout-thinset",
+      "mesh_validation": {
+        "degenerate_faces": 0,
+        "face_count": 12,
+        "nonmanifold_edges": 0,
+        "normals_consistent": true,
+        "triangle_count": 12,
+        "vertex_count": 8,
+        "watertight": true,
+        "winding_errors": 0
+      },
+      "name": "A1 Grout/Thinset",
+      "spatial_validation": null,
+      "stl_filename": "Review_GroutThinset.stl",
+      "stl_round_trip": {
+        "bounds_mm": [
+          0.0,
+          0.0,
+          2.0,
+          130.8,
+          101.729117431,
+          3.0
+        ],
+        "face_count": 12,
+        "maximum_triangle_edge_mm": 165.70290683415965,
+        "mesh_validation": {
+          "degenerate_faces": 0,
+          "face_count": 12,
+          "nonmanifold_edges": 0,
+          "normals_consistent": true,
+          "triangle_count": 12,
+          "vertex_count": 8,
+          "watertight": true,
+          "winding_errors": 0
+        },
+        "valid": true
+      },
+      "stl_sha256": "efb423587684e5909fd0c4248821b98f0499e011353b3f95ceeba51243e6e869",
+      "tile_ids": []
+    },
+    {
+      "body_id": "panel-a1-tile-color-1",
+      "bounds_mm": [
+        0.0,
+        0.0,
+        3.0,
+        130.8,
+        101.72911743121205,
+        5.4
+      ],
+      "geometry_signature_sha256": "fd2b869f30e4644c30df574cee47402bfaac3a0f3de600d1f36c734c6d64f32e",
+      "logical_channel": "tile-color-1",
+      "mesh_validation": {
+        "degenerate_faces": 0,
+        "face_count": 2452,
+        "nonmanifold_edges": 0,
+        "normals_consistent": true,
+        "triangle_count": 2452,
+        "vertex_count": 1296,
+        "watertight": true,
+        "winding_errors": 0
+      },
+      "name": "A1 Tile Color 1",
+      "spatial_validation": {
+        "connected_component_count": 35,
+        "cross_tile_triangles": 0,
+        "errors": [],
+        "expected_shell_count": 35,
+        "maximum_triangle_edge_mm": 23.149370041824767,
+        "shells": [
+          {
+            "bounds_mm": [
+              0.9000000000000011,
+              0.0,
+              3.0,
+              20.900000000000006,
+              5.773502691896259,
+              5.4
+            ],
+            "face_count": 44,
+            "maximum_triangle_edge_mm": 20.063897926375127,
+            "piece_type": "edge_cut",
+            "source_polygon_bounds_mm": [
+              0.9000000000000011,
+              0.0,
+              20.900000000000006,
+              5.773502691896259
+            ],
+            "source_polygon_diameter_mm": 20.000000000000004,
+            "tile_id": "placement-000010",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              22.7,
+              0.0,
+              3.0,
+              42.7,
+              5.773502691896259,
+              5.4
+            ],
+            "face_count": 44,
+            "maximum_triangle_edge_mm": 20.063897926375127,
+            "piece_type": "edge_cut",
+            "source_polygon_bounds_mm": [
+              22.7,
+              0.0,
+              42.7,
+              5.773502691896259
+            ],
+            "source_polygon_diameter_mm": 20.000000000000004,
+            "tile_id": "placement-000011",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              44.5,
+              0.0,
+              3.0,
+              64.5,
+              5.773502691896259,
+              5.4
+            ],
+            "face_count": 44,
+            "maximum_triangle_edge_mm": 20.063897926375123,
+            "piece_type": "edge_cut",
+            "source_polygon_bounds_mm": [
+              44.5,
+              0.0,
+              64.5,
+              5.773502691896259
+            ],
+            "source_polygon_diameter_mm": 20.0,
+            "tile_id": "placement-000012",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              66.3,
+              0.0,
+              3.0,
+              86.30000000000001,
+              5.773502691896259,
+              5.4
+            ],
+            "face_count": 44,
+            "maximum_triangle_edge_mm": 20.063897926375137,
+            "piece_type": "edge_cut",
+            "source_polygon_bounds_mm": [
+              66.3,
+              0.0,
+              86.30000000000001,
+              5.773502691896259
+            ],
+            "source_polygon_diameter_mm": 20.000000000000014,
+            "tile_id": "placement-000013",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              88.1,
+              0.0,
+              3.0,
+              108.10000000000001,
+              5.773502691896259,
+              5.4
+            ],
+            "face_count": 44,
+            "maximum_triangle_edge_mm": 20.063897926375137,
+            "piece_type": "edge_cut",
+            "source_polygon_bounds_mm": [
+              88.1,
+              0.0,
+              108.10000000000001,
+              5.773502691896259
+            ],
+            "source_polygon_diameter_mm": 20.000000000000014,
+            "tile_id": "placement-000014",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              109.9,
+              0.0,
+              3.0,
+              129.9,
+              5.773502691896259,
+              5.4
+            ],
+            "face_count": 44,
+            "maximum_triangle_edge_mm": 20.063897926375123,
+            "piece_type": "edge_cut",
+            "source_polygon_bounds_mm": [
+              109.9,
+              0.0,
+              129.9,
+              5.773502691896259
+            ],
+            "source_polygon_diameter_mm": 20.0,
+            "tile_id": "placement-000015",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              0.0,
+              1.55884572681199,
+              3.0,
+              10.000000000000004,
+              24.65285649439702,
+              5.4
+            ],
+            "face_count": 60,
+            "maximum_triangle_edge_mm": 23.149370041824753,
+            "piece_type": "half",
+            "source_polygon_bounds_mm": [
+              0.0,
+              1.55884572681199,
+              10.000000000000004,
+              24.65285649439702
+            ],
+            "source_polygon_diameter_mm": 23.094010767585033,
+            "tile_id": "placement-000019",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              33.6,
+              1.55884572681199,
+              3.0,
+              53.6,
+              24.65285649439702,
+              5.4
+            ],
+            "face_count": 92,
+            "maximum_triangle_edge_mm": 23.094010767585033,
+            "piece_type": "full",
+            "source_polygon_bounds_mm": [
+              33.6,
+              1.55884572681199,
+              53.6,
+              24.65285649439702
+            ],
+            "source_polygon_diameter_mm": 23.094010767585033,
+            "tile_id": "placement-000021",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              55.4,
+              1.55884572681199,
+              3.0,
+              75.4,
+              24.65285649439702,
+              5.4
+            ],
+            "face_count": 92,
+            "maximum_triangle_edge_mm": 23.09401076758504,
+            "piece_type": "full",
+            "source_polygon_bounds_mm": [
+              55.4,
+              1.55884572681199,
+              75.4,
+              24.65285649439702
+            ],
+            "source_polygon_diameter_mm": 23.09401076758504,
+            "tile_id": "placement-000022",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              77.19999999999999,
+              1.55884572681199,
+              3.0,
+              97.2,
+              24.65285649439702,
+              5.4
+            ],
+            "face_count": 92,
+            "maximum_triangle_edge_mm": 23.094010767585043,
+            "piece_type": "full",
+            "source_polygon_bounds_mm": [
+              77.19999999999999,
+              1.55884572681199,
+              97.2,
+              24.65285649439702
+            ],
+            "source_polygon_diameter_mm": 23.094010767585043,
+            "tile_id": "placement-000023",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              120.8,
+              1.55884572681199,
+              3.0,
+              130.8,
+              24.65285649439702,
+              5.4
+            ],
+            "face_count": 60,
+            "maximum_triangle_edge_mm": 23.149370041824753,
+            "piece_type": "half",
+            "source_polygon_bounds_mm": [
+              120.8,
+              1.55884572681199,
+              130.8,
+              24.65285649439702
+            ],
+            "source_polygon_diameter_mm": 23.094010767585033,
+            "tile_id": "placement-000025",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              0.9000000000000011,
+              20.43819952931275,
+              3.0,
+              20.900000000000006,
+              43.53221029689778,
+              5.4
+            ],
+            "face_count": 92,
+            "maximum_triangle_edge_mm": 23.094010767585033,
+            "piece_type": "full",
+            "source_polygon_bounds_mm": [
+              0.9000000000000011,
+              20.43819952931275,
+              20.900000000000006,
+              43.53221029689778
+            ],
+            "source_polygon_diameter_mm": 23.094010767585033,
+            "tile_id": "placement-000028",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              44.5,
+              20.43819952931275,
+              3.0,
+              64.5,
+              43.53221029689778,
+              5.4
+            ],
+            "face_count": 92,
+            "maximum_triangle_edge_mm": 23.09401076758503,
+            "piece_type": "full",
+            "source_polygon_bounds_mm": [
+              44.5,
+              20.43819952931275,
+              64.5,
+              43.53221029689778
+            ],
+            "source_polygon_diameter_mm": 23.094010767585033,
+            "tile_id": "placement-000030",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              66.3,
+              20.43819952931275,
+              3.0,
+              86.30000000000001,
+              43.53221029689778,
+              5.4
+            ],
+            "face_count": 92,
+            "maximum_triangle_edge_mm": 23.09401076758504,
+            "piece_type": "full",
+            "source_polygon_bounds_mm": [
+              66.3,
+              20.43819952931275,
+              86.30000000000001,
+              43.53221029689778
+            ],
+            "source_polygon_diameter_mm": 23.09401076758504,
+            "tile_id": "placement-000031",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              88.1,
+              20.43819952931275,
+              3.0,
+              108.10000000000001,
+              43.53221029689778,
+              5.4
+            ],
+            "face_count": 92,
+            "maximum_triangle_edge_mm": 23.09401076758504,
+            "piece_type": "full",
+            "source_polygon_bounds_mm": [
+              88.1,
+              20.43819952931275,
+              108.10000000000001,
+              43.53221029689778
+            ],
+            "source_polygon_diameter_mm": 23.09401076758504,
+            "tile_id": "placement-000032",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              0.0,
+              39.317553331813514,
+              3.0,
+              10.000000000000004,
+              62.41156409939854,
+              5.4
+            ],
+            "face_count": 60,
+            "maximum_triangle_edge_mm": 23.149370041824746,
+            "piece_type": "half",
+            "source_polygon_bounds_mm": [
+              0.0,
+              39.317553331813514,
+              10.000000000000004,
+              62.41156409939854
+            ],
+            "source_polygon_diameter_mm": 23.094010767585026,
+            "tile_id": "placement-000037",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              11.8,
+              39.317553331813514,
+              3.0,
+              31.800000000000004,
+              62.41156409939854,
+              5.4
+            ],
+            "face_count": 92,
+            "maximum_triangle_edge_mm": 23.094010767585033,
+            "piece_type": "full",
+            "source_polygon_bounds_mm": [
+              11.8,
+              39.317553331813514,
+              31.800000000000004,
+              62.41156409939854
+            ],
+            "source_polygon_diameter_mm": 23.094010767585033,
+            "tile_id": "placement-000038",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              99.0,
+              39.317553331813514,
+              3.0,
+              119.00000000000001,
+              62.41156409939854,
+              5.4
+            ],
+            "face_count": 92,
+            "maximum_triangle_edge_mm": 23.094010767585047,
+            "piece_type": "full",
+            "source_polygon_bounds_mm": [
+              99.0,
+              39.317553331813514,
+              119.00000000000001,
+              62.41156409939854
+            ],
+            "source_polygon_diameter_mm": 23.094010767585047,
+            "tile_id": "placement-000042",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              120.8,
+              39.317553331813514,
+              3.0,
+              130.8,
+              62.41156409939854,
+              5.4
+            ],
+            "face_count": 60,
+            "maximum_triangle_edge_mm": 23.149370041824746,
+            "piece_type": "half",
+            "source_polygon_bounds_mm": [
+              120.8,
+              39.317553331813514,
+              130.8,
+              62.41156409939854
+            ],
+            "source_polygon_diameter_mm": 23.094010767585026,
+            "tile_id": "placement-000043",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              0.9000000000000011,
+              58.19690713431427,
+              3.0,
+              20.900000000000006,
+              81.29091790189932,
+              5.4
+            ],
+            "face_count": 92,
+            "maximum_triangle_edge_mm": 23.09401076758504,
+            "piece_type": "full",
+            "source_polygon_bounds_mm": [
+              0.9000000000000011,
+              58.19690713431427,
+              20.900000000000006,
+              81.29091790189932
+            ],
+            "source_polygon_diameter_mm": 23.094010767585047,
+            "tile_id": "placement-000046",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              22.7,
+              58.19690713431427,
+              3.0,
+              42.7,
+              81.29091790189932,
+              5.4
+            ],
+            "face_count": 92,
+            "maximum_triangle_edge_mm": 23.094010767585033,
+            "piece_type": "full",
+            "source_polygon_bounds_mm": [
+              22.7,
+              58.19690713431427,
+              42.7,
+              81.29091790189932
+            ],
+            "source_polygon_diameter_mm": 23.094010767585047,
+            "tile_id": "placement-000047",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              66.3,
+              58.19690713431427,
+              3.0,
+              86.30000000000001,
+              81.29091790189932,
+              5.4
+            ],
+            "face_count": 92,
+            "maximum_triangle_edge_mm": 23.094010767585047,
+            "piece_type": "full",
+            "source_polygon_bounds_mm": [
+              66.3,
+              58.19690713431427,
+              86.30000000000001,
+              81.29091790189932
+            ],
+            "source_polygon_diameter_mm": 23.094010767585047,
+            "tile_id": "placement-000049",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              109.9,
+              58.19690713431427,
+              3.0,
+              129.9,
+              81.29091790189932,
+              5.4
+            ],
+            "face_count": 92,
+            "maximum_triangle_edge_mm": 23.094010767585033,
+            "piece_type": "full",
+            "source_polygon_bounds_mm": [
+              109.9,
+              58.19690713431427,
+              129.9,
+              81.29091790189932
+            ],
+            "source_polygon_diameter_mm": 23.094010767585047,
+            "tile_id": "placement-000051",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              0.0,
+              77.07626093681503,
+              3.0,
+              10.000000000000004,
+              100.17027170440008,
+              5.4
+            ],
+            "face_count": 60,
+            "maximum_triangle_edge_mm": 23.149370041824767,
+            "piece_type": "half",
+            "source_polygon_bounds_mm": [
+              0.0,
+              77.07626093681503,
+              10.000000000000004,
+              100.17027170440008
+            ],
+            "source_polygon_diameter_mm": 23.094010767585047,
+            "tile_id": "placement-000055",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              11.8,
+              77.07626093681503,
+              3.0,
+              31.800000000000004,
+              100.17027170440008,
+              5.4
+            ],
+            "face_count": 92,
+            "maximum_triangle_edge_mm": 23.094010767585033,
+            "piece_type": "full",
+            "source_polygon_bounds_mm": [
+              11.8,
+              77.07626093681503,
+              31.800000000000004,
+              100.17027170440008
+            ],
+            "source_polygon_diameter_mm": 23.094010767585047,
+            "tile_id": "placement-000056",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              33.6,
+              77.07626093681503,
+              3.0,
+              53.6,
+              100.17027170440008,
+              5.4
+            ],
+            "face_count": 92,
+            "maximum_triangle_edge_mm": 23.094010767585033,
+            "piece_type": "full",
+            "source_polygon_bounds_mm": [
+              33.6,
+              77.07626093681503,
+              53.6,
+              100.17027170440008
+            ],
+            "source_polygon_diameter_mm": 23.094010767585047,
+            "tile_id": "placement-000057",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              77.19999999999999,
+              77.07626093681503,
+              3.0,
+              97.2,
+              100.17027170440008,
+              5.4
+            ],
+            "face_count": 92,
+            "maximum_triangle_edge_mm": 23.094010767585047,
+            "piece_type": "full",
+            "source_polygon_bounds_mm": [
+              77.19999999999999,
+              77.07626093681503,
+              97.2,
+              100.17027170440008
+            ],
+            "source_polygon_diameter_mm": 23.094010767585047,
+            "tile_id": "placement-000059",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              99.0,
+              77.07626093681503,
+              3.0,
+              119.00000000000001,
+              100.17027170440008,
+              5.4
+            ],
+            "face_count": 92,
+            "maximum_triangle_edge_mm": 23.094010767585047,
+            "piece_type": "full",
+            "source_polygon_bounds_mm": [
+              99.0,
+              77.07626093681503,
+              119.00000000000001,
+              100.17027170440008
+            ],
+            "source_polygon_diameter_mm": 23.094010767585047,
+            "tile_id": "placement-000060",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              120.8,
+              77.07626093681503,
+              3.0,
+              130.8,
+              100.17027170440008,
+              5.4
+            ],
+            "face_count": 60,
+            "maximum_triangle_edge_mm": 23.149370041824767,
+            "piece_type": "half",
+            "source_polygon_bounds_mm": [
+              120.8,
+              77.07626093681503,
+              130.8,
+              100.17027170440008
+            ],
+            "source_polygon_diameter_mm": 23.094010767585047,
+            "tile_id": "placement-000061",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              0.9000000000000011,
+              95.95561473931579,
+              3.0,
+              20.900000000000002,
+              101.72911743121205,
+              5.4
+            ],
+            "face_count": 44,
+            "maximum_triangle_edge_mm": 20.063897926375123,
+            "piece_type": "edge_cut",
+            "source_polygon_bounds_mm": [
+              0.9000000000000011,
+              95.95561473931579,
+              20.900000000000002,
+              101.72911743121205
+            ],
+            "source_polygon_diameter_mm": 20.0,
+            "tile_id": "placement-000064",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              22.700000000000003,
+              95.95561473931579,
+              3.0,
+              42.7,
+              101.72911743121205,
+              5.4
+            ],
+            "face_count": 44,
+            "maximum_triangle_edge_mm": 20.063897926375123,
+            "piece_type": "edge_cut",
+            "source_polygon_bounds_mm": [
+              22.700000000000003,
+              95.95561473931579,
+              42.7,
+              101.72911743121205
+            ],
+            "source_polygon_diameter_mm": 20.0,
+            "tile_id": "placement-000065",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              44.5,
+              95.95561473931579,
+              3.0,
+              64.5,
+              101.72911743121205,
+              5.4
+            ],
+            "face_count": 44,
+            "maximum_triangle_edge_mm": 20.063897926375123,
+            "piece_type": "edge_cut",
+            "source_polygon_bounds_mm": [
+              44.5,
+              95.95561473931579,
+              64.5,
+              101.72911743121205
+            ],
+            "source_polygon_diameter_mm": 20.0,
+            "tile_id": "placement-000066",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              66.3,
+              95.95561473931579,
+              3.0,
+              86.3,
+              101.72911743121205,
+              5.4
+            ],
+            "face_count": 44,
+            "maximum_triangle_edge_mm": 20.063897926375123,
+            "piece_type": "edge_cut",
+            "source_polygon_bounds_mm": [
+              66.3,
+              95.95561473931579,
+              86.3,
+              101.72911743121205
+            ],
+            "source_polygon_diameter_mm": 20.0,
+            "tile_id": "placement-000067",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              88.1,
+              95.95561473931579,
+              3.0,
+              108.09999999999998,
+              101.72911743121205,
+              5.4
+            ],
+            "face_count": 44,
+            "maximum_triangle_edge_mm": 20.06389792637511,
+            "piece_type": "edge_cut",
+            "source_polygon_bounds_mm": [
+              88.1,
+              95.95561473931579,
+              108.09999999999998,
+              101.72911743121205
+            ],
+            "source_polygon_diameter_mm": 19.999999999999986,
+            "tile_id": "placement-000068",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              109.9,
+              95.95561473931579,
+              3.0,
+              129.9,
+              101.72911743121205,
+              5.4
+            ],
+            "face_count": 44,
+            "maximum_triangle_edge_mm": 20.063897926375123,
+            "piece_type": "edge_cut",
+            "source_polygon_bounds_mm": [
+              109.9,
+              95.95561473931579,
+              129.9,
+              101.72911743121205
+            ],
+            "source_polygon_diameter_mm": 20.0,
+            "tile_id": "placement-000069",
+            "valid": true
+          }
+        ],
+        "source_tile_correspondence": true,
+        "valid": true
+      },
+      "stl_filename": "Review_TileColor1.stl",
+      "stl_round_trip": {
+        "bounds_mm": [
+          0.0,
+          0.0,
+          3.0,
+          130.8,
+          101.729117431,
+          5.4
+        ],
+        "face_count": 2452,
+        "maximum_triangle_edge_mm": 23.14937004124112,
+        "mesh_validation": {
+          "degenerate_faces": 0,
+          "face_count": 2452,
+          "nonmanifold_edges": 0,
+          "normals_consistent": true,
+          "triangle_count": 2452,
+          "vertex_count": 1296,
+          "watertight": true,
+          "winding_errors": 0
+        },
+        "spatial_validation": {
+          "connected_component_count": 35,
+          "cross_tile_triangles": 0,
+          "errors": [],
+          "expected_shell_count": 35,
+          "maximum_triangle_edge_mm": 23.14937004124112,
+          "shells": [
+            {
+              "bounds_mm": [
+                0.9,
+                0.0,
+                3.0,
+                20.9,
+                5.773502692,
+                5.4
+              ],
+              "face_count": 44,
+              "maximum_triangle_edge_mm": 20.063897926375123,
+              "piece_type": "edge_cut",
+              "source_polygon_bounds_mm": [
+                0.9000000000000011,
+                0.0,
+                20.900000000000006,
+                5.773502691896259
+              ],
+              "source_polygon_diameter_mm": 20.000000000000004,
+              "tile_id": "placement-000010",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                22.7,
+                0.0,
+                3.0,
+                42.7,
+                5.773502692,
+                5.4
+              ],
+              "face_count": 44,
+              "maximum_triangle_edge_mm": 20.063897926375127,
+              "piece_type": "edge_cut",
+              "source_polygon_bounds_mm": [
+                22.7,
+                0.0,
+                42.7,
+                5.773502691896259
+              ],
+              "source_polygon_diameter_mm": 20.000000000000004,
+              "tile_id": "placement-000011",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                44.5,
+                0.0,
+                3.0,
+                64.5,
+                5.773502692,
+                5.4
+              ],
+              "face_count": 44,
+              "maximum_triangle_edge_mm": 20.063897926375123,
+              "piece_type": "edge_cut",
+              "source_polygon_bounds_mm": [
+                44.5,
+                0.0,
+                64.5,
+                5.773502691896259
+              ],
+              "source_polygon_diameter_mm": 20.0,
+              "tile_id": "placement-000012",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                66.3,
+                0.0,
+                3.0,
+                86.3,
+                5.773502692,
+                5.4
+              ],
+              "face_count": 44,
+              "maximum_triangle_edge_mm": 20.063897926375123,
+              "piece_type": "edge_cut",
+              "source_polygon_bounds_mm": [
+                66.3,
+                0.0,
+                86.30000000000001,
+                5.773502691896259
+              ],
+              "source_polygon_diameter_mm": 20.000000000000014,
+              "tile_id": "placement-000013",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                88.1,
+                0.0,
+                3.0,
+                108.1,
+                5.773502692,
+                5.4
+              ],
+              "face_count": 44,
+              "maximum_triangle_edge_mm": 20.063897926375123,
+              "piece_type": "edge_cut",
+              "source_polygon_bounds_mm": [
+                88.1,
+                0.0,
+                108.10000000000001,
+                5.773502691896259
+              ],
+              "source_polygon_diameter_mm": 20.000000000000014,
+              "tile_id": "placement-000014",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                109.9,
+                0.0,
+                3.0,
+                129.9,
+                5.773502692,
+                5.4
+              ],
+              "face_count": 44,
+              "maximum_triangle_edge_mm": 20.063897926375123,
+              "piece_type": "edge_cut",
+              "source_polygon_bounds_mm": [
+                109.9,
+                0.0,
+                129.9,
+                5.773502691896259
+              ],
+              "source_polygon_diameter_mm": 20.0,
+              "tile_id": "placement-000015",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                0.0,
+                1.558845727,
+                3.0,
+                10.0,
+                24.652856494,
+                5.4
+              ],
+              "face_count": 60,
+              "maximum_triangle_edge_mm": 23.14937004124112,
+              "piece_type": "half",
+              "source_polygon_bounds_mm": [
+                0.0,
+                1.55884572681199,
+                10.000000000000004,
+                24.65285649439702
+              ],
+              "source_polygon_diameter_mm": 23.094010767585033,
+              "tile_id": "placement-000019",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                33.6,
+                1.558845727,
+                3.0,
+                53.6,
+                24.652856494,
+                5.4
+              ],
+              "face_count": 92,
+              "maximum_triangle_edge_mm": 23.094010767688776,
+              "piece_type": "full",
+              "source_polygon_bounds_mm": [
+                33.6,
+                1.55884572681199,
+                53.6,
+                24.65285649439702
+              ],
+              "source_polygon_diameter_mm": 23.094010767585033,
+              "tile_id": "placement-000021",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                55.4,
+                1.558845727,
+                3.0,
+                75.4,
+                24.652856494,
+                5.4
+              ],
+              "face_count": 92,
+              "maximum_triangle_edge_mm": 23.094010767688783,
+              "piece_type": "full",
+              "source_polygon_bounds_mm": [
+                55.4,
+                1.55884572681199,
+                75.4,
+                24.65285649439702
+              ],
+              "source_polygon_diameter_mm": 23.09401076758504,
+              "tile_id": "placement-000022",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                77.2,
+                1.558845727,
+                3.0,
+                97.2,
+                24.652856494,
+                5.4
+              ],
+              "face_count": 92,
+              "maximum_triangle_edge_mm": 23.094010767688776,
+              "piece_type": "full",
+              "source_polygon_bounds_mm": [
+                77.19999999999999,
+                1.55884572681199,
+                97.2,
+                24.65285649439702
+              ],
+              "source_polygon_diameter_mm": 23.094010767585043,
+              "tile_id": "placement-000023",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                120.8,
+                1.558845727,
+                3.0,
+                130.8,
+                24.652856494,
+                5.4
+              ],
+              "face_count": 60,
+              "maximum_triangle_edge_mm": 23.14937004124112,
+              "piece_type": "half",
+              "source_polygon_bounds_mm": [
+                120.8,
+                1.55884572681199,
+                130.8,
+                24.65285649439702
+              ],
+              "source_polygon_diameter_mm": 23.094010767585033,
+              "tile_id": "placement-000025",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                0.9,
+                20.438199529,
+                3.0,
+                20.9,
+                43.532210297,
+                5.4
+              ],
+              "face_count": 92,
+              "maximum_triangle_edge_mm": 23.094010767688772,
+              "piece_type": "full",
+              "source_polygon_bounds_mm": [
+                0.9000000000000011,
+                20.43819952931275,
+                20.900000000000006,
+                43.53221029689778
+              ],
+              "source_polygon_diameter_mm": 23.094010767585033,
+              "tile_id": "placement-000028",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                44.5,
+                20.438199529,
+                3.0,
+                64.5,
+                43.532210297,
+                5.4
+              ],
+              "face_count": 92,
+              "maximum_triangle_edge_mm": 23.094010767688772,
+              "piece_type": "full",
+              "source_polygon_bounds_mm": [
+                44.5,
+                20.43819952931275,
+                64.5,
+                43.53221029689778
+              ],
+              "source_polygon_diameter_mm": 23.094010767585033,
+              "tile_id": "placement-000030",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                66.3,
+                20.438199529,
+                3.0,
+                86.3,
+                43.532210297,
+                5.4
+              ],
+              "face_count": 92,
+              "maximum_triangle_edge_mm": 23.094010767688772,
+              "piece_type": "full",
+              "source_polygon_bounds_mm": [
+                66.3,
+                20.43819952931275,
+                86.30000000000001,
+                43.53221029689778
+              ],
+              "source_polygon_diameter_mm": 23.09401076758504,
+              "tile_id": "placement-000031",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                88.1,
+                20.438199529,
+                3.0,
+                108.1,
+                43.532210297,
+                5.4
+              ],
+              "face_count": 92,
+              "maximum_triangle_edge_mm": 23.094010767688772,
+              "piece_type": "full",
+              "source_polygon_bounds_mm": [
+                88.1,
+                20.43819952931275,
+                108.10000000000001,
+                43.53221029689778
+              ],
+              "source_polygon_diameter_mm": 23.09401076758504,
+              "tile_id": "placement-000032",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                0.0,
+                39.317553332,
+                3.0,
+                10.0,
+                62.411564099,
+                5.4
+              ],
+              "face_count": 60,
+              "maximum_triangle_edge_mm": 23.14937004124112,
+              "piece_type": "half",
+              "source_polygon_bounds_mm": [
+                0.0,
+                39.317553331813514,
+                10.000000000000004,
+                62.41156409939854
+              ],
+              "source_polygon_diameter_mm": 23.094010767585026,
+              "tile_id": "placement-000037",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                11.8,
+                39.317553332,
+                3.0,
+                31.8,
+                62.411564099,
+                5.4
+              ],
+              "face_count": 92,
+              "maximum_triangle_edge_mm": 23.094010767688776,
+              "piece_type": "full",
+              "source_polygon_bounds_mm": [
+                11.8,
+                39.317553331813514,
+                31.800000000000004,
+                62.41156409939854
+              ],
+              "source_polygon_diameter_mm": 23.094010767585033,
+              "tile_id": "placement-000038",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                99.0,
+                39.317553332,
+                3.0,
+                119.0,
+                62.411564099,
+                5.4
+              ],
+              "face_count": 92,
+              "maximum_triangle_edge_mm": 23.094010767688776,
+              "piece_type": "full",
+              "source_polygon_bounds_mm": [
+                99.0,
+                39.317553331813514,
+                119.00000000000001,
+                62.41156409939854
+              ],
+              "source_polygon_diameter_mm": 23.094010767585047,
+              "tile_id": "placement-000042",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                120.8,
+                39.317553332,
+                3.0,
+                130.8,
+                62.411564099,
+                5.4
+              ],
+              "face_count": 60,
+              "maximum_triangle_edge_mm": 23.14937004124112,
+              "piece_type": "half",
+              "source_polygon_bounds_mm": [
+                120.8,
+                39.317553331813514,
+                130.8,
+                62.41156409939854
+              ],
+              "source_polygon_diameter_mm": 23.094010767585026,
+              "tile_id": "placement-000043",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                0.9,
+                58.196907134,
+                3.0,
+                20.9,
+                81.290917902,
+                5.4
+              ],
+              "face_count": 92,
+              "maximum_triangle_edge_mm": 23.094010767688772,
+              "piece_type": "full",
+              "source_polygon_bounds_mm": [
+                0.9000000000000011,
+                58.19690713431427,
+                20.900000000000006,
+                81.29091790189932
+              ],
+              "source_polygon_diameter_mm": 23.094010767585047,
+              "tile_id": "placement-000046",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                22.7,
+                58.196907134,
+                3.0,
+                42.7,
+                81.290917902,
+                5.4
+              ],
+              "face_count": 92,
+              "maximum_triangle_edge_mm": 23.094010767688776,
+              "piece_type": "full",
+              "source_polygon_bounds_mm": [
+                22.7,
+                58.19690713431427,
+                42.7,
+                81.29091790189932
+              ],
+              "source_polygon_diameter_mm": 23.094010767585047,
+              "tile_id": "placement-000047",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                66.3,
+                58.196907134,
+                3.0,
+                86.3,
+                81.290917902,
+                5.4
+              ],
+              "face_count": 92,
+              "maximum_triangle_edge_mm": 23.094010767688772,
+              "piece_type": "full",
+              "source_polygon_bounds_mm": [
+                66.3,
+                58.19690713431427,
+                86.30000000000001,
+                81.29091790189932
+              ],
+              "source_polygon_diameter_mm": 23.094010767585047,
+              "tile_id": "placement-000049",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                109.9,
+                58.196907134,
+                3.0,
+                129.9,
+                81.290917902,
+                5.4
+              ],
+              "face_count": 92,
+              "maximum_triangle_edge_mm": 23.094010767688772,
+              "piece_type": "full",
+              "source_polygon_bounds_mm": [
+                109.9,
+                58.19690713431427,
+                129.9,
+                81.29091790189932
+              ],
+              "source_polygon_diameter_mm": 23.094010767585047,
+              "tile_id": "placement-000051",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                0.0,
+                77.076260937,
+                3.0,
+                10.0,
+                100.170271704,
+                5.4
+              ],
+              "face_count": 60,
+              "maximum_triangle_edge_mm": 23.14937004124112,
+              "piece_type": "half",
+              "source_polygon_bounds_mm": [
+                0.0,
+                77.07626093681503,
+                10.000000000000004,
+                100.17027170440008
+              ],
+              "source_polygon_diameter_mm": 23.094010767585047,
+              "tile_id": "placement-000055",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                11.8,
+                77.076260937,
+                3.0,
+                31.8,
+                100.170271704,
+                5.4
+              ],
+              "face_count": 92,
+              "maximum_triangle_edge_mm": 23.094010767688776,
+              "piece_type": "full",
+              "source_polygon_bounds_mm": [
+                11.8,
+                77.07626093681503,
+                31.800000000000004,
+                100.17027170440008
+              ],
+              "source_polygon_diameter_mm": 23.094010767585047,
+              "tile_id": "placement-000056",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                33.6,
+                77.076260937,
+                3.0,
+                53.6,
+                100.170271704,
+                5.4
+              ],
+              "face_count": 92,
+              "maximum_triangle_edge_mm": 23.094010767688776,
+              "piece_type": "full",
+              "source_polygon_bounds_mm": [
+                33.6,
+                77.07626093681503,
+                53.6,
+                100.17027170440008
+              ],
+              "source_polygon_diameter_mm": 23.094010767585047,
+              "tile_id": "placement-000057",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                77.2,
+                77.076260937,
+                3.0,
+                97.2,
+                100.170271704,
+                5.4
+              ],
+              "face_count": 92,
+              "maximum_triangle_edge_mm": 23.094010767688776,
+              "piece_type": "full",
+              "source_polygon_bounds_mm": [
+                77.19999999999999,
+                77.07626093681503,
+                97.2,
+                100.17027170440008
+              ],
+              "source_polygon_diameter_mm": 23.094010767585047,
+              "tile_id": "placement-000059",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                99.0,
+                77.076260937,
+                3.0,
+                119.0,
+                100.170271704,
+                5.4
+              ],
+              "face_count": 92,
+              "maximum_triangle_edge_mm": 23.094010767688776,
+              "piece_type": "full",
+              "source_polygon_bounds_mm": [
+                99.0,
+                77.07626093681503,
+                119.00000000000001,
+                100.17027170440008
+              ],
+              "source_polygon_diameter_mm": 23.094010767585047,
+              "tile_id": "placement-000060",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                120.8,
+                77.076260937,
+                3.0,
+                130.8,
+                100.170271704,
+                5.4
+              ],
+              "face_count": 60,
+              "maximum_triangle_edge_mm": 23.14937004124112,
+              "piece_type": "half",
+              "source_polygon_bounds_mm": [
+                120.8,
+                77.07626093681503,
+                130.8,
+                100.17027170440008
+              ],
+              "source_polygon_diameter_mm": 23.094010767585047,
+              "tile_id": "placement-000061",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                0.9,
+                95.955614739,
+                3.0,
+                20.9,
+                101.729117431,
+                5.4
+              ],
+              "face_count": 44,
+              "maximum_triangle_edge_mm": 20.063897926375123,
+              "piece_type": "edge_cut",
+              "source_polygon_bounds_mm": [
+                0.9000000000000011,
+                95.95561473931579,
+                20.900000000000002,
+                101.72911743121205
+              ],
+              "source_polygon_diameter_mm": 20.0,
+              "tile_id": "placement-000064",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                22.7,
+                95.955614739,
+                3.0,
+                42.7,
+                101.729117431,
+                5.4
+              ],
+              "face_count": 44,
+              "maximum_triangle_edge_mm": 20.063897926375127,
+              "piece_type": "edge_cut",
+              "source_polygon_bounds_mm": [
+                22.700000000000003,
+                95.95561473931579,
+                42.7,
+                101.72911743121205
+              ],
+              "source_polygon_diameter_mm": 20.0,
+              "tile_id": "placement-000065",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                44.5,
+                95.955614739,
+                3.0,
+                64.5,
+                101.729117431,
+                5.4
+              ],
+              "face_count": 44,
+              "maximum_triangle_edge_mm": 20.063897926375123,
+              "piece_type": "edge_cut",
+              "source_polygon_bounds_mm": [
+                44.5,
+                95.95561473931579,
+                64.5,
+                101.72911743121205
+              ],
+              "source_polygon_diameter_mm": 20.0,
+              "tile_id": "placement-000066",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                66.3,
+                95.955614739,
+                3.0,
+                86.3,
+                101.729117431,
+                5.4
+              ],
+              "face_count": 44,
+              "maximum_triangle_edge_mm": 20.063897926375123,
+              "piece_type": "edge_cut",
+              "source_polygon_bounds_mm": [
+                66.3,
+                95.95561473931579,
+                86.3,
+                101.72911743121205
+              ],
+              "source_polygon_diameter_mm": 20.0,
+              "tile_id": "placement-000067",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                88.1,
+                95.955614739,
+                3.0,
+                108.1,
+                101.729117431,
+                5.4
+              ],
+              "face_count": 44,
+              "maximum_triangle_edge_mm": 20.063897926375123,
+              "piece_type": "edge_cut",
+              "source_polygon_bounds_mm": [
+                88.1,
+                95.95561473931579,
+                108.09999999999998,
+                101.72911743121205
+              ],
+              "source_polygon_diameter_mm": 19.999999999999986,
+              "tile_id": "placement-000068",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                109.9,
+                95.955614739,
+                3.0,
+                129.9,
+                101.729117431,
+                5.4
+              ],
+              "face_count": 44,
+              "maximum_triangle_edge_mm": 20.063897926375123,
+              "piece_type": "edge_cut",
+              "source_polygon_bounds_mm": [
+                109.9,
+                95.95561473931579,
+                129.9,
+                101.72911743121205
+              ],
+              "source_polygon_diameter_mm": 20.0,
+              "tile_id": "placement-000069",
+              "valid": true
+            }
+          ],
+          "source_tile_correspondence": true,
+          "valid": true
+        },
+        "valid": true
+      },
+      "stl_sha256": "24e8c743508e54f1b731ab0fd252a1a5514f74983991567af71bbdf46bebccad",
+      "tile_ids": [
+        "placement-000010",
+        "placement-000011",
+        "placement-000012",
+        "placement-000013",
+        "placement-000014",
+        "placement-000015",
+        "placement-000019",
+        "placement-000021",
+        "placement-000022",
+        "placement-000023",
+        "placement-000025",
+        "placement-000028",
+        "placement-000030",
+        "placement-000031",
+        "placement-000032",
+        "placement-000037",
+        "placement-000038",
+        "placement-000042",
+        "placement-000043",
+        "placement-000046",
+        "placement-000047",
+        "placement-000049",
+        "placement-000051",
+        "placement-000055",
+        "placement-000056",
+        "placement-000057",
+        "placement-000059",
+        "placement-000060",
+        "placement-000061",
+        "placement-000064",
+        "placement-000065",
+        "placement-000066",
+        "placement-000067",
+        "placement-000068",
+        "placement-000069"
+      ]
+    },
+    {
+      "body_id": "panel-a1-tile-color-2",
+      "bounds_mm": [
+        11.8,
+        1.55884572681199,
+        3.0,
+        129.9,
+        100.17027170440008,
+        5.4
+      ],
+      "geometry_signature_sha256": "bcb0ac9e5312f6d7085439957a90fa430ad14bb31904882c443ea3eecc86c049",
+      "logical_channel": "tile-color-2",
+      "mesh_validation": {
+        "degenerate_faces": 0,
+        "face_count": 828,
+        "nonmanifold_edges": 0,
+        "normals_consistent": true,
+        "triangle_count": 828,
+        "vertex_count": 432,
+        "watertight": true,
+        "winding_errors": 0
+      },
+      "name": "A1 Tile Color 2",
+      "spatial_validation": {
+        "connected_component_count": 9,
+        "cross_tile_triangles": 0,
+        "errors": [],
+        "expected_shell_count": 9,
+        "maximum_triangle_edge_mm": 23.094010767585047,
+        "shells": [
+          {
+            "bounds_mm": [
+              11.8,
+              1.55884572681199,
+              3.0,
+              31.800000000000004,
+              24.65285649439702,
+              5.4
+            ],
+            "face_count": 92,
+            "maximum_triangle_edge_mm": 23.094010767585033,
+            "piece_type": "full",
+            "source_polygon_bounds_mm": [
+              11.8,
+              1.55884572681199,
+              31.800000000000004,
+              24.65285649439702
+            ],
+            "source_polygon_diameter_mm": 23.094010767585033,
+            "tile_id": "placement-000020",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              99.0,
+              1.55884572681199,
+              3.0,
+              119.00000000000001,
+              24.65285649439702,
+              5.4
+            ],
+            "face_count": 92,
+            "maximum_triangle_edge_mm": 23.094010767585043,
+            "piece_type": "full",
+            "source_polygon_bounds_mm": [
+              99.0,
+              1.55884572681199,
+              119.00000000000001,
+              24.65285649439702
+            ],
+            "source_polygon_diameter_mm": 23.094010767585043,
+            "tile_id": "placement-000024",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              22.7,
+              20.43819952931275,
+              3.0,
+              42.7,
+              43.53221029689778,
+              5.4
+            ],
+            "face_count": 92,
+            "maximum_triangle_edge_mm": 23.09401076758503,
+            "piece_type": "full",
+            "source_polygon_bounds_mm": [
+              22.7,
+              20.43819952931275,
+              42.7,
+              43.53221029689778
+            ],
+            "source_polygon_diameter_mm": 23.094010767585036,
+            "tile_id": "placement-000029",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              109.9,
+              20.43819952931275,
+              3.0,
+              129.9,
+              43.53221029689778,
+              5.4
+            ],
+            "face_count": 92,
+            "maximum_triangle_edge_mm": 23.09401076758503,
+            "piece_type": "full",
+            "source_polygon_bounds_mm": [
+              109.9,
+              20.43819952931275,
+              129.9,
+              43.53221029689778
+            ],
+            "source_polygon_diameter_mm": 23.094010767585033,
+            "tile_id": "placement-000033",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              33.6,
+              39.317553331813514,
+              3.0,
+              53.6,
+              62.41156409939854,
+              5.4
+            ],
+            "face_count": 92,
+            "maximum_triangle_edge_mm": 23.094010767585033,
+            "piece_type": "full",
+            "source_polygon_bounds_mm": [
+              33.6,
+              39.317553331813514,
+              53.6,
+              62.41156409939854
+            ],
+            "source_polygon_diameter_mm": 23.094010767585033,
+            "tile_id": "placement-000039",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              77.19999999999999,
+              39.317553331813514,
+              3.0,
+              97.2,
+              62.41156409939854,
+              5.4
+            ],
+            "face_count": 92,
+            "maximum_triangle_edge_mm": 23.094010767585047,
+            "piece_type": "full",
+            "source_polygon_bounds_mm": [
+              77.19999999999999,
+              39.317553331813514,
+              97.2,
+              62.41156409939854
+            ],
+            "source_polygon_diameter_mm": 23.094010767585047,
+            "tile_id": "placement-000041",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              44.5,
+              58.19690713431427,
+              3.0,
+              64.5,
+              81.29091790189932,
+              5.4
+            ],
+            "face_count": 92,
+            "maximum_triangle_edge_mm": 23.094010767585033,
+            "piece_type": "full",
+            "source_polygon_bounds_mm": [
+              44.5,
+              58.19690713431427,
+              64.5,
+              81.29091790189932
+            ],
+            "source_polygon_diameter_mm": 23.094010767585047,
+            "tile_id": "placement-000048",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              88.1,
+              58.19690713431427,
+              3.0,
+              108.10000000000001,
+              81.29091790189932,
+              5.4
+            ],
+            "face_count": 92,
+            "maximum_triangle_edge_mm": 23.094010767585047,
+            "piece_type": "full",
+            "source_polygon_bounds_mm": [
+              88.1,
+              58.19690713431427,
+              108.10000000000001,
+              81.29091790189932
+            ],
+            "source_polygon_diameter_mm": 23.094010767585047,
+            "tile_id": "placement-000050",
+            "valid": true
+          },
+          {
+            "bounds_mm": [
+              55.4,
+              77.07626093681503,
+              3.0,
+              75.4,
+              100.17027170440008,
+              5.4
+            ],
+            "face_count": 92,
+            "maximum_triangle_edge_mm": 23.09401076758504,
+            "piece_type": "full",
+            "source_polygon_bounds_mm": [
+              55.4,
+              77.07626093681503,
+              75.4,
+              100.17027170440008
+            ],
+            "source_polygon_diameter_mm": 23.094010767585047,
+            "tile_id": "placement-000058",
+            "valid": true
+          }
+        ],
+        "source_tile_correspondence": true,
+        "valid": true
+      },
+      "stl_filename": "Review_TileColor2.stl",
+      "stl_round_trip": {
+        "bounds_mm": [
+          11.8,
+          1.558845727,
+          3.0,
+          129.9,
+          100.170271704,
+          5.4
+        ],
+        "face_count": 828,
+        "maximum_triangle_edge_mm": 23.094010767688783,
+        "mesh_validation": {
+          "degenerate_faces": 0,
+          "face_count": 828,
+          "nonmanifold_edges": 0,
+          "normals_consistent": true,
+          "triangle_count": 828,
+          "vertex_count": 432,
+          "watertight": true,
+          "winding_errors": 0
+        },
+        "spatial_validation": {
+          "connected_component_count": 9,
+          "cross_tile_triangles": 0,
+          "errors": [],
+          "expected_shell_count": 9,
+          "maximum_triangle_edge_mm": 23.094010767688783,
+          "shells": [
+            {
+              "bounds_mm": [
+                11.8,
+                1.558845727,
+                3.0,
+                31.8,
+                24.652856494,
+                5.4
+              ],
+              "face_count": 92,
+              "maximum_triangle_edge_mm": 23.094010767688776,
+              "piece_type": "full",
+              "source_polygon_bounds_mm": [
+                11.8,
+                1.55884572681199,
+                31.800000000000004,
+                24.65285649439702
+              ],
+              "source_polygon_diameter_mm": 23.094010767585033,
+              "tile_id": "placement-000020",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                99.0,
+                1.558845727,
+                3.0,
+                119.0,
+                24.652856494,
+                5.4
+              ],
+              "face_count": 92,
+              "maximum_triangle_edge_mm": 23.094010767688776,
+              "piece_type": "full",
+              "source_polygon_bounds_mm": [
+                99.0,
+                1.55884572681199,
+                119.00000000000001,
+                24.65285649439702
+              ],
+              "source_polygon_diameter_mm": 23.094010767585043,
+              "tile_id": "placement-000024",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                22.7,
+                20.438199529,
+                3.0,
+                42.7,
+                43.532210297,
+                5.4
+              ],
+              "face_count": 92,
+              "maximum_triangle_edge_mm": 23.094010767688776,
+              "piece_type": "full",
+              "source_polygon_bounds_mm": [
+                22.7,
+                20.43819952931275,
+                42.7,
+                43.53221029689778
+              ],
+              "source_polygon_diameter_mm": 23.094010767585036,
+              "tile_id": "placement-000029",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                109.9,
+                20.438199529,
+                3.0,
+                129.9,
+                43.532210297,
+                5.4
+              ],
+              "face_count": 92,
+              "maximum_triangle_edge_mm": 23.094010767688772,
+              "piece_type": "full",
+              "source_polygon_bounds_mm": [
+                109.9,
+                20.43819952931275,
+                129.9,
+                43.53221029689778
+              ],
+              "source_polygon_diameter_mm": 23.094010767585033,
+              "tile_id": "placement-000033",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                33.6,
+                39.317553332,
+                3.0,
+                53.6,
+                62.411564099,
+                5.4
+              ],
+              "face_count": 92,
+              "maximum_triangle_edge_mm": 23.094010767688776,
+              "piece_type": "full",
+              "source_polygon_bounds_mm": [
+                33.6,
+                39.317553331813514,
+                53.6,
+                62.41156409939854
+              ],
+              "source_polygon_diameter_mm": 23.094010767585033,
+              "tile_id": "placement-000039",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                77.2,
+                39.317553332,
+                3.0,
+                97.2,
+                62.411564099,
+                5.4
+              ],
+              "face_count": 92,
+              "maximum_triangle_edge_mm": 23.094010767688776,
+              "piece_type": "full",
+              "source_polygon_bounds_mm": [
+                77.19999999999999,
+                39.317553331813514,
+                97.2,
+                62.41156409939854
+              ],
+              "source_polygon_diameter_mm": 23.094010767585047,
+              "tile_id": "placement-000041",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                44.5,
+                58.196907134,
+                3.0,
+                64.5,
+                81.290917902,
+                5.4
+              ],
+              "face_count": 92,
+              "maximum_triangle_edge_mm": 23.094010767688772,
+              "piece_type": "full",
+              "source_polygon_bounds_mm": [
+                44.5,
+                58.19690713431427,
+                64.5,
+                81.29091790189932
+              ],
+              "source_polygon_diameter_mm": 23.094010767585047,
+              "tile_id": "placement-000048",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                88.1,
+                58.196907134,
+                3.0,
+                108.1,
+                81.290917902,
+                5.4
+              ],
+              "face_count": 92,
+              "maximum_triangle_edge_mm": 23.094010767688772,
+              "piece_type": "full",
+              "source_polygon_bounds_mm": [
+                88.1,
+                58.19690713431427,
+                108.10000000000001,
+                81.29091790189932
+              ],
+              "source_polygon_diameter_mm": 23.094010767585047,
+              "tile_id": "placement-000050",
+              "valid": true
+            },
+            {
+              "bounds_mm": [
+                55.4,
+                77.076260937,
+                3.0,
+                75.4,
+                100.170271704,
+                5.4
+              ],
+              "face_count": 92,
+              "maximum_triangle_edge_mm": 23.094010767688783,
+              "piece_type": "full",
+              "source_polygon_bounds_mm": [
+                55.4,
+                77.07626093681503,
+                75.4,
+                100.17027170440008
+              ],
+              "source_polygon_diameter_mm": 23.094010767585047,
+              "tile_id": "placement-000058",
+              "valid": true
+            }
+          ],
+          "source_tile_correspondence": true,
+          "valid": true
+        },
+        "valid": true
+      },
+      "stl_sha256": "49613baf5e2858dc29b40c15c59e150c1f08d00ae70909cdf7ef28c684c42915",
+      "tile_ids": [
+        "placement-000020",
+        "placement-000024",
+        "placement-000029",
+        "placement-000033",
+        "placement-000039",
+        "placement-000041",
+        "placement-000048",
+        "placement-000050",
+        "placement-000058"
+      ]
+    },
+    {
+      "body_id": "panel-a1-tile-color-3",
+      "bounds_mm": [
+        55.4,
+        39.317553331813514,
+        3.0,
+        75.4,
+        62.41156409939854,
+        5.4
+      ],
+      "geometry_signature_sha256": "f2ae5495675d5b1085b0ff77ac9f1187324a344c8e046c6f4047dd35875f7833",
+      "logical_channel": "tile-color-3",
+      "mesh_validation": {
+        "degenerate_faces": 0,
+        "face_count": 92,
+        "nonmanifold_edges": 0,
+        "normals_consistent": true,
+        "triangle_count": 92,
+        "vertex_count": 48,
+        "watertight": true,
+        "winding_errors": 0
+      },
+      "name": "A1 Tile Color 3",
+      "spatial_validation": {
+        "connected_component_count": 1,
+        "cross_tile_triangles": 0,
+        "errors": [],
+        "expected_shell_count": 1,
+        "maximum_triangle_edge_mm": 23.09401076758504,
+        "shells": [
+          {
+            "bounds_mm": [
+              55.4,
+              39.317553331813514,
+              3.0,
+              75.4,
+              62.41156409939854,
+              5.4
+            ],
+            "face_count": 92,
+            "maximum_triangle_edge_mm": 23.09401076758504,
+            "piece_type": "full",
+            "source_polygon_bounds_mm": [
+              55.4,
+              39.317553331813514,
+              75.4,
+              62.41156409939854
+            ],
+            "source_polygon_diameter_mm": 23.09401076758504,
+            "tile_id": "placement-000040",
+            "valid": true
+          }
+        ],
+        "source_tile_correspondence": true,
+        "valid": true
+      },
+      "stl_filename": "Review_TileColor3.stl",
+      "stl_round_trip": {
+        "bounds_mm": [
+          55.4,
+          39.317553332,
+          3.0,
+          75.4,
+          62.411564099,
+          5.4
+        ],
+        "face_count": 92,
+        "maximum_triangle_edge_mm": 23.094010767688783,
+        "mesh_validation": {
+          "degenerate_faces": 0,
+          "face_count": 92,
+          "nonmanifold_edges": 0,
+          "normals_consistent": true,
+          "triangle_count": 92,
+          "vertex_count": 48,
+          "watertight": true,
+          "winding_errors": 0
+        },
+        "spatial_validation": {
+          "connected_component_count": 1,
+          "cross_tile_triangles": 0,
+          "errors": [],
+          "expected_shell_count": 1,
+          "maximum_triangle_edge_mm": 23.094010767688783,
+          "shells": [
+            {
+              "bounds_mm": [
+                55.4,
+                39.317553332,
+                3.0,
+                75.4,
+                62.411564099,
+                5.4
+              ],
+              "face_count": 92,
+              "maximum_triangle_edge_mm": 23.094010767688783,
+              "piece_type": "full",
+              "source_polygon_bounds_mm": [
+                55.4,
+                39.317553331813514,
+                75.4,
+                62.41156409939854
+              ],
+              "source_polygon_diameter_mm": 23.09401076758504,
+              "tile_id": "placement-000040",
+              "valid": true
+            }
+          ],
+          "source_tile_correspondence": true,
+          "valid": true
+        },
+        "valid": true
+      },
+      "stl_sha256": "b500eb04f8c8dfd02e7741d4199c99ced8d110ba6a111c7e15fafa145a46dd0e",
+      "tile_ids": [
+        "placement-000040"
+      ]
+    }
+  ],
+  "clipped_tile_count": 18,
+  "coordinate_system": {
+    "axes": [
+      "X right across artwork",
+      "Y down artwork",
+      "Z up from build plate"
+    ],
+    "origin": "artwork-top-left",
+    "units": "mm"
+  },
+  "fabricate_profile": {
+    "base_thickness_mm": 2.0,
+    "base_thickness_status": "fixture_only",
+    "crown_segments": 6,
+    "grout_surface": "flat",
+    "grout_thinset_thickness_mm": 1.0,
+    "grout_thinset_thickness_status": "fixture_only",
+    "profile_id": "phase1.1-physical-review-fixture",
+    "rounded_crown_mm": 0.8,
+    "straight_tile_relief_mm": 1.6,
+    "total_tile_relief_above_grout_mm": 2.4,
+    "version": 1
+  },
+  "fabricated_height_mm": 101.72911743121205,
+  "fabricated_width_mm": 130.8,
+  "frame_land_generated": false,
+  "full_tile_count": 27,
+  "geometry_signature_sha256": "afab2afb27344e80b6559df5f4b2c5c5fb33e54d00037441606619743fb2d2c3",
+  "grout_gap_mm": 1.8,
+  "panelization": "not_implemented",
+  "print_orientation": "backside-on-build-plate; artwork-face-up",
+  "resolved_tile_count": 45,
+  "schema": {
+    "name": "mosaica-fabricate-review",
+    "version": 1
+  },
+  "shared_reference_frame": {
+    "coordinate_system": {
+      "axes": [
+        "X right across artwork",
+        "Y down artwork",
+        "Z up from build plate"
+      ],
+      "origin": "artwork-top-left",
+      "units": "mm"
+    },
+    "errors": [],
+    "origin_mm": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "valid": true
+  },
+  "tile_flat_to_flat_mm": 20.0,
+  "tile_orientation": "point_top",
+  "tile_preset": "s",
+  "tile_profile": "V4 Rounded",
+  "total_z_height_mm": 5.4,
+  "units": "mm",
+  "used_logical_channels": [
+    {
+      "channel_id": "base",
+      "display_color": null,
+      "kind": "base",
+      "name": "Base",
+      "source_color_id": null
+    },
+    {
+      "channel_id": "grout-thinset",
+      "display_color": "#FAF9F6",
+      "kind": "grout_thinset",
+      "name": "Grout/Thinset",
+      "source_color_id": "project-color-1"
+    },
+    {
+      "channel_id": "tile-color-1",
+      "display_color": "#FAF9F6",
+      "kind": "tile_color",
+      "name": "Tile Color 1",
+      "source_color_id": "project-color-1"
+    },
+    {
+      "channel_id": "tile-color-2",
+      "display_color": "#000000",
+      "kind": "tile_color",
+      "name": "Tile Color 2",
+      "source_color_id": "project-color-2"
+    },
+    {
+      "channel_id": "tile-color-3",
+      "display_color": "#B56F52",
+      "kind": "tile_color",
+      "name": "Tile Color 3",
+      "source_color_id": "project-color-4"
+    }
+  ]
+}

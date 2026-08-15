@@ -1,0 +1,86 @@
+solid panel-a1-base
+  facet normal 0 0 -1
+    outer loop
+      vertex 0.000000000 0.000000000 0.000000000
+      vertex 130.800000000 101.729117431 0.000000000
+      vertex 130.800000000 0.000000000 0.000000000
+    endloop
+  endfacet
+  facet normal 0 0 -1
+    outer loop
+      vertex 0.000000000 0.000000000 0.000000000
+      vertex 0.000000000 101.729117431 0.000000000
+      vertex 130.800000000 101.729117431 0.000000000
+    endloop
+  endfacet
+  facet normal 0 -1 0
+    outer loop
+      vertex 0.000000000 0.000000000 0.000000000
+      vertex 130.800000000 0.000000000 0.000000000
+      vertex 130.800000000 0.000000000 2.000000000
+    endloop
+  endfacet
+  facet normal 0 -1 0
+    outer loop
+      vertex 0.000000000 0.000000000 0.000000000
+      vertex 130.800000000 0.000000000 2.000000000
+      vertex 0.000000000 0.000000000 2.000000000
+    endloop
+  endfacet
+  facet normal 1 0 0
+    outer loop
+      vertex 130.800000000 0.000000000 0.000000000
+      vertex 130.800000000 101.729117431 0.000000000
+      vertex 130.800000000 101.729117431 2.000000000
+    endloop
+  endfacet
+  facet normal 1 0 0
+    outer loop
+      vertex 130.800000000 0.000000000 0.000000000
+      vertex 130.800000000 101.729117431 2.000000000
+      vertex 130.800000000 0.000000000 2.000000000
+    endloop
+  endfacet
+  facet normal 0 1 0
+    outer loop
+      vertex 130.800000000 101.729117431 0.000000000
+      vertex 0.000000000 101.729117431 0.000000000
+      vertex 0.000000000 101.729117431 2.000000000
+    endloop
+  endfacet
+  facet normal 0 1 -0
+    outer loop
+      vertex 130.800000000 101.729117431 0.000000000
+      vertex 0.000000000 101.729117431 2.000000000
+      vertex 130.800000000 101.729117431 2.000000000
+    endloop
+  endfacet
+  facet normal -1 0 0
+    outer loop
+      vertex 0.000000000 101.729117431 0.000000000
+      vertex 0.000000000 0.000000000 0.000000000
+      vertex 0.000000000 0.000000000 2.000000000
+    endloop
+  endfacet
+  facet normal -1 0 0
+    outer loop
+      vertex 0.000000000 101.729117431 0.000000000
+      vertex 0.000000000 0.000000000 2.000000000
+      vertex 0.000000000 101.729117431 2.000000000
+    endloop
+  endfacet
+  facet normal 0 0 1
+    outer loop
+      vertex 0.000000000 0.000000000 2.000000000
+      vertex 130.800000000 0.000000000 2.000000000
+      vertex 130.800000000 101.729117431 2.000000000
+    endloop
+  endfacet
+  facet normal 0 0 1
+    outer loop
+      vertex 0.000000000 0.000000000 2.000000000
+      vertex 130.800000000 101.729117431 2.000000000
+      vertex 0.000000000 101.729117431 2.000000000
+    endloop
+  endfacet
+endsolid panel-a1-base
