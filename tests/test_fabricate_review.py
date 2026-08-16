@@ -130,7 +130,7 @@ def test_review_export_does_not_mutate_source_mosaic_project(tmp_path):
 
 def test_review_manifest_records_application_and_fabrication_contract(tmp_path):
     manifest = json.loads(generate_review_package(tmp_path / "review").manifest_path.read_text())
-    assert manifest["application_version"] == "1.9.5"
+    assert manifest["application_version"] == "2.0.0"
     assert manifest["units"] == "mm"
     assert manifest["coordinate_system"]["origin"] == "artwork-top-left"
     assert manifest["print_orientation"] == "backside-on-build-plate; artwork-face-up"

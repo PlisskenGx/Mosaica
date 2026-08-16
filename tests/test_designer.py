@@ -326,7 +326,7 @@ def test_workspace_status_uses_authoritative_version_and_two_part_layout():
     _, script = _request(app, "GET", "/designer.js")
     _, stylesheet = _request(app, "GET", "/designer.css")
     metadata = Path("pyproject.toml").read_text()
-    assert __version__ == "1.9.5"
+    assert __version__ == "2.0.0"
     assert payload["app_version"] == __version__
     assert 'dynamic = ["version"]' in metadata
     assert 'version = {attr = "mosaica.__version__"}' in metadata

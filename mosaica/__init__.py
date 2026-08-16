@@ -4,7 +4,7 @@ Mosaica.
 Standalone physical tile mosaic generation engine.
 """
 
-__version__ = "1.9.5"
+__version__ = "2.0.0"
 
 from .engine import generate_mosaic
 from .contour_refinement import (
