@@ -101,11 +101,17 @@ def validate_shared_reference_frame(panel: SinglePanelGeometry) -> dict:
     profile = model.profile
     base = panel.body("base")
     grout = panel.body("grout-thinset")
-    expected_xy = (0.0, 0.0, model.artwork_width_mm, model.artwork_height_mm)
+    expected_xy = panel.fabrication_bounds_mm
     errors = []
-    if (base.bounds_mm[0], base.bounds_mm[1], base.bounds_mm[3], base.bounds_mm[4]) != expected_xy:
+    if not _bounds_close(
+        (base.bounds_mm[0], base.bounds_mm[1], base.bounds_mm[3], base.bounds_mm[4]),
+        expected_xy,
+    ):
         errors.append("Base does not use the complete fabrication XY frame.")
-    if (grout.bounds_mm[0], grout.bounds_mm[1], grout.bounds_mm[3], grout.bounds_mm[4]) != expected_xy:
+    if not _bounds_close(
+        (grout.bounds_mm[0], grout.bounds_mm[1], grout.bounds_mm[3], grout.bounds_mm[4]),
+        expected_xy,
+    ):
         errors.append("Grout/Thinset does not align to the Base XY frame.")
     if base.bounds_mm[2] != 0.0:
         errors.append("Base backside is not on Z=0.")
@@ -124,6 +130,7 @@ def validate_shared_reference_frame(panel: SinglePanelGeometry) -> dict:
     return {
         "valid": not errors,
         "origin_mm": [0.0, 0.0, 0.0],
+        "fabrication_bounds_mm": list(expected_xy),
         "coordinate_system": {
             "origin": model.origin,
             "axes": list(model.axes),
@@ -251,10 +258,21 @@ def export_review_package(
         "units": model.units,
         "artwork_width_mm": model.artwork_width_mm,
         "artwork_height_mm": model.artwork_height_mm,
-        "fabricated_width_mm": model.physical_bounds_mm[3],
-        "fabricated_height_mm": model.physical_bounds_mm[4],
+        "fabrication_bounds_mm": list(panel.fabrication_bounds_mm),
+        "fabricated_width_mm": (
+            panel.fabrication_bounds_mm[2] - panel.fabrication_bounds_mm[0]
+        ),
+        "fabricated_height_mm": (
+            panel.fabrication_bounds_mm[3] - panel.fabrication_bounds_mm[1]
+        ),
         "total_z_height_mm": model.physical_bounds_mm[5],
         "grout_gap_mm": model.grout_gap_mm,
+        "perimeter_correction_mm": model.grout_gap_mm / 2.0,
+        "dimension_semantics": {
+            "designer_artwork_bounds": "unchanged_pre_trim_lattice_rectangle",
+            "fabrication_bounds": "straightened_manufacturing_perimeter",
+            "lattice_scaled_or_repositioned": False,
+        },
         "tile_preset": model.tile_preset_id,
         "tile_flat_to_flat_mm": model.tile_flat_to_flat_mm,
         "tile_orientation": model.tile_orientation,

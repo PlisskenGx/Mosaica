@@ -169,3 +169,28 @@ panel crown construction. Fabricate uses an origin-preserving convex inset.
 Review validation checks each tile shell against its source polygon, limits
 triangle edges by that polygon's diameter, verifies one component per source
 tile, and parses every STL back for topology and spatial validation.
+
+### Straight fabrication perimeter
+
+Designer and resolved artwork dimensions continue to describe the unscaled,
+unmoved pre-trim lattice rectangle. Fabricate exposes a separate manufacturing
+rectangle after applying final straight cuts to complete 3D bodies. On the
+staggered axis, the cut datum is derived as one half of the authoritative grout
+gap (0.9 mm for 1.8 mm grout), matching the neighboring full-tile extremum.
+Point Top therefore trims left/right to the half-gap datum; Flat Top applies
+the rotated rule to top/bottom. The non-staggered sides remain at the artwork
+planes. Base, Grout/Thinset, and crossing Tile Color solids share the final
+rectangle. Interior tiles, centers, pitch, crowns, and ordinary grout channels
+are unchanged.
+
+Every tile begins from its authoritative full parent hex. The complete V4
+Rounded solid is generated first and then clipped against all four fabrication
+planes. Original parent-hex edges retain the factory crown; every artificial
+artwork/manufacturing edge is a capped, vertical, full-height straight cut,
+independent of orientation or piece classification.
+
+Future frame land must grow outward from this clean fabrication perimeter,
+not from the alternating pre-trim tile/grout extremities. For the Phase 1.1
+Point Top fixture, artwork remains 130.8 mm wide while fabrication spans X
+0.9–129.9 mm and is therefore 129.0 mm wide. No scaling or compensating
+lattice translation is performed.

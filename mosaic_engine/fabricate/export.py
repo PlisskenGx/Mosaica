@@ -65,6 +65,7 @@ def export_single_panel_prototype(
     manifest.write_text(json.dumps({
         "schema": {"name": "mosaica-fabricate-panel", "version": 1},
         "panel_id": panel.panel_id,
+        "fabrication_bounds_mm": list(panel.fabrication_bounds_mm),
         "resolved_model": panel.model.to_dict(),
         "bodies": body_records,
     }, indent=2, sort_keys=True) + "\n", encoding="utf-8")

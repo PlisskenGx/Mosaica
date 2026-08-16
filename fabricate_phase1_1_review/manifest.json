@@ -7,22 +7,22 @@
     {
       "body_id": "panel-a1-base",
       "bounds_mm": [
+        0.9,
         0.0,
         0.0,
-        0.0,
-        130.8,
+        129.9,
         101.72911743121205,
         2.0
       ],
-      "geometry_signature_sha256": "26b708109a7e9e5ee2ac728c0c666129268700fecfd00c777af5b8c5963e3daf",
+      "geometry_signature_sha256": "b3ac67c110ae537e557877893a98757dec59e49b8599e81c89fc1b953bf76792",
       "logical_channel": "base",
       "mesh_validation": {
         "degenerate_faces": 0,
-        "face_count": 12,
+        "face_count": 40,
         "nonmanifold_edges": 0,
         "normals_consistent": true,
-        "triangle_count": 12,
-        "vertex_count": 8,
+        "triangle_count": 40,
+        "vertex_count": 22,
         "watertight": true,
         "winding_errors": 0
       },
@@ -31,49 +31,49 @@
       "stl_filename": "Review_Base.stl",
       "stl_round_trip": {
         "bounds_mm": [
+          0.9,
           0.0,
           0.0,
-          0.0,
-          130.8,
+          129.9,
           101.729117431,
           2.0
         ],
-        "face_count": 12,
-        "maximum_triangle_edge_mm": 165.70290683415965,
+        "face_count": 40,
+        "maximum_triangle_edge_mm": 163.85325273059112,
         "mesh_validation": {
           "degenerate_faces": 0,
-          "face_count": 12,
+          "face_count": 40,
           "nonmanifold_edges": 0,
           "normals_consistent": true,
-          "triangle_count": 12,
-          "vertex_count": 8,
+          "triangle_count": 40,
+          "vertex_count": 22,
           "watertight": true,
           "winding_errors": 0
         },
         "valid": true
       },
-      "stl_sha256": "afd8eaae833eceee29c8c2aa1bf8eb742446f745cf18459b97702f22910660be",
+      "stl_sha256": "67e4779eb78187d69e12b624ad641017f73f43c66e609dc88bf0a0aaec2cefb6",
       "tile_ids": []
     },
     {
       "body_id": "panel-a1-grout-thinset",
       "bounds_mm": [
-        0.0,
+        0.9,
         0.0,
         2.0,
-        130.8,
+        129.9,
         101.72911743121205,
         3.0
       ],
-      "geometry_signature_sha256": "b525e82a017ba39b1cbeb500faf76e2974ec2d02eacb47f48d1fb23650cd8f59",
+      "geometry_signature_sha256": "b5eaf4f8999aae6f1ca341e77dff9d938ab044b6667307c7a45d3b5e97132b8a",
       "logical_channel": "grout-thinset",
       "mesh_validation": {
         "degenerate_faces": 0,
-        "face_count": 12,
+        "face_count": 40,
         "nonmanifold_edges": 0,
         "normals_consistent": true,
-        "triangle_count": 12,
-        "vertex_count": 8,
+        "triangle_count": 40,
+        "vertex_count": 22,
         "watertight": true,
         "winding_errors": 0
       },
@@ -82,49 +82,49 @@
       "stl_filename": "Review_GroutThinset.stl",
       "stl_round_trip": {
         "bounds_mm": [
-          0.0,
+          0.9,
           0.0,
           2.0,
-          130.8,
+          129.9,
           101.729117431,
           3.0
         ],
-        "face_count": 12,
-        "maximum_triangle_edge_mm": 165.70290683415965,
+        "face_count": 40,
+        "maximum_triangle_edge_mm": 163.85325273059112,
         "mesh_validation": {
           "degenerate_faces": 0,
-          "face_count": 12,
+          "face_count": 40,
           "nonmanifold_edges": 0,
           "normals_consistent": true,
-          "triangle_count": 12,
-          "vertex_count": 8,
+          "triangle_count": 40,
+          "vertex_count": 22,
           "watertight": true,
           "winding_errors": 0
         },
         "valid": true
       },
-      "stl_sha256": "efb423587684e5909fd0c4248821b98f0499e011353b3f95ceeba51243e6e869",
+      "stl_sha256": "2f472738c8014829c3a6173120fc7079a3efafd05c6d16eb1811a9823355810e",
       "tile_ids": []
     },
     {
       "body_id": "panel-a1-tile-color-1",
       "bounds_mm": [
-        0.0,
+        0.9,
         0.0,
         3.0,
-        130.8,
+        129.9,
         101.72911743121205,
         5.4
       ],
-      "geometry_signature_sha256": "fd2b869f30e4644c30df574cee47402bfaac3a0f3de600d1f36c734c6d64f32e",
+      "geometry_signature_sha256": "65ced8c9e9097a511a5eeec476304f60d55ba2e6ba6fc441ddf871759d3dfbec",
       "logical_channel": "tile-color-1",
       "mesh_validation": {
         "degenerate_faces": 0,
-        "face_count": 2452,
+        "face_count": 3004,
         "nonmanifold_edges": 0,
         "normals_consistent": true,
-        "triangle_count": 2452,
-        "vertex_count": 1296,
+        "triangle_count": 3004,
+        "vertex_count": 1572,
         "watertight": true,
         "winding_errors": 0
       },
@@ -134,19 +134,19 @@
         "cross_tile_triangles": 0,
         "errors": [],
         "expected_shell_count": 35,
-        "maximum_triangle_edge_mm": 23.149370041824767,
+        "maximum_triangle_edge_mm": 23.094010767585047,
         "shells": [
           {
             "bounds_mm": [
-              0.9000000000000011,
+              0.9,
               0.0,
               3.0,
               20.900000000000006,
               5.773502691896259,
               5.4
             ],
-            "face_count": 44,
-            "maximum_triangle_edge_mm": 20.063897926375127,
+            "face_count": 68,
+            "maximum_triangle_edge_mm": 20.000000000000007,
             "piece_type": "edge_cut",
             "source_polygon_bounds_mm": [
               0.9000000000000011,
@@ -167,8 +167,8 @@
               5.773502691896259,
               5.4
             ],
-            "face_count": 44,
-            "maximum_triangle_edge_mm": 20.063897926375127,
+            "face_count": 68,
+            "maximum_triangle_edge_mm": 20.000000000000004,
             "piece_type": "edge_cut",
             "source_polygon_bounds_mm": [
               22.7,
@@ -189,8 +189,8 @@
               5.773502691896259,
               5.4
             ],
-            "face_count": 44,
-            "maximum_triangle_edge_mm": 20.063897926375123,
+            "face_count": 68,
+            "maximum_triangle_edge_mm": 20.0,
             "piece_type": "edge_cut",
             "source_polygon_bounds_mm": [
               44.5,
@@ -211,8 +211,8 @@
               5.773502691896259,
               5.4
             ],
-            "face_count": 44,
-            "maximum_triangle_edge_mm": 20.063897926375137,
+            "face_count": 68,
+            "maximum_triangle_edge_mm": 20.000000000000014,
             "piece_type": "edge_cut",
             "source_polygon_bounds_mm": [
               66.3,
@@ -233,8 +233,8 @@
               5.773502691896259,
               5.4
             ],
-            "face_count": 44,
-            "maximum_triangle_edge_mm": 20.063897926375137,
+            "face_count": 68,
+            "maximum_triangle_edge_mm": 20.000000000000014,
             "piece_type": "edge_cut",
             "source_polygon_bounds_mm": [
               88.1,
@@ -255,8 +255,8 @@
               5.773502691896259,
               5.4
             ],
-            "face_count": 44,
-            "maximum_triangle_edge_mm": 20.063897926375123,
+            "face_count": 68,
+            "maximum_triangle_edge_mm": 20.0,
             "piece_type": "edge_cut",
             "source_polygon_bounds_mm": [
               109.9,
@@ -270,15 +270,15 @@
           },
           {
             "bounds_mm": [
-              0.0,
-              1.55884572681199,
+              0.9,
+              2.0784609691,
               3.0,
               10.000000000000004,
-              24.65285649439702,
+              24.1332412521,
               5.4
             ],
-            "face_count": 60,
-            "maximum_triangle_edge_mm": 23.149370041824753,
+            "face_count": 102,
+            "maximum_triangle_edge_mm": 19.10706675550743,
             "piece_type": "half",
             "source_polygon_bounds_mm": [
               0.0,
@@ -359,14 +359,14 @@
           {
             "bounds_mm": [
               120.8,
-              1.55884572681199,
+              2.0784609691,
               3.0,
-              130.8,
-              24.65285649439702,
+              129.9,
+              24.1332412521,
               5.4
             ],
-            "face_count": 60,
-            "maximum_triangle_edge_mm": 23.149370041824753,
+            "face_count": 98,
+            "maximum_triangle_edge_mm": 13.481221507426211,
             "piece_type": "half",
             "source_polygon_bounds_mm": [
               120.8,
@@ -380,7 +380,7 @@
           },
           {
             "bounds_mm": [
-              0.9000000000000011,
+              0.9,
               20.43819952931275,
               3.0,
               20.900000000000006,
@@ -388,7 +388,7 @@
               5.4
             ],
             "face_count": 92,
-            "maximum_triangle_edge_mm": 23.094010767585033,
+            "maximum_triangle_edge_mm": 23.094010767585036,
             "piece_type": "full",
             "source_polygon_bounds_mm": [
               0.9000000000000011,
@@ -468,15 +468,15 @@
           },
           {
             "bounds_mm": [
-              0.0,
-              39.317553331813514,
+              0.9,
+              39.8371685741,
               3.0,
               10.000000000000004,
-              62.41156409939854,
+              61.8919488571,
               5.4
             ],
-            "face_count": 60,
-            "maximum_triangle_edge_mm": 23.149370041824746,
+            "face_count": 102,
+            "maximum_triangle_edge_mm": 19.107066755508775,
             "piece_type": "half",
             "source_polygon_bounds_mm": [
               0.0,
@@ -535,14 +535,14 @@
           {
             "bounds_mm": [
               120.8,
-              39.317553331813514,
+              39.8371685741,
               3.0,
-              130.8,
-              62.41156409939854,
+              129.9,
+              61.8919488571,
               5.4
             ],
-            "face_count": 60,
-            "maximum_triangle_edge_mm": 23.149370041824746,
+            "face_count": 98,
+            "maximum_triangle_edge_mm": 13.481221507503806,
             "piece_type": "half",
             "source_polygon_bounds_mm": [
               120.8,
@@ -556,7 +556,7 @@
           },
           {
             "bounds_mm": [
-              0.9000000000000011,
+              0.9,
               58.19690713431427,
               3.0,
               20.900000000000006,
@@ -644,15 +644,15 @@
           },
           {
             "bounds_mm": [
-              0.0,
-              77.07626093681503,
+              0.9,
+              77.5958761791,
               3.0,
               10.000000000000004,
-              100.17027170440008,
+              99.6506564621,
               5.4
             ],
-            "face_count": 60,
-            "maximum_triangle_edge_mm": 23.149370041824767,
+            "face_count": 102,
+            "maximum_triangle_edge_mm": 19.107066755510107,
             "piece_type": "half",
             "source_polygon_bounds_mm": [
               0.0,
@@ -755,14 +755,14 @@
           {
             "bounds_mm": [
               120.8,
-              77.07626093681503,
+              77.5958761791,
               3.0,
-              130.8,
-              100.17027170440008,
+              129.9,
+              99.6506564621,
               5.4
             ],
-            "face_count": 60,
-            "maximum_triangle_edge_mm": 23.149370041824767,
+            "face_count": 98,
+            "maximum_triangle_edge_mm": 13.481221507502623,
             "piece_type": "half",
             "source_polygon_bounds_mm": [
               120.8,
@@ -776,15 +776,15 @@
           },
           {
             "bounds_mm": [
-              0.9000000000000011,
+              0.9,
               95.95561473931579,
               3.0,
               20.900000000000002,
               101.72911743121205,
               5.4
             ],
-            "face_count": 44,
-            "maximum_triangle_edge_mm": 20.063897926375123,
+            "face_count": 72,
+            "maximum_triangle_edge_mm": 13.333333333299999,
             "piece_type": "edge_cut",
             "source_polygon_bounds_mm": [
               0.9000000000000011,
@@ -805,8 +805,8 @@
               101.72911743121205,
               5.4
             ],
-            "face_count": 44,
-            "maximum_triangle_edge_mm": 20.063897926375123,
+            "face_count": 72,
+            "maximum_triangle_edge_mm": 13.333333333299997,
             "piece_type": "edge_cut",
             "source_polygon_bounds_mm": [
               22.700000000000003,
@@ -827,8 +827,8 @@
               101.72911743121205,
               5.4
             ],
-            "face_count": 44,
-            "maximum_triangle_edge_mm": 20.063897926375123,
+            "face_count": 72,
+            "maximum_triangle_edge_mm": 13.333333333299997,
             "piece_type": "edge_cut",
             "source_polygon_bounds_mm": [
               44.5,
@@ -849,8 +849,8 @@
               101.72911743121205,
               5.4
             ],
-            "face_count": 44,
-            "maximum_triangle_edge_mm": 20.063897926375123,
+            "face_count": 72,
+            "maximum_triangle_edge_mm": 13.333333333300004,
             "piece_type": "edge_cut",
             "source_polygon_bounds_mm": [
               66.3,
@@ -871,8 +871,8 @@
               101.72911743121205,
               5.4
             ],
-            "face_count": 44,
-            "maximum_triangle_edge_mm": 20.06389792637511,
+            "face_count": 72,
+            "maximum_triangle_edge_mm": 13.333333333300004,
             "piece_type": "edge_cut",
             "source_polygon_bounds_mm": [
               88.1,
@@ -893,8 +893,8 @@
               101.72911743121205,
               5.4
             ],
-            "face_count": 44,
-            "maximum_triangle_edge_mm": 20.063897926375123,
+            "face_count": 72,
+            "maximum_triangle_edge_mm": 13.33333333329999,
             "piece_type": "edge_cut",
             "source_polygon_bounds_mm": [
               109.9,
@@ -913,22 +913,22 @@
       "stl_filename": "Review_TileColor1.stl",
       "stl_round_trip": {
         "bounds_mm": [
-          0.0,
+          0.9,
           0.0,
           3.0,
-          130.8,
+          129.9,
           101.729117431,
           5.4
         ],
-        "face_count": 2452,
-        "maximum_triangle_edge_mm": 23.14937004124112,
+        "face_count": 3004,
+        "maximum_triangle_edge_mm": 23.094010767688783,
         "mesh_validation": {
           "degenerate_faces": 0,
-          "face_count": 2452,
+          "face_count": 3004,
           "nonmanifold_edges": 0,
           "normals_consistent": true,
-          "triangle_count": 2452,
-          "vertex_count": 1296,
+          "triangle_count": 3004,
+          "vertex_count": 1572,
           "watertight": true,
           "winding_errors": 0
         },
@@ -937,7 +937,7 @@
           "cross_tile_triangles": 0,
           "errors": [],
           "expected_shell_count": 35,
-          "maximum_triangle_edge_mm": 23.14937004124112,
+          "maximum_triangle_edge_mm": 23.094010767688783,
           "shells": [
             {
               "bounds_mm": [
@@ -948,8 +948,8 @@
                 5.773502692,
                 5.4
               ],
-              "face_count": 44,
-              "maximum_triangle_edge_mm": 20.063897926375123,
+              "face_count": 68,
+              "maximum_triangle_edge_mm": 20.0,
               "piece_type": "edge_cut",
               "source_polygon_bounds_mm": [
                 0.9000000000000011,
@@ -970,8 +970,8 @@
                 5.773502692,
                 5.4
               ],
-              "face_count": 44,
-              "maximum_triangle_edge_mm": 20.063897926375127,
+              "face_count": 68,
+              "maximum_triangle_edge_mm": 20.000000000000004,
               "piece_type": "edge_cut",
               "source_polygon_bounds_mm": [
                 22.7,
@@ -992,8 +992,8 @@
                 5.773502692,
                 5.4
               ],
-              "face_count": 44,
-              "maximum_triangle_edge_mm": 20.063897926375123,
+              "face_count": 68,
+              "maximum_triangle_edge_mm": 20.0,
               "piece_type": "edge_cut",
               "source_polygon_bounds_mm": [
                 44.5,
@@ -1014,8 +1014,8 @@
                 5.773502692,
                 5.4
               ],
-              "face_count": 44,
-              "maximum_triangle_edge_mm": 20.063897926375123,
+              "face_count": 68,
+              "maximum_triangle_edge_mm": 20.0,
               "piece_type": "edge_cut",
               "source_polygon_bounds_mm": [
                 66.3,
@@ -1036,8 +1036,8 @@
                 5.773502692,
                 5.4
               ],
-              "face_count": 44,
-              "maximum_triangle_edge_mm": 20.063897926375123,
+              "face_count": 68,
+              "maximum_triangle_edge_mm": 20.0,
               "piece_type": "edge_cut",
               "source_polygon_bounds_mm": [
                 88.1,
@@ -1058,8 +1058,8 @@
                 5.773502692,
                 5.4
               ],
-              "face_count": 44,
-              "maximum_triangle_edge_mm": 20.063897926375123,
+              "face_count": 68,
+              "maximum_triangle_edge_mm": 20.0,
               "piece_type": "edge_cut",
               "source_polygon_bounds_mm": [
                 109.9,
@@ -1073,15 +1073,15 @@
             },
             {
               "bounds_mm": [
-                0.0,
-                1.558845727,
+                0.9,
+                2.078460969,
                 3.0,
                 10.0,
-                24.652856494,
+                24.133241252,
                 5.4
               ],
-              "face_count": 60,
-              "maximum_triangle_edge_mm": 23.14937004124112,
+              "face_count": 102,
+              "maximum_triangle_edge_mm": 19.10706675603434,
               "piece_type": "half",
               "source_polygon_bounds_mm": [
                 0.0,
@@ -1162,14 +1162,14 @@
             {
               "bounds_mm": [
                 120.8,
-                1.558845727,
+                2.078460969,
                 3.0,
-                130.8,
-                24.652856494,
+                129.9,
+                24.133241252,
                 5.4
               ],
-              "face_count": 60,
-              "maximum_triangle_edge_mm": 23.14937004124112,
+              "face_count": 98,
+              "maximum_triangle_edge_mm": 13.481221507394654,
               "piece_type": "half",
               "source_polygon_bounds_mm": [
                 120.8,
@@ -1271,15 +1271,15 @@
             },
             {
               "bounds_mm": [
-                0.0,
-                39.317553332,
+                0.9,
+                39.837168574,
                 3.0,
                 10.0,
-                62.411564099,
+                61.891948857,
                 5.4
               ],
-              "face_count": 60,
-              "maximum_triangle_edge_mm": 23.14937004124112,
+              "face_count": 102,
+              "maximum_triangle_edge_mm": 19.107066756034335,
               "piece_type": "half",
               "source_polygon_bounds_mm": [
                 0.0,
@@ -1338,14 +1338,14 @@
             {
               "bounds_mm": [
                 120.8,
-                39.317553332,
+                39.837168574,
                 3.0,
-                130.8,
-                62.411564099,
+                129.9,
+                61.891948857,
                 5.4
               ],
-              "face_count": 60,
-              "maximum_triangle_edge_mm": 23.14937004124112,
+              "face_count": 98,
+              "maximum_triangle_edge_mm": 13.481221507394656,
               "piece_type": "half",
               "source_polygon_bounds_mm": [
                 120.8,
@@ -1447,15 +1447,15 @@
             },
             {
               "bounds_mm": [
-                0.0,
-                77.076260937,
+                0.9,
+                77.595876179,
                 3.0,
                 10.0,
-                100.170271704,
+                99.650656462,
                 5.4
               ],
-              "face_count": 60,
-              "maximum_triangle_edge_mm": 23.14937004124112,
+              "face_count": 102,
+              "maximum_triangle_edge_mm": 19.107066756034335,
               "piece_type": "half",
               "source_polygon_bounds_mm": [
                 0.0,
@@ -1558,14 +1558,14 @@
             {
               "bounds_mm": [
                 120.8,
-                77.076260937,
+                77.595876179,
                 3.0,
-                130.8,
-                100.170271704,
+                129.9,
+                99.650656462,
                 5.4
               ],
-              "face_count": 60,
-              "maximum_triangle_edge_mm": 23.14937004124112,
+              "face_count": 98,
+              "maximum_triangle_edge_mm": 13.48122150739465,
               "piece_type": "half",
               "source_polygon_bounds_mm": [
                 120.8,
@@ -1586,8 +1586,8 @@
                 101.729117431,
                 5.4
               ],
-              "face_count": 44,
-              "maximum_triangle_edge_mm": 20.063897926375123,
+              "face_count": 72,
+              "maximum_triangle_edge_mm": 13.333333332999999,
               "piece_type": "edge_cut",
               "source_polygon_bounds_mm": [
                 0.9000000000000011,
@@ -1608,8 +1608,8 @@
                 101.729117431,
                 5.4
               ],
-              "face_count": 44,
-              "maximum_triangle_edge_mm": 20.063897926375127,
+              "face_count": 72,
+              "maximum_triangle_edge_mm": 13.333333333000002,
               "piece_type": "edge_cut",
               "source_polygon_bounds_mm": [
                 22.700000000000003,
@@ -1630,8 +1630,8 @@
                 101.729117431,
                 5.4
               ],
-              "face_count": 44,
-              "maximum_triangle_edge_mm": 20.063897926375123,
+              "face_count": 72,
+              "maximum_triangle_edge_mm": 13.333333332999999,
               "piece_type": "edge_cut",
               "source_polygon_bounds_mm": [
                 44.5,
@@ -1652,8 +1652,8 @@
                 101.729117431,
                 5.4
               ],
-              "face_count": 44,
-              "maximum_triangle_edge_mm": 20.063897926375123,
+              "face_count": 72,
+              "maximum_triangle_edge_mm": 13.333333332999999,
               "piece_type": "edge_cut",
               "source_polygon_bounds_mm": [
                 66.3,
@@ -1674,8 +1674,8 @@
                 101.729117431,
                 5.4
               ],
-              "face_count": 44,
-              "maximum_triangle_edge_mm": 20.063897926375123,
+              "face_count": 72,
+              "maximum_triangle_edge_mm": 13.333333332999999,
               "piece_type": "edge_cut",
               "source_polygon_bounds_mm": [
                 88.1,
@@ -1696,8 +1696,8 @@
                 101.729117431,
                 5.4
               ],
-              "face_count": 44,
-              "maximum_triangle_edge_mm": 20.063897926375123,
+              "face_count": 72,
+              "maximum_triangle_edge_mm": 13.333333332999999,
               "piece_type": "edge_cut",
               "source_polygon_bounds_mm": [
                 109.9,
@@ -1715,7 +1715,7 @@
         },
         "valid": true
       },
-      "stl_sha256": "24e8c743508e54f1b731ab0fd252a1a5514f74983991567af71bbdf46bebccad",
+      "stl_sha256": "0bb0493cb6d9ac0be256bbd3d69b86d2d66c448aeab5e25c52f346ed59eccc4e",
       "tile_ids": [
         "placement-000010",
         "placement-000011",
@@ -2361,6 +2361,11 @@
     "origin": "artwork-top-left",
     "units": "mm"
   },
+  "dimension_semantics": {
+    "designer_artwork_bounds": "unchanged_pre_trim_lattice_rectangle",
+    "fabrication_bounds": "straightened_manufacturing_perimeter",
+    "lattice_scaled_or_repositioned": false
+  },
   "fabricate_profile": {
     "base_thickness_mm": 2.0,
     "base_thickness_status": "fixture_only",
@@ -2375,12 +2380,19 @@
     "version": 1
   },
   "fabricated_height_mm": 101.72911743121205,
-  "fabricated_width_mm": 130.8,
+  "fabricated_width_mm": 129.0,
+  "fabrication_bounds_mm": [
+    0.9,
+    0.0,
+    129.9,
+    101.72911743121205
+  ],
   "frame_land_generated": false,
   "full_tile_count": 27,
-  "geometry_signature_sha256": "afab2afb27344e80b6559df5f4b2c5c5fb33e54d00037441606619743fb2d2c3",
+  "geometry_signature_sha256": "711a19357260675aec8ea77daecdb7e3d90418831efa51272c261a48bae11690",
   "grout_gap_mm": 1.8,
   "panelization": "not_implemented",
+  "perimeter_correction_mm": 0.9,
   "print_orientation": "backside-on-build-plate; artwork-face-up",
   "resolved_tile_count": 45,
   "schema": {
@@ -2398,6 +2410,12 @@
       "units": "mm"
     },
     "errors": [],
+    "fabrication_bounds_mm": [
+      0.9,
+      0.0,
+      129.9,
+      101.72911743121205
+    ],
     "origin_mm": [
       0.0,
       0.0,

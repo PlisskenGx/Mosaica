@@ -79,8 +79,9 @@ def test_review_exports_only_used_aligned_logical_bodies(tmp_path):
     manifest = json.loads(package.manifest_path.read_text())
     assert manifest["shared_reference_frame"]["valid"] is True
     assert manifest["shared_reference_frame"]["origin_mm"] == [0.0, 0.0, 0.0]
-    assert manifest["fabricated_width_mm"] == manifest["artwork_width_mm"]
+    assert manifest["fabricated_width_mm"] == manifest["artwork_width_mm"] - 1.8
     assert manifest["fabricated_height_mm"] == manifest["artwork_height_mm"]
+    assert manifest["fabrication_bounds_mm"] == [0.9, 0.0, 129.9, manifest["artwork_height_mm"]]
     assert validate_shared_reference_frame(panel)["errors"] == []
 
 

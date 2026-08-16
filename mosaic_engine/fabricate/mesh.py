@@ -37,6 +37,7 @@ class SinglePanelGeometry:
     panel_id: str
     model: ResolvedFabricationModel
     bodies: tuple[MeshBody, ...]
+    fabrication_bounds_mm: tuple[float, float, float, float]
 
     def body(self, channel_id: str) -> MeshBody:
         try:
@@ -242,6 +243,190 @@ def polygon_diameter(points: tuple[Point2MM, ...]) -> float:
     )
 
 
+def _triangle_normal_raw(triangle: Triangle3) -> Point3MM:
+    first, second, third = triangle
+    left = tuple(second[index] - first[index] for index in range(3))
+    right = tuple(third[index] - first[index] for index in range(3))
+    return (
+        left[1] * right[2] - left[2] * right[1],
+        left[2] * right[0] - left[0] * right[2],
+        left[0] * right[1] - left[1] * right[0],
+    )
+
+
+def clip_mesh_to_axis_plane(
+    triangles: tuple[Triangle3, ...],
+    *,
+    axis: int,
+    plane_mm: float,
+    keep_greater: bool,
+) -> tuple[Triangle3, ...]:
+    """Clip a closed convex mesh and cap the new planar manufactured side."""
+
+    tolerance = 1e-10
+
+    def inside(point: Point3MM) -> bool:
+        return (
+            point[axis] >= plane_mm - tolerance
+            if keep_greater else point[axis] <= plane_mm + tolerance
+        )
+
+    def snap_to_plane(point: Point3MM) -> Point3MM:
+        if abs(point[axis] - plane_mm) > tolerance:
+            return point
+        return tuple(
+            plane_mm if index == axis else point[index]
+            for index in range(3)
+        )  # type: ignore[return-value]
+
+    def intersection(first: Point3MM, second: Point3MM) -> Point3MM:
+        if abs(first[axis] - plane_mm) <= tolerance:
+            return snap_to_plane(first)
+        if abs(second[axis] - plane_mm) <= tolerance:
+            return snap_to_plane(second)
+        denominator = second[axis] - first[axis]
+        if abs(denominator) <= tolerance:
+            return first
+        scale = (plane_mm - first[axis]) / denominator
+        values = tuple(round(
+            plane_mm if index == axis else first[index] + scale * (second[index] - first[index]),
+            10,
+        ) for index in range(3))
+        return values  # type: ignore[return-value]
+
+    clipped_triangles: list[Triangle3] = []
+    cut_points: dict[tuple[float, float, float], Point3MM] = {}
+    for triangle in triangles:
+        polygon = list(triangle)
+        result: list[Point3MM] = []
+        for first, second in zip(polygon, polygon[1:] + polygon[:1]):
+            first_inside = inside(first)
+            second_inside = inside(second)
+            if first_inside:
+                result.append(snap_to_plane(first))
+            if first_inside != second_inside:
+                point = intersection(first, second)
+                result.append(point)
+                cut_points[point] = point
+        deduplicated: list[Point3MM] = []
+        for point in result:
+            if not deduplicated or any(
+                abs(point[index] - deduplicated[-1][index]) > tolerance
+                for index in range(3)
+            ):
+                deduplicated.append(point)
+        if len(deduplicated) > 1 and all(
+            abs(deduplicated[0][index] - deduplicated[-1][index]) <= tolerance
+            for index in range(3)
+        ):
+            deduplicated.pop()
+        result = deduplicated
+        if len(result) >= 3:
+            for index in range(1, len(result) - 1):
+                clipped_triangles.append((result[0], result[index], result[index + 1]))
+
+    if len(cut_points) >= 3:
+        other_axes = [value for value in range(3) if value != axis]
+        all_points = list(cut_points.values())
+
+        def cross(origin: Point3MM, first: Point3MM, second: Point3MM) -> float:
+            return (
+                (first[other_axes[0]] - origin[other_axes[0]])
+                * (second[other_axes[1]] - origin[other_axes[1]])
+                - (first[other_axes[1]] - origin[other_axes[1]])
+                * (second[other_axes[0]] - origin[other_axes[0]])
+            )
+
+        coordinate_order = sorted(
+            all_points,
+            key=lambda point: (point[other_axes[0]], point[other_axes[1]]),
+        )
+        lower: list[Point3MM] = []
+        for point in coordinate_order:
+            while len(lower) >= 2 and cross(lower[-2], lower[-1], point) <= tolerance:
+                lower.pop()
+            lower.append(point)
+        upper: list[Point3MM] = []
+        for point in reversed(coordinate_order):
+            while len(upper) >= 2 and cross(upper[-2], upper[-1], point) <= tolerance:
+                upper.pop()
+            upper.append(point)
+        hull = lower[:-1] + upper[:-1]
+
+        # Preserve every split vertex on the true contour so cap edges match
+        # the clipped side triangulation, while excluding points inside the cap
+        # introduced by earlier face triangulation.
+        points: list[Point3MM] = []
+        boundary_tolerance = 1e-8
+        for first, second in zip(hull, hull[1:] + hull[:1]):
+            dx = second[other_axes[0]] - first[other_axes[0]]
+            dy = second[other_axes[1]] - first[other_axes[1]]
+            length_squared = dx * dx + dy * dy
+            candidates = []
+            for point in all_points:
+                if abs(cross(first, second, point)) > boundary_tolerance:
+                    continue
+                projection = (
+                    (point[other_axes[0]] - first[other_axes[0]]) * dx
+                    + (point[other_axes[1]] - first[other_axes[1]]) * dy
+                )
+                if -boundary_tolerance <= projection <= length_squared + boundary_tolerance:
+                    candidates.append((projection, point))
+            candidates.sort(key=lambda value: value[0])
+            points.extend(point for _, point in candidates[:-1])
+        center = tuple(round(
+            plane_mm if index == axis else (
+                sum(point[index] for point in hull) / len(hull)
+            ),
+            10,
+        ) for index in range(3))
+        desired_normal = -1.0 if keep_greater else 1.0
+        cap = [
+            (center, points[index], points[(index + 1) % len(points)])
+            for index in range(len(points))
+        ]
+        if cap and _triangle_normal_raw(cap[0])[axis] * desired_normal < 0:
+            cap = [(first, third, second) for first, second, third in cap]
+        clipped_triangles.extend(cap)
+    return tuple(clipped_triangles)
+
+
+def fabrication_perimeter_bounds(model: ResolvedFabricationModel) -> tuple[float, float, float, float]:
+    """Return the straight manufacturing perimeter without changing artwork."""
+
+    correction = model.grout_gap_mm / 2.0
+    if model.tile_orientation == "point_top":
+        return (
+            round(correction, 9), 0.0,
+            round(model.artwork_width_mm - correction, 9), model.artwork_height_mm,
+        )
+    if model.tile_orientation == "flat_top":
+        return (
+            0.0, round(correction, 9),
+            model.artwork_width_mm, round(model.artwork_height_mm - correction, 9),
+        )
+    raise ValueError(f"Unsupported fabrication orientation: {model.tile_orientation}")
+
+
+def clip_mesh_to_fabrication_perimeter(
+    triangles: tuple[Triangle3, ...],
+    model: ResolvedFabricationModel,
+) -> tuple[Triangle3, ...]:
+    left, top, right, bottom = fabrication_perimeter_bounds(model)
+    triangles = clip_mesh_to_axis_plane(
+        triangles, axis=0, plane_mm=left, keep_greater=True,
+    )
+    triangles = clip_mesh_to_axis_plane(
+        triangles, axis=0, plane_mm=right, keep_greater=False,
+    )
+    triangles = clip_mesh_to_axis_plane(
+        triangles, axis=1, plane_mm=top, keep_greater=True,
+    )
+    return clip_mesh_to_axis_plane(
+        triangles, axis=1, plane_mm=bottom, keep_greater=False,
+    )
+
+
 def build_single_panel_geometry(model: ResolvedFabricationModel) -> SinglePanelGeometry:
     """Generate one aligned, face-up panel; no panelization is performed."""
 
@@ -256,11 +441,15 @@ def build_single_panel_geometry(model: ResolvedFabricationModel) -> SinglePanelG
     bodies = [
         MeshBody(
             "panel-a1-base", "A1 Base", "base",
-            extruded_polygon_mesh(rectangle, 0.0, base_top),
+            clip_mesh_to_fabrication_perimeter(
+                extruded_polygon_mesh(rectangle, 0.0, base_top), model,
+            ),
         ),
         MeshBody(
             "panel-a1-grout-thinset", "A1 Grout/Thinset", "grout-thinset",
-            extruded_polygon_mesh(rectangle, base_top, grout_top),
+            clip_mesh_to_fabrication_perimeter(
+                extruded_polygon_mesh(rectangle, base_top, grout_top), model,
+            ),
         ),
     ]
     for channel in (
@@ -271,11 +460,14 @@ def build_single_panel_geometry(model: ResolvedFabricationModel) -> SinglePanelG
             if value.material_channel_id == channel.channel_id
         )
         solids = tuple(
-            rounded_tile_mesh(
-                tile.polygon_mm, grout_top,
-                profile.straight_tile_relief_mm,
-                profile.rounded_crown_mm,
-                profile.crown_segments,
+            clip_mesh_to_fabrication_perimeter(
+                rounded_tile_mesh(
+                    tile.full_polygon_mm, grout_top,
+                    profile.straight_tile_relief_mm,
+                    profile.rounded_crown_mm,
+                    profile.crown_segments,
+                ),
+                model,
             )
             for tile in tiles
         )
@@ -286,7 +478,9 @@ def build_single_panel_geometry(model: ResolvedFabricationModel) -> SinglePanelG
             tuple(value.tile_id for value in tiles),
             tuple(len(value) for value in solids),
         ))
-    return SinglePanelGeometry("A1", model, tuple(bodies))
+    return SinglePanelGeometry(
+        "A1", model, tuple(bodies), fabrication_perimeter_bounds(model),
+    )
 
 
 def triangle_normal(triangle: Triangle3) -> Point3MM:
