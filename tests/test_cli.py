@@ -3,11 +3,11 @@ import sys
 
 from PIL import Image
 
-from mosaic_engine.cli import main
-from mosaic_engine import editor
-from mosaic_engine.geometry import build_geometry
-from mosaic_engine.model import MosaicConfig, MosaicResult, PaletteColor
-from mosaic_engine.project import MosaicProject
+from mosaica.cli import main
+from mosaica import editor
+from mosaica.geometry import build_geometry
+from mosaica.model import MosaicConfig, MosaicResult, PaletteColor
+from mosaica.project import MosaicProject
 
 
 def test_cli_can_save_load_and_edit_project(tmp_path, monkeypatch):
@@ -20,7 +20,7 @@ def test_cli_can_save_load_and_edit_project(tmp_path, monkeypatch):
         sys,
         "argv",
         [
-            "mosaic-engine",
+            "mosaica",
             str(source),
             "--color", "Black:#000000",
             "--color", "White:#FFFFFF",
@@ -39,7 +39,7 @@ def test_cli_can_save_load_and_edit_project(tmp_path, monkeypatch):
         sys,
         "argv",
         [
-            "mosaic-engine",
+            "mosaica",
             "--load-project", str(first_project),
             "--clear-override", "1,1",
             "--save-project", str(second_project),
@@ -65,7 +65,7 @@ def test_cli_launches_local_editor(monkeypatch):
         sys,
         "argv",
         [
-            "mosaic-engine",
+            "mosaica",
             "--edit-project", "saved-project.json",
             "--editor-port", "9123",
             "--no-browser",
@@ -106,7 +106,7 @@ def test_cli_emits_machine_readable_benchmark_json(
     ))
     path = project.save(tmp_path / "benchmark.json")
     monkeypatch.setattr(sys, "argv", [
-        "mosaic-engine",
+        "mosaica",
         "--benchmark", str(path),
         "--benchmark-json",
     ])
@@ -150,7 +150,7 @@ def test_cli_caches_evidence_without_changing_tiles_and_refines_offline(
     effective = project.effective_grid
     overrides = project.overrides
     monkeypatch.setattr(sys, "argv", [
-        "mosaic-engine", "--cache-evidence", str(path),
+        "mosaica", "--cache-evidence", str(path),
     ])
 
     main()
@@ -163,7 +163,7 @@ def test_cli_caches_evidence_without_changing_tiles_and_refines_offline(
     source.unlink()
     capsys.readouterr()
     monkeypatch.setattr(sys, "argv", [
-        "mosaic-engine",
+        "mosaica",
         "--refine-proposals", str(path),
         "--refine-json",
     ])

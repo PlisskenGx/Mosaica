@@ -609,7 +609,7 @@ class MosaicEditorApp:
     def _asset(path: str, start_response):
         filename, content_type = ASSETS[path]
         body = (
-            files("mosaic_engine")
+            files("mosaica")
             .joinpath("web", filename)
             .read_bytes()
         )

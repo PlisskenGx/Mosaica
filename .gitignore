@@ -8,3 +8,5 @@ mark_test/
 mark_v04a/
 mark_v04b/
 mosaic_output/*.3mf
+fabricate_phase1_1_review/*.3mf
+*.egg-info/

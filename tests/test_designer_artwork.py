@@ -4,15 +4,15 @@ from math import isclose
 
 import pytest
 
-from mosaic_engine.artwork import (
+from mosaica.artwork import (
     INITIAL_FIT_FRACTION,
     available_artwork_bounds,
     create_artwork,
     sanitize_svg,
     update_artwork_transform,
 )
-from mosaic_engine.border import build_border_layer
-from mosaic_engine.designer import DesignerProjectShell, MosaicDesignerApp
+from mosaica.border import build_border_layer
+from mosaica.designer import DesignerProjectShell, MosaicDesignerApp
 
 
 LANDSCAPE_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100">

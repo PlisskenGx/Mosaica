@@ -1,9 +1,9 @@
-from mosaic_engine.model import (
+from mosaica.model import (
     MosaicConfig,
     PaletteColor,
 )
 
-from mosaic_engine.processing import (
+from mosaica.processing import (
     cleanup_grid,
     threshold_grid,
 )

@@ -3,12 +3,12 @@ import json
 
 import pytest
 
-import mosaic_engine.designer as designer_module
-import mosaic_engine.designer_generation as generation_module
-from mosaic_engine.artwork import ArtworkTransform
-from mosaic_engine.border import build_border_layer
-from mosaic_engine.designer import MosaicDesignerApp
-from mosaic_engine.designer_colors import DEFAULT_DESIGNER_COLORS
+import mosaica.designer as designer_module
+import mosaica.designer_generation as generation_module
+from mosaica.artwork import ArtworkTransform
+from mosaica.border import build_border_layer
+from mosaica.designer import MosaicDesignerApp
+from mosaica.designer_colors import DEFAULT_DESIGNER_COLORS
 
 
 BLUE = "#0066CC"

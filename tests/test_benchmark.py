@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from mosaic_engine.benchmark import (
+from mosaica.benchmark import (
     analyze_benchmark_projects,
     analyze_project,
     benchmark_reports_json,
@@ -11,18 +11,18 @@ from mosaic_engine.benchmark import (
     evaluate_contour_refinement_proposals,
     format_benchmark_reports,
 )
-from mosaic_engine.contour_refinement import (
+from mosaica.contour_refinement import (
     ContourAlternative,
     ContourCandidate,
     ContourChange,
     ContourRefinementReport,
     ContourScore,
 )
-from mosaic_engine.evidence import BWEvidence, TileEvidence
-from mosaic_engine.geometry import build_geometry
-from mosaic_engine.model import MosaicConfig, MosaicResult, PaletteColor
-from mosaic_engine.project import MosaicProject
-from mosaic_engine.refinement import (
+from mosaica.evidence import BWEvidence, TileEvidence
+from mosaica.geometry import build_geometry
+from mosaica.model import MosaicConfig, MosaicResult, PaletteColor
+from mosaica.project import MosaicProject
+from mosaica.refinement import (
     RefinementProposal,
     RefinementReport,
     ScoreBreakdown,

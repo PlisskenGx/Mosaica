@@ -145,7 +145,7 @@ panel layouts, and user fabrication controls remain Phase 2 or later work.
 Regenerate the compact, recognizable three-color review mosaic with:
 
 ```bash
-python -m mosaic_engine.fabricate.review --out fabricate_phase1_1_review
+python -m mosaica.fabricate.review --out fabricate_phase1_1_review
 ```
 
 The command resolves a canonical Designer fixture through the same immutable

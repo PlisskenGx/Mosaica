@@ -5,12 +5,12 @@ import sys
 
 from PIL import Image, ImageDraw
 
-from mosaic_engine.cli import main
-from mosaic_engine.evidence import BWEvidence, TileEvidence
-from mosaic_engine.geometry import build_geometry
-from mosaic_engine.model import MosaicConfig, MosaicResult, PaletteColor
-from mosaic_engine.project import MosaicProject
-from mosaic_engine.refinement import (
+from mosaica.cli import main
+from mosaica.evidence import BWEvidence, TileEvidence
+from mosaica.geometry import build_geometry
+from mosaica.model import MosaicConfig, MosaicResult, PaletteColor
+from mosaica.project import MosaicProject
+from mosaica.refinement import (
     format_refinement_report,
     generate_refinement_proposals,
 )
@@ -221,7 +221,7 @@ def test_refinement_cli_human_readable_output(tmp_path, monkeypatch, capsys):
     path = _saved_cli_project(tmp_path)
     before = path.read_bytes()
     monkeypatch.setattr(sys, "argv", [
-        "mosaic-engine", "--refine-proposals", str(path),
+        "mosaica", "--refine-proposals", str(path),
     ])
 
     main()
@@ -236,7 +236,7 @@ def test_refinement_cli_human_readable_output(tmp_path, monkeypatch, capsys):
 def test_refinement_cli_json_output(tmp_path, monkeypatch, capsys):
     path = _saved_cli_project(tmp_path)
     monkeypatch.setattr(sys, "argv", [
-        "mosaic-engine", "--refine-proposals", str(path), "--refine-json",
+        "mosaica", "--refine-proposals", str(path), "--refine-json",
     ])
 
     main()

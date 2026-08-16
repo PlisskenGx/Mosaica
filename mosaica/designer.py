@@ -49,7 +49,7 @@ DESIGNER_GROUT_MM = 1.8
 P1S_BUILD_AREA_MM = 256.0
 CUSTOM_GRID_MAX = 200
 CANVAS_PREVIEW_REM_PER_INCH = 0.20
-_TRANSPORT_LOG = logging.getLogger("mosaic_engine.designer.transport")
+_TRANSPORT_LOG = logging.getLogger("mosaica.designer.transport")
 if not _TRANSPORT_LOG.handlers:
     _transport_handler = logging.StreamHandler()
     _transport_handler.setFormatter(logging.Formatter("%(levelname)s %(message)s"))
@@ -1132,7 +1132,7 @@ class MosaicDesignerApp:
     @staticmethod
     def _asset(path: str, start_response):
         filename, content_type = DESIGNER_ASSETS[path]
-        body = files("mosaic_engine").joinpath("web", filename).read_bytes()
+        body = files("mosaica").joinpath("web", filename).read_bytes()
         start_response("200 OK", [
             ("Content-Type", content_type),
             ("Cache-Control", "no-store"),

@@ -1,7 +1,7 @@
 from math import isclose
 
-from mosaic_engine.designer import DesignerProjectShell
-from mosaic_engine.fabricate import (
+from mosaica.designer import DesignerProjectShell
+from mosaica.fabricate import (
     MeshBody,
     build_single_panel_geometry,
     clip_mesh_to_axis_plane,
@@ -10,7 +10,7 @@ from mosaic_engine.fabricate import (
     resolve_designer_project,
     rounded_tile_mesh,
 )
-from mosaic_engine.fabricate.review import REVIEW_PROFILE, build_review_model, build_review_panel
+from mosaica.fabricate.review import REVIEW_PROFILE, build_review_model, build_review_panel
 
 
 def _solid(panel, tile_id):

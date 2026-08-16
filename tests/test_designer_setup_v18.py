@@ -4,8 +4,8 @@ from math import isclose
 
 import pytest
 
-from mosaic_engine.boundary import clip_polygon_to_rect, polygon_area
-from mosaic_engine.designer import (
+from mosaica.boundary import clip_polygon_to_rect, polygon_area
+from mosaica.designer import (
     CANVAS_PRESETS, CUSTOM_GRID_MAX, TILE_PRESETS,
     DesignerProjectShell, MosaicDesignerApp,
 )

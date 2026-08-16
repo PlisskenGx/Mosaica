@@ -8,10 +8,10 @@ from wsgiref.util import setup_testing_defaults
 
 import pytest
 
-from mosaic_engine import __version__
-import mosaic_engine.designer as designer_module
-from mosaic_engine.cli import main
-from mosaic_engine.designer import (
+from mosaica import __version__
+import mosaica.designer as designer_module
+from mosaica.cli import main
+from mosaica.designer import (
     CANVAS_PRESETS,
     CANVAS_PREVIEW_REM_PER_INCH,
     DESIGNER_GROUT_MM,
@@ -329,7 +329,7 @@ def test_workspace_status_uses_authoritative_version_and_two_part_layout():
     assert __version__ == "1.9.5"
     assert payload["app_version"] == __version__
     assert 'dynamic = ["version"]' in metadata
-    assert 'version = {attr = "mosaic_engine.__version__"}' in metadata
+    assert 'version = {attr = "mosaica.__version__"}' in metadata
     assert 'version = "0.6.3"' not in metadata
     assert "Copyright Veradura Design" not in script
     assert "version.textContent = `v${state.app_version}`" in script
@@ -427,7 +427,7 @@ def test_threaded_http_server_writes_complete_framed_response(caplog):
         BytesIO(), output, StringIO(), environ, multithread=True,
     )
     handler.http_version = "1.1"
-    with caplog.at_level("INFO", logger="mosaic_engine.designer.transport"):
+    with caplog.at_level("INFO", logger="mosaica.designer.transport"):
         handler.run(app)
     headers, body = output.getvalue().split(b"\r\n\r\n", 1)
     assert headers.startswith(b"HTTP/1.1 200 OK")
@@ -484,7 +484,7 @@ def test_cli_launches_designer_without_changing_editor_behavior(monkeypatch):
         called.update(options)
     monkeypatch.setattr(designer_module, "run_designer", fake_run_designer)
     monkeypatch.setattr(sys, "argv", [
-        "mosaic-engine", "--designer", "--editor-port", "9124", "--no-browser",
+        "mosaica", "--designer", "--editor-port", "9124", "--no-browser",
     ])
     main()
     assert called == {"port": 9124, "open_browser": False}

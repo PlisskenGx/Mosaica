@@ -2,10 +2,10 @@ from math import ceil, hypot, isclose
 
 import pytest
 
-from mosaic_engine.boundary import polygon_area
-from mosaic_engine.designer import CANVAS_PRESETS, TILE_PRESETS, DesignerProjectShell
-from mosaic_engine.designer import MosaicDesignerApp
-from mosaic_engine.border import build_border_layer
+from mosaica.boundary import polygon_area
+from mosaica.designer import CANVAS_PRESETS, TILE_PRESETS, DesignerProjectShell
+from mosaica.designer import MosaicDesignerApp
+from mosaica.border import build_border_layer
 
 
 ORIENTATIONS = ("flat_top", "point_top")

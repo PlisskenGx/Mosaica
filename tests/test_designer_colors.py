@@ -3,8 +3,8 @@ import json
 
 import pytest
 
-from mosaic_engine.designer import DesignerProjectShell, MosaicDesignerApp
-from mosaic_engine.designer_colors import (
+from mosaica.designer import DesignerProjectShell, MosaicDesignerApp
+from mosaica.designer_colors import (
     CANONICAL_MOSAICA_COLORS, CURATED_MOSAICA_PALETTE,
     DEFAULT_DESIGNER_COLORS,
     DesignColor,

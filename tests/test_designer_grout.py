@@ -1,8 +1,8 @@
 from io import BytesIO
 import json
 
-import mosaic_engine.designer_generation as generation_module
-from mosaic_engine.designer import MosaicDesignerApp
+import mosaica.designer_generation as generation_module
+from mosaica.designer import MosaicDesignerApp
 
 
 def _request(app, method, path, body=None):

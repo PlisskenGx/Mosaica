@@ -3,15 +3,15 @@ import json
 
 import pytest
 
-from mosaic_engine.border import (
+from mosaica.border import (
     BORDER_PRESETS,
     PROJECT_COLOR_ROLES,
     build_border_layer,
     physical_perimeter_rings,
 )
-from mosaic_engine.designer import DesignerProjectShell, MosaicDesignerApp
-from mosaic_engine.model import MosaicConfig
-from mosaic_engine.processing import tile_neighbors
+from mosaica.designer import DesignerProjectShell, MosaicDesignerApp
+from mosaica.model import MosaicConfig
+from mosaica.processing import tile_neighbors
 
 
 def _request(app, method, path, body=None):

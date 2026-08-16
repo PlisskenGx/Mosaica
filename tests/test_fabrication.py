@@ -4,14 +4,14 @@ from math import ceil, isclose
 from pathlib import Path
 import sys
 
-from mosaic_engine.cli import main
-from mosaic_engine.fabrication import (
+from mosaica.cli import main
+from mosaica.fabrication import (
     build_fabrication_data,
     export_fabrication_package,
 )
-from mosaic_engine.geometry import build_panel_geometry
-from mosaic_engine.model import MosaicConfig, MosaicResult, PaletteColor
-from mosaic_engine.project import MosaicProject
+from mosaica.geometry import build_panel_geometry
+from mosaica.model import MosaicConfig, MosaicResult, PaletteColor
+from mosaica.project import MosaicProject
 
 
 PALETTE = (
@@ -195,7 +195,7 @@ def test_cli_fabrication_export(tmp_path, monkeypatch, capsys):
     before = project_path.read_bytes()
     output = tmp_path / "build-package"
     monkeypatch.setattr(sys, "argv", [
-        "mosaic-engine",
+        "mosaica",
         "--fabrication", str(project_path),
         "--out", str(output),
         "--waste", "0.20",

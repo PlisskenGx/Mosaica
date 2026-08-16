@@ -1,6 +1,6 @@
 from math import isclose
 
-from mosaic_engine.fabricate import (
+from mosaica.fabricate import (
     MeshBody,
     maximum_triangle_edge,
     mesh_validation,
@@ -11,7 +11,7 @@ from mosaic_engine.fabricate import (
     tile_body_spatial_validation,
     write_mesh_stl,
 )
-from mosaic_engine.fabricate.review import REVIEW_PROFILE, build_review_model, build_review_panel
+from mosaica.fabricate.review import REVIEW_PROFILE, build_review_model, build_review_panel
 
 
 GROUT_TOP_MM = REVIEW_PROFILE.base_thickness_mm + REVIEW_PROFILE.grout_thickness_mm

@@ -1,11 +1,11 @@
 import json
 
-from mosaic_engine.fabricate import (
+from mosaica.fabricate import (
     FabricationProfile,
     build_single_panel_geometry,
     resolve_mosaic_project,
 )
-from mosaic_engine.fabricate.review import (
+from mosaica.fabricate.review import (
     REVIEW_PROFILE,
     build_review_model,
     build_review_panel,
@@ -14,9 +14,9 @@ from mosaic_engine.fabricate.review import (
     main,
     validate_shared_reference_frame,
 )
-from mosaic_engine.geometry import build_panel_geometry
-from mosaic_engine.model import MosaicConfig, MosaicResult, PaletteColor
-from mosaic_engine.project import MosaicProject
+from mosaica.geometry import build_panel_geometry
+from mosaica.model import MosaicConfig, MosaicResult, PaletteColor
+from mosaica.project import MosaicProject
 
 
 def _project(tmp_path):

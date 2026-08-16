@@ -4,13 +4,13 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from mosaic_engine.engine import (
+from mosaica.engine import (
     _open_source_image,
     generate_mosaic,
 )
-from mosaic_engine.export import export_preview_png
-from mosaic_engine.geometry import build_geometry
-from mosaic_engine.model import (
+from mosaica.export import export_preview_png
+from mosaica.geometry import build_geometry
+from mosaica.model import (
     MosaicConfig,
     MosaicResult,
     PaletteColor,

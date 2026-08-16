@@ -1,5 +1,5 @@
 """
-Mosaic Engine.
+Mosaica.
 
 Standalone physical tile mosaic generation engine.
 """

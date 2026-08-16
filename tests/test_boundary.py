@@ -1,16 +1,16 @@
 from math import isclose
 
-from mosaic_engine.boundary import (
+from mosaica.boundary import (
     Rect,
     clip_polygon_to_rect,
     polygon_area,
 )
 
-from mosaic_engine.geometry import (
+from mosaica.geometry import (
     build_panel_geometry,
 )
 
-from mosaic_engine.model import (
+from mosaica.model import (
     MosaicConfig,
 )
 

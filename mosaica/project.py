@@ -269,11 +269,11 @@ class MosaicProject:
         schema = data.get("schema", {})
 
         if schema.get("name") != PROJECT_SCHEMA_NAME:
-            raise ValueError("Not a Mosaic Engine project file.")
+            raise ValueError("Not a Mosaica project file.")
 
         if schema.get("version") != PROJECT_SCHEMA_VERSION:
             raise ValueError(
-                "Unsupported Mosaic Engine project schema version: "
+                "Unsupported Mosaica project schema version: "
                 f"{schema.get('version')}"
             )
 

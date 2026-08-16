@@ -3,9 +3,9 @@ import json
 
 import pytest
 
-import mosaic_engine.designer_generation as generation_module
-from mosaic_engine.designer import DesignerProjectShell, MosaicDesignerApp
-from mosaic_engine.engine import _point_in_polygon
+import mosaica.designer_generation as generation_module
+from mosaica.designer import DesignerProjectShell, MosaicDesignerApp
+from mosaica.engine import _point_in_polygon
 
 
 def _request(app, method, path, body=None):

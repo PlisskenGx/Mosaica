@@ -3,8 +3,8 @@ from math import isclose
 
 import pytest
 
-from mosaic_engine.designer import DesignerProjectShell
-from mosaic_engine.fabricate import (
+from mosaica.designer import DesignerProjectShell
+from mosaica.fabricate import (
     FabricationProfile,
     build_single_panel_geometry,
     export_single_panel_prototype,
@@ -12,10 +12,10 @@ from mosaic_engine.fabricate import (
     resolve_designer_project,
     resolve_mosaic_project,
 )
-from mosaic_engine.fabricate.mesh import triangle_normal
-from mosaic_engine.geometry import build_panel_geometry
-from mosaic_engine.model import MosaicConfig, MosaicResult, PaletteColor
-from mosaic_engine.project import MosaicProject
+from mosaica.fabricate.mesh import triangle_normal
+from mosaica.geometry import build_panel_geometry
+from mosaica.model import MosaicConfig, MosaicResult, PaletteColor
+from mosaica.project import MosaicProject
 
 
 FIXTURE_PROFILE = FabricationProfile(
@@ -180,7 +180,7 @@ def test_resolution_and_geometry_do_not_mutate_project(tmp_path):
 
 
 def test_core_fabricate_module_has_no_designer_or_browser_runtime_dependency():
-    source = __import__("pathlib").Path("mosaic_engine/fabricate/resolve.py").read_text()
+    source = __import__("pathlib").Path("mosaica/fabricate/resolve.py").read_text()
     runtime_source = source.split("if TYPE_CHECKING:", 1)[0]
     assert "from ..designer import" not in runtime_source
     assert "web" not in runtime_source

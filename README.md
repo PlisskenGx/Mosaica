@@ -1,4 +1,4 @@
-# Mosaic Engine
+# Mosaica
 
 A standalone core for converting artwork into a buildable tile mosaic.
 
@@ -14,7 +14,7 @@ A standalone core for converting artwork into a buildable tile mosaic.
 
 ## Example
 ```bash
-python -m mosaic_engine.cli artwork.png \
+mosaica artwork.png \
   --color 'Black:#111111:SKU-BLK' \
   --color 'White:#F4F2EA:SKU-WHT' \
   --tile 1 --grout 0.0625 --width 46 --fit contain --out output

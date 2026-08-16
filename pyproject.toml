@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 
 [project]
-name = "mosaic-engine"
+name = "mosaica"
 dynamic = ["version"]
 description = "Standalone physical tile mosaic generation engine"
 requires-python = ">=3.11"
@@ -16,11 +16,14 @@ dependencies = [
 
 
 [project.scripts]
-mosaic-engine = "mosaic_engine.cli:main"
+mosaica = "mosaica.cli:main"
 
 
 [tool.setuptools.package-data]
-mosaic_engine = ["web/*.html", "web/*.css", "web/*.js"]
+mosaica = ["web/*.html", "web/*.css", "web/*.js"]
 
 [tool.setuptools.dynamic]
-version = {attr = "mosaic_engine.__version__"}
+version = {attr = "mosaica.__version__"}
+
+[tool.setuptools.packages.find]
+include = ["mosaica*"]

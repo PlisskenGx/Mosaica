@@ -6,26 +6,26 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-import mosaic_engine.editor as editor_module
-from mosaic_engine.editor import MosaicEditorApp, run_editor
-from mosaic_engine.contour_refinement import (
+import mosaica.editor as editor_module
+from mosaica.editor import MosaicEditorApp, run_editor
+from mosaica.contour_refinement import (
     ContourAlternative,
     ContourCandidate,
     ContourRefinementReport,
     ContourScore,
 )
-from mosaic_engine.evidence import cache_project_bw_evidence
-from mosaic_engine.geometry import (
+from mosaica.evidence import cache_project_bw_evidence
+from mosaica.geometry import (
     build_geometry,
     build_panel_geometry,
 )
-from mosaic_engine.model import (
+from mosaica.model import (
     MosaicConfig,
     MosaicResult,
     PaletteColor,
 )
-from mosaic_engine.project import MosaicProject
-from mosaic_engine.refinement import (
+from mosaica.project import MosaicProject
+from mosaica.refinement import (
     CandidateRegion,
     RefinementProposal,
     RefinementReport,
@@ -162,7 +162,7 @@ def test_editor_route_loads_saved_project(tmp_path):
     status, body = _request(app, "GET", "/")
 
     assert status == "200 OK"
-    assert "Mosaic Engine Editor" in body
+    assert "Mosaica Editor" in body
     assert "editor.js" in body
 
     status, script = _request(app, "GET", "/editor.js")

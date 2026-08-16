@@ -5,7 +5,7 @@ import json
 import pytest
 from PIL import Image, ImageDraw
 
-from mosaic_engine.evidence import (
+from mosaica.evidence import (
     BWEvidenceCache,
     build_evidence_cache,
     cache_project_bw_evidence,
@@ -15,10 +15,10 @@ from mosaic_engine.evidence import (
     physical_neighbor_rings,
     resolve_project_bw_evidence,
 )
-from mosaic_engine.geometry import build_geometry
-from mosaic_engine.model import MosaicConfig, MosaicResult, PaletteColor
-from mosaic_engine.project import MosaicProject
-from mosaic_engine.refinement import generate_refinement_proposals
+from mosaica.geometry import build_geometry
+from mosaica.model import MosaicConfig, MosaicResult, PaletteColor
+from mosaica.project import MosaicProject
+from mosaica.refinement import generate_refinement_proposals
 
 
 PALETTE = (

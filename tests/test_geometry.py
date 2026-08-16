@@ -1,10 +1,10 @@
 from math import isclose
 
-from mosaic_engine.geometry import (
+from mosaica.geometry import (
     build_geometry,
 )
 
-from mosaic_engine.model import (
+from mosaica.model import (
     MosaicConfig,
 )
 

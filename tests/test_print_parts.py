@@ -5,10 +5,10 @@ import sys
 
 import pytest
 
-from mosaic_engine.cli import main
-from mosaic_engine.geometry import build_panel_geometry
-from mosaic_engine.model import MosaicConfig, MosaicResult, PaletteColor
-from mosaic_engine.print_parts import (
+from mosaica.cli import main
+from mosaica.geometry import build_panel_geometry
+from mosaica.model import MosaicConfig, MosaicResult, PaletteColor
+from mosaica.print_parts import (
     build_print_parts_manifest,
     calibration_polygon,
     export_calibration_package,
@@ -17,7 +17,7 @@ from mosaic_engine.print_parts import (
     offset_polygon,
     triangulate_extrusion,
 )
-from mosaic_engine.project import MosaicProject
+from mosaica.project import MosaicProject
 
 
 PALETTE = (
@@ -174,7 +174,7 @@ def test_cli_print_parts_and_calibration(tmp_path, monkeypatch, capsys):
     before = project_path.read_bytes()
     parts = tmp_path / "parts"
     monkeypatch.setattr(sys, "argv", [
-        "mosaic-engine", "--print-parts", str(project_path), "--out", str(parts),
+        "mosaica", "--print-parts", str(project_path), "--out", str(parts),
         "--thickness-mm", "3.2", "--xy-offset-mm", "0.05",
     ])
     main()
@@ -184,7 +184,7 @@ def test_cli_print_parts_and_calibration(tmp_path, monkeypatch, capsys):
 
     calibration = tmp_path / "calibration"
     monkeypatch.setattr(sys, "argv", [
-        "mosaic-engine", "--print-calibration", "--shape", "hex", "--tile", "1",
+        "mosaica", "--print-calibration", "--shape", "hex", "--tile", "1",
         "--thickness-mm", "3.0", "--out", str(calibration),
     ])
     main()

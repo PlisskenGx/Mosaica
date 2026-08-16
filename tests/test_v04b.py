@@ -2,12 +2,12 @@ from pathlib import Path
 
 from PIL import Image
 
-from mosaic_engine.engine import (
+from mosaica.engine import (
     _classify_coverage,
     generate_mosaic,
 )
-from mosaic_engine.geometry import build_geometry
-from mosaic_engine.model import MosaicConfig, PaletteColor
+from mosaica.geometry import build_geometry
+from mosaica.model import MosaicConfig, PaletteColor
 
 
 PALETTE = [

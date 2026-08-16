@@ -5,22 +5,22 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from mosaic_engine.export import (
+from mosaica.export import (
     export_counts_csv,
     export_grid_csv,
     export_placements_csv,
     export_preview_png,
 )
-from mosaic_engine.geometry import (
+from mosaica.geometry import (
     build_geometry,
     build_panel_geometry,
 )
-from mosaic_engine.model import (
+from mosaica.model import (
     MosaicConfig,
     MosaicResult,
     PaletteColor,
 )
-from mosaic_engine.project import (
+from mosaica.project import (
     MosaicProject,
     PROJECT_SCHEMA_NAME,
     PROJECT_SCHEMA_VERSION,

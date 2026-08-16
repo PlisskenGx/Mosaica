@@ -1,2 +1,0 @@
-[console_scripts]
-mosaic-engine = mosaic_engine.cli:main

@@ -3,14 +3,14 @@ from dataclasses import replace
 
 import pytest
 
-from mosaic_engine.contour_refinement import (
+from mosaica.contour_refinement import (
     generate_contour_refinement_proposals,
 )
-from mosaic_engine.evidence import BWEvidence, TileEvidence
-from mosaic_engine.geometry import build_geometry
-from mosaic_engine.model import MosaicConfig, MosaicResult, PaletteColor
-from mosaic_engine.processing import tile_neighbors
-from mosaic_engine.project import MosaicProject
+from mosaica.evidence import BWEvidence, TileEvidence
+from mosaica.geometry import build_geometry
+from mosaica.model import MosaicConfig, MosaicResult, PaletteColor
+from mosaica.processing import tile_neighbors
+from mosaica.project import MosaicProject
 
 
 PALETTE = (
