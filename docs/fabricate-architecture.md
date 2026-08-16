@@ -148,6 +148,11 @@ Regenerate the compact, recognizable three-color review mosaic with:
 python -m mosaica.fabricate.review --out fabricate_phase1_1_review
 ```
 
+The checked-in V4 Rounded physical-validation baseline is preserved at
+`archive/veradura/viability/fabricate_phase1_1_review/`. The command above
+creates a fresh local review output at the repository root; that reproducible
+directory is intentionally ignored.
+
 The command resolves a canonical Designer fixture through the same immutable
 Fabricate model, builds one panel, and writes aligned `Review_Base.stl`,
 `Review_GroutThinset.stl`, used `Review_TileColor*.stl` bodies, and
