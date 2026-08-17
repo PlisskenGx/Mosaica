@@ -96,15 +96,11 @@ occupy each plate. The usable envelope will be the validated P1S build area
 minus prime-tower and clearance reservations; no arbitrary reservation is
 encoded yet.
 
-Panel seams will use simple horizontal/vertical grout lines and initially a
-split-grout seam that reconstructs the normal 1.8 mm channel. Visible seam
-registration is independent from connector clearance.
-
-Future connectors are top-down, puzzle-like, deterministic, keyed against
-wrong neighbors/orientation, support-free where practical, and lightly snug.
-They provide alignment and temporary retention only; ACP, adhesive, and the
-traditional frame provide long-term integrity. A few medium connectors are
-preferred over many fragile features. Local base reinforcement is permissible
+Panel seams will follow the grout network and reconstruct the normal 1.8 mm
+channel without cutting tiles. The natural complementary boundary is evaluated
+first; hidden registration or retention geometry is deferred unless physical
+testing proves a concrete need. ACP, adhesive, and the traditional frame
+provide long-term integrity. Local base reinforcement remains permissible only
 after physical validation.
 
 Panels will receive deterministic assembly IDs (`A1`, `A2`, ...), remain
@@ -199,3 +195,76 @@ not from the alternating pre-trim tile/grout extremities. For the Phase 1.1
 Point Top fixture, artwork remains 130.8 mm wide while fabrication spans X
 0.9–129.9 mm and is therefore 129.0 mm wide. No scaling or compensating
 lattice translation is performed.
+
+## Phase 2A concave-grout and connection prototype
+
+Phase 2A adds an optional `concave` fabrication-profile grout surface while
+leaving the validated `flat` surface unchanged. The experiment uses a smooth
+0.30 mm maximum depression below the existing grout-top datum. The 1.8 mm
+visible grout gap, 2.0 mm Base, 1.0 mm structural Grout/Thinset body, and V4
+Rounded tile geometry remain fixed. Each authoritative tile edge now anchors a
+boundary-driven strip with three deterministic 0.30 mm transverse intervals per
+half-gap. This preserves the smooth sin-squared profile without a directional
+Cartesian heightfield approximating diagonal boundaries. The depression and
+edge-driven tessellation remain experimental physical-test values, not
+production specifications.
+
+Generate the dedicated two-panel fixture with:
+
+```bash
+python -m mosaica.fabricate.phase2a --out fabricate_phase2a_review
+```
+
+Its vertical, zig-zagging seam follows the center of the existing parent-hex
+grout network. Tile ownership changes at that seam, but no tile is divided or
+re-shaped. Phase 2A intentionally has no dedicated connector, locator,
+clearance, or retention geometry. The long complementary grout-line boundary
+itself is the registration experiment. Phase 2A physical review confirmed that
+it aligns well without connectors while both flat panel backs rest on the same
+backer.
+
+Visible tile and grout alignment is authoritative. The eventual ACP backer,
+adhesive, and frame provide permanent structural integrity. No dedicated
+connector is planned for the current release. This manually controlled split
+is not automatic production panelization, nesting, or a final frame-land
+design.
+
+## Phase 2B physical decision and production baseline
+
+Phase 2B physically evaluated a 1.0 mm straight wall, producing 1.8 mm tile
+relief and a 4.8 mm finished stack. That reduced-height experiment was rejected
+as the production baseline: the earlier 1.6 mm straight wall provides visibly
+preferable depth, quality, and perceived craftsmanship. Production therefore
+retains a 2.0 mm Base, 1.0 mm Grout/Thinset layer, 1.6 mm straight wall, and
+0.8 mm crown for 2.4 mm tile relief and 5.4 mm total Z.
+
+The physically approved V4 crown is frozen exactly, including its 0.8 mm
+height, inset, six-segment curvature, XY coordinates, and clipped-edge behavior.
+The corrected orientation-independent 0.30 mm concave grout remains
+provisionally retained because physical review found no sufficient downside to
+justify another geometry change.
+
+Panels use spreadsheet-style identities: alphabetic rows from top to bottom and
+numeric columns from left to right (`A1`, `A2`, `B1`, and so on). Export object
+names, filenames, manifest records, and physical marks share that identity.
+This model is sufficient for a future assembly map without assuming a single
+row. The current fixture uses `A1` and `A2`.
+
+The dependency-free dot-matrix panel ID was physically approved. Each Base
+contains only its normally ordered, backside-readable panel ID using 1.0 mm
+cells debossed 0.35 mm. There is no TOP arrow, mirrored text, wordmark, or
+decorative content. The cavities remain within the 2.0 mm Base, clear of the
+perimeter and natural seam, and nonstructural.
+
+Generate the comparison package with:
+
+```bash
+python -m mosaica.fabricate.phase2b --out fabricate_production_review
+```
+
+The current non-binding P1S process candidate is Bambu's 0.20 mm Standard
+profile with two wall loops, variable layer height off, and ironing of topmost
+surfaces using Concentric pattern, 18% flow, 30 mm/s speed, and 0.15 mm line
+spacing. These are slicer/process metadata, not modeled geometry. The future
+production 3MF and assembly-map systems may consume this information; Phase 2B
+does not implement either system.

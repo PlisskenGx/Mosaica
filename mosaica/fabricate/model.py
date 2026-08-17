@@ -23,6 +23,8 @@ class FabricationProfile:
     rounded_crown_mm: float = 0.8
     crown_segments: int = 6
     grout_surface: str = "flat"
+    grout_depression_mm: float = 0.0
+    grout_mesh_step_mm: float = 0.9
     frame_land_mm: float = 9.525
 
     def __post_init__(self) -> None:
@@ -40,8 +42,19 @@ class FabricationProfile:
                 raise ValueError(f"{name} must be positive.")
         if self.crown_segments < 2:
             raise ValueError("Rounded crown requires at least two segments.")
-        if self.grout_surface != "flat":
-            raise ValueError("Phase 1 supports the flat grout surface only.")
+        if self.grout_surface not in {"flat", "concave"}:
+            raise ValueError("Grout surface must be 'flat' or 'concave'.")
+        if self.grout_surface == "flat" and self.grout_depression_mm != 0.0:
+            raise ValueError("Flat grout cannot have a surface depression.")
+        if self.grout_surface == "concave" and not (
+            0.0 < self.grout_depression_mm < self.grout_thickness_mm
+        ):
+            raise ValueError(
+                "Concave grout depression must be positive and less than the "
+                "structural Grout/Thinset thickness."
+            )
+        if self.grout_mesh_step_mm <= 0:
+            raise ValueError("Grout surface mesh step must be positive.")
         if self.frame_land_mm < 0:
             raise ValueError("Frame land cannot be negative.")
 
