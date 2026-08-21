@@ -3,6 +3,7 @@ import json
 from mosaica.fabricate import mesh_validation, rounded_tile_rings
 from mosaica.fabricate.phase2a import PHASE2A_PROFILE, build_phase2a_prototype
 from mosaica.fabricate.phase2b import (
+    LEGACY_5_4_PROFILE,
     PANEL_ID_CELL_MM,
     PANEL_ID_DEBOSS_DEPTH_MM,
     PRODUCTION_PROFILE,
@@ -15,24 +16,27 @@ from mosaica.fabricate.phase2b import (
 def test_production_profile_locks_the_physically_validated_z_stack():
     phase2a = build_phase2a_prototype()
     production = build_production_prototype()
-    assert PHASE2A_PROFILE.straight_tile_relief_mm == PRODUCTION_PROFILE.straight_tile_relief_mm == 1.6
+    assert PRODUCTION_PROFILE.base_thickness_mm == 1.5
+    assert PRODUCTION_PROFILE.grout_thickness_mm == 1.0
+    assert PRODUCTION_PROFILE.straight_tile_relief_mm == 1.3
     assert PHASE2A_PROFILE.rounded_crown_mm == PRODUCTION_PROFILE.rounded_crown_mm == 0.8
-    assert PRODUCTION_PROFILE.total_tile_relief_mm == 2.4
-    assert production.model.physical_bounds_mm[-1] == 5.4
+    assert PRODUCTION_PROFILE.total_tile_relief_mm == 2.1
+    assert production.model.physical_bounds_mm[-1] == 4.6
+    assert LEGACY_5_4_PROFILE.base_thickness_mm == 2.0
+    assert LEGACY_5_4_PROFILE.straight_tile_relief_mm == 1.6
     assert phase2a.model.profile == PHASE2A_PROFILE
 
 
-def test_production_crown_is_identical_to_the_validated_phase2a_crown():
+def test_production_crown_preserves_validated_xy_and_translates_only_in_z():
     phase2a = build_phase2a_prototype()
     production = build_production_prototype()
     polygon = phase2a.model.tiles[0].full_polygon_mm
-    grout_top = 3.0
     before = rounded_tile_rings(
-        polygon, grout_top, PHASE2A_PROFILE.straight_tile_relief_mm,
+        polygon, 3.0, PHASE2A_PROFILE.straight_tile_relief_mm,
         PHASE2A_PROFILE.rounded_crown_mm, PHASE2A_PROFILE.crown_segments,
     )
     after = rounded_tile_rings(
-        polygon, grout_top, PRODUCTION_PROFILE.straight_tile_relief_mm,
+        polygon, 2.5, PRODUCTION_PROFILE.straight_tile_relief_mm,
         PRODUCTION_PROFILE.rounded_crown_mm, PRODUCTION_PROFILE.crown_segments,
     )
     assert len(before) == len(after)
@@ -40,17 +44,20 @@ def test_production_crown_is_identical_to_the_validated_phase2a_crown():
         assert tuple((x, y) for x, y, _z in before_ring) == tuple(
             (x, y) for x, y, _z in after_ring
         )
-        assert before_ring == after_ring
+        assert {
+            round(before_point[2] - after_point[2], 9)
+            for before_point, after_point in zip(before_ring, after_ring)
+        } == {0.8}
 
 
 def test_production_preserves_the_structural_and_grout_dimensions():
     prototype = build_production_prototype()
-    assert prototype.model.profile.base_thickness_mm == 2.0
+    assert prototype.model.profile.base_thickness_mm == 1.5
     assert prototype.model.profile.grout_thickness_mm == 1.0
     assert prototype.model.grout_gap_mm == 1.8
     assert prototype.model.profile.grout_depression_mm == 0.30
     for panel in prototype.panels:
-        assert panel.body("grout-thinset").bounds_mm[2:6:3] == (2.0, 3.0)
+        assert panel.body("grout-thinset").bounds_mm[2:6:3] == (1.5, 2.5)
 
 
 def test_production_keeps_the_phase2a_seam_and_whole_tile_ownership():
@@ -76,7 +83,7 @@ def test_backside_marks_are_shallow_inside_watertight_base_bodies():
     for panel in prototype.panels:
         body = panel.body("base")
         z_values = {point[2] for triangle in body.triangles for point in triangle}
-        assert z_values == {0.0, PANEL_ID_DEBOSS_DEPTH_MM, 2.0}
+        assert z_values == {0.0, PANEL_ID_DEBOSS_DEPTH_MM, 1.5}
         validation = mesh_validation(body)
         assert validation["watertight"] is True
         assert validation["nonmanifold_edges"] == 0
@@ -158,15 +165,23 @@ def test_production_manifest_records_validated_dimensions_and_process_metadata(t
     manifest = json.loads(package.manifest_path.read_text())
     assert manifest["validated_dimensions"] == {
         "backside_deboss_depth_mm": 0.35,
-        "finished_total_z_mm": 5.4,
+        "finished_total_z_mm": 4.6,
         "panel_id_cell_mm": 1.0,
         "rounded_crown_mm": 0.8,
-        "straight_tile_relief_mm": 1.6,
-        "total_tile_relief_mm": 2.4,
+        "straight_tile_relief_mm": 1.3,
+        "total_tile_relief_mm": 2.1,
     }
     assert manifest["provisionally_retained_dimensions"] == {
         "grout_depression_mm": 0.3,
         "grout_gap_mm": 1.8,
     }
-    assert manifest["process_candidate"]["ironing_pattern"] == "Concentric"
-    assert manifest["process_candidate"]["binding"].startswith("non-binding")
+    assert manifest["process_candidate"]["adaptive_variable_layer_height"] is True
+    assert manifest["process_candidate"]["default_surface_finish"] == "Standard / no ironing"
+    assert manifest["process_candidate"]["ironing"] == "optional"
+    assert manifest["process_candidate"]["premium_ironing_profile"] == {
+        "surface": "Topmost surfaces",
+        "pattern": "Concentric",
+        "flow_percent": 18,
+        "speed_mm_s": 30,
+        "line_spacing_mm": 0.15,
+    }

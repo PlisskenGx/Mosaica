@@ -23,8 +23,8 @@ from .phase2a import (
 PRODUCTION_ARTIFACT_NAME = "Mosaica Fabricate Production Baseline Review"
 PANEL_ID_CELL_MM = 1.0
 PANEL_ID_DEBOSS_DEPTH_MM = 0.35
-PRODUCTION_PROFILE = FabricationProfile(
-    profile_id="mosaica-validated-production-baseline",
+LEGACY_5_4_PROFILE = FabricationProfile(
+    profile_id="mosaica-legacy-validated-5-4-mm-baseline",
     version=1,
     base_thickness_mm=2.0,
     grout_thickness_mm=1.0,
@@ -35,6 +35,13 @@ PRODUCTION_PROFILE = FabricationProfile(
     grout_depression_mm=0.30,
     grout_mesh_step_mm=0.30,
     frame_land_mm=0.0,
+)
+PRODUCTION_PROFILE = replace(
+    LEGACY_5_4_PROFILE,
+    profile_id="mosaica-validated-production-baseline",
+    version=2,
+    base_thickness_mm=1.5,
+    straight_tile_relief_mm=1.3,
 )
 
 
@@ -70,44 +77,86 @@ def panel_identifier(row: int, column: int) -> str:
 
 
 _GLYPHS = {
+    "0": ("01110", "10001", "10011", "10101", "11001", "10001", "01110"),
     "A": ("01110", "10001", "10001", "11111", "10001", "10001", "10001"),
     "1": ("010", "110", "010", "010", "010", "010", "111"),
     "2": ("11110", "00001", "00001", "01110", "10000", "10000", "11111"),
+    "3": ("11110", "00001", "00001", "01110", "00001", "00001", "11110"),
+    "4": ("10010", "10010", "10010", "11111", "00010", "00010", "00010"),
+    "5": ("11111", "10000", "10000", "11110", "00001", "00001", "11110"),
+    "6": ("01110", "10000", "10000", "11110", "10001", "10001", "01110"),
+    "7": ("11111", "00001", "00010", "00100", "01000", "01000", "01000"),
+    "8": ("01110", "10001", "10001", "01110", "10001", "10001", "01110"),
+    "9": ("01110", "10001", "10001", "01111", "00001", "00001", "01110"),
+    "B": ("11110", "10001", "10001", "11110", "10001", "10001", "11110"),
+    "C": ("01111", "10000", "10000", "10000", "10000", "10000", "01111"),
+    "D": ("11110", "10001", "10001", "10001", "10001", "10001", "11110"),
+    "E": ("11111", "10000", "10000", "11110", "10000", "10000", "11111"),
+    "F": ("11111", "10000", "10000", "11110", "10000", "10000", "10000"),
+    "G": ("01111", "10000", "10000", "10111", "10001", "10001", "01111"),
+    "H": ("10001", "10001", "10001", "11111", "10001", "10001", "10001"),
+    "I": ("111", "010", "010", "010", "010", "010", "111"),
+    "J": ("00111", "00010", "00010", "00010", "00010", "10010", "01100"),
+    "K": ("10001", "10010", "10100", "11000", "10100", "10010", "10001"),
+    "L": ("10000", "10000", "10000", "10000", "10000", "10000", "11111"),
+    "M": ("10001", "11011", "10101", "10101", "10001", "10001", "10001"),
+    "N": ("10001", "11001", "10101", "10011", "10001", "10001", "10001"),
+    "O": ("01110", "10001", "10001", "10001", "10001", "10001", "01110"),
+    "P": ("11110", "10001", "10001", "11110", "10000", "10000", "10000"),
+    "Q": ("01110", "10001", "10001", "10001", "10101", "10010", "01101"),
+    "R": ("11110", "10001", "10001", "11110", "10100", "10010", "10001"),
+    "S": ("01111", "10000", "10000", "01110", "00001", "00001", "11110"),
+    "T": ("11111", "00100", "00100", "00100", "00100", "00100", "00100"),
+    "U": ("10001", "10001", "10001", "10001", "10001", "10001", "01110"),
+    "V": ("10001", "10001", "10001", "10001", "10001", "01010", "00100"),
+    "W": ("10001", "10001", "10001", "10101", "10101", "10101", "01010"),
+    "X": ("10001", "10001", "01010", "00100", "01010", "10001", "10001"),
+    "Y": ("10001", "10001", "01010", "00100", "00100", "00100", "00100"),
+    "Z": ("11111", "00001", "00010", "00100", "01000", "10000", "11111"),
 }
+
+
+def _marking_dimensions(panel_id: str) -> tuple[float, float]:
+    pitch, glyph_gap = 1.45, 1.45 * 2
+    glyphs = tuple(_GLYPHS[value] for value in panel_id)
+    widths = [len(glyph[0]) * pitch - (pitch - PANEL_ID_CELL_MM) for glyph in glyphs]
+    return sum(widths) + glyph_gap * (len(glyphs) - 1), 7 * pitch - (pitch - PANEL_ID_CELL_MM)
+
+
+def _marking_cells_at(
+    identity: PanelIdentity, origin_x: float, origin_y: float,
+) -> tuple[tuple[Point2MM, ...], ...]:
+    pixel, pitch, glyph_gap = PANEL_ID_CELL_MM, 1.45, 1.45 * 2
+    glyphs = tuple(_GLYPHS[value] for value in identity.panel_id)
+    widths = [len(glyph[0]) * pitch - (pitch - pixel) for glyph in glyphs]
+    cells = []
+    cursor_x = origin_x
+    for glyph, width in zip(glyphs, widths):
+        for row, values in enumerate(glyph):
+            for column, value in enumerate(values):
+                if value == "1":
+                    x, y = cursor_x + column * pitch, origin_y + row * pitch
+                    cells.append(((x, y), (x + pixel, y), (x + pixel, y + pixel), (x, y + pixel)))
+        cursor_x += width + glyph_gap
+    return tuple(cells)
 
 
 def _marking_cells(
     identity: PanelIdentity,
     bounds: tuple[float, float, float, float],
 ) -> tuple[tuple[Point2MM, ...], ...]:
-    pixel, pitch, glyph_gap = PANEL_ID_CELL_MM, 1.45, 1.45 * 2
-    glyphs = (_GLYPHS[identity.panel_id[0]], _GLYPHS[identity.panel_id[1:]])
-    widths = [len(glyph[0]) * pitch - (pitch - pixel) for glyph in glyphs]
-    mark_width = sum(widths) + glyph_gap * (len(glyphs) - 1)
-    mark_height = 7 * pitch - (pitch - pixel)
+    mark_width, mark_height = _marking_dimensions(identity.panel_id)
     left, _top, right, bottom = bounds
     inset = 8.0
     origin_x = left + inset if identity.column == 0 else right - inset - mark_width
     origin_y = bottom - inset - mark_height
-    cells = []
-    cursor_x = origin_x
-    for glyph, width in zip(glyphs, widths):
-        for row, values in enumerate(glyph):
-            for column, value in enumerate(values):
-                if value != "1":
-                    continue
-                # Glyph columns remain in their normal reading order.  The
-                # production ID is authored for direct backside inspection;
-                # no mirror/reversal transform is applied.
-                x = cursor_x + column * pitch
-                y = origin_y + row * pitch
-                cells.append(((x, y), (x + pixel, y), (x + pixel, y + pixel), (x, y + pixel)))
-        cursor_x += width + glyph_gap
-    return tuple(cells)
+    return _marking_cells_at(identity, origin_x, origin_y)
 
 
-def build_production_model() -> ResolvedFabricationModel:
-    return replace(build_phase2a_model(), profile=PRODUCTION_PROFILE)
+def build_production_model(
+    profile: FabricationProfile = PRODUCTION_PROFILE,
+) -> ResolvedFabricationModel:
+    return replace(build_phase2a_model(), profile=profile)
 
 
 def _panel_outline(
@@ -121,8 +170,10 @@ def _panel_outline(
     return ((right, top), (right, bottom)) + tuple(reversed(seam_top_to_bottom))
 
 
-def build_production_prototype() -> ProductionPrototype:
-    model = build_production_model()
+def build_production_prototype(
+    profile: FabricationProfile = PRODUCTION_PROFILE,
+) -> ProductionPrototype:
+    model = build_production_model(profile)
     seam, phase2a_ownership = derive_vertical_grout_seam(model)
     ownership = {
         tile_id: ("A1" if owner == "A" else "A2")
@@ -228,7 +279,7 @@ def generate_production_review_package(output_directory: str | Path) -> Phase2AR
         "artifact_name": PRODUCTION_ARTIFACT_NAME,
         "application_version": __version__,
         "fabrication_profile": prototype.model.profile.__dict__,
-        "validated_dimensions": {"straight_tile_relief_mm": 1.6, "rounded_crown_mm": 0.8, "total_tile_relief_mm": 2.4, "finished_total_z_mm": 5.4, "panel_id_cell_mm": PANEL_ID_CELL_MM, "backside_deboss_depth_mm": PANEL_ID_DEBOSS_DEPTH_MM},
+        "validated_dimensions": {"straight_tile_relief_mm": 1.3, "rounded_crown_mm": 0.8, "total_tile_relief_mm": 2.1, "finished_total_z_mm": 4.6, "panel_id_cell_mm": PANEL_ID_CELL_MM, "backside_deboss_depth_mm": PANEL_ID_DEBOSS_DEPTH_MM},
         "provisionally_retained_dimensions": {"grout_gap_mm": 1.8, "grout_depression_mm": 0.30},
         "panels": [{
             **identities[panel.panel_id].__dict__,
@@ -239,7 +290,22 @@ def generate_production_review_package(output_directory: str | Path) -> Phase2AR
         } for panel in prototype.panels],
         "seam": {"orientation": prototype.seam.orientation, "location_mm": [list(point) for point in prototype.seam.points_mm], "tile_cuts_created": 0},
         "panel_connection": {"type": "natural_grout_line_seam", "dedicated_connector_geometry": False, "tile_cuts_created": 0, "permanent_structure": "ACP_backer_and_adhesive"},
-        "process_candidate": {"printer": "Bambu Lab P1S", "preset": "0.20 mm Standard", "wall_loops": 2, "ironing": "Topmost surfaces", "ironing_pattern": "Concentric", "ironing_flow_percent": 18, "ironing_speed_mm_s": 30, "ironing_line_spacing_mm": 0.15, "variable_layer_height": False, "binding": "non-binding physical-review metadata"},
+        "process_candidate": {
+            "printer": "Bambu Lab P1S",
+            "preset": "0.20 mm Standard",
+            "wall_loops": 2,
+            "adaptive_variable_layer_height": True,
+            "default_surface_finish": "Standard / no ironing",
+            "ironing": "optional",
+            "premium_ironing_profile": {
+                "surface": "Topmost surfaces",
+                "pattern": "Concentric",
+                "flow_percent": 18,
+                "speed_mm_s": 30,
+                "line_spacing_mm": 0.15,
+            },
+            "binding": "production process direction for future 3MF export",
+        },
         "coordinate_system": {"units": "mm", "origin": prototype.model.origin, "export": "shared global assembly coordinates"},
         "body_channel_ownership": records,
         "geometry_signature_sha256": signature,
@@ -249,8 +315,8 @@ def generate_production_review_package(output_directory: str | Path) -> Phase2AR
             "Choose load as one object with multiple parts so shared global coordinates are retained.",
             "Assign Base, Grout/Thinset, and Tile Color bodies to the intended filaments.",
             "Print backside down and artwork face up; the readable debossed panel ID faces the build plate.",
-            "Use the 0.20 mm Standard P1S baseline with two wall loops and variable layer height off.",
-            "Iron topmost surfaces with Concentric pattern, 18% flow, 30 mm/s, and 0.15 mm line spacing.",
+            "Use the 0.20 mm Standard P1S baseline with two wall loops and Adaptive Variable Layer Height on.",
+            "Default to Standard/no ironing; optional premium ironing uses Topmost surfaces, Concentric, 18% flow, 30 mm/s, and 0.15 mm line spacing.",
             "Bond both panels to the same ACP backer and mate A1 to A2 along the natural grout-line seam.",
         ],
     }

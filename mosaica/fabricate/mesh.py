@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from itertools import product
 from math import atan2, ceil, cos, degrees, pi, sin, sqrt
 
 from .model import Point2MM, ResolvedFabricationModel, ResolvedTile
@@ -382,6 +383,169 @@ def debossed_x_monotone_base_mesh(
             if not in_hole(*midpoint):
                 bottom_triangles.extend(_cap(cell, 0.0, False))
 
+    boundary_top = _surface_boundary_loop(tuple(top_triangles))
+    boundary_bottom = tuple((x, y, 0.0) for x, y, _ in boundary_top)
+    triangles = top_triangles + bottom_triangles
+    triangles.extend(_join_rings(boundary_bottom, boundary_top))
+    bottom_loops = _surface_boundary_loops(tuple(bottom_triangles))
+    outer_loop = max(
+        bottom_loops,
+        key=lambda loop: abs(_area(tuple((x, y) for x, y, _ in loop))),
+    )
+    for loop in bottom_loops:
+        if loop == outer_loop:
+            continue
+        if _area(tuple((x, y) for x, y, _ in loop)) > 0:
+            loop = tuple(reversed(loop))
+        cavity_bottom = tuple((x, y, 0.0) for x, y, _ in loop)
+        cavity_top = tuple((x, y, deboss_depth_mm) for x, y, _ in loop)
+        triangles.extend(_join_rings(cavity_bottom, cavity_top))
+        center = (
+            round(sum(x for x, _y, _z in cavity_top) / len(cavity_top), 9),
+            round(sum(y for _x, y, _z in cavity_top) / len(cavity_top), 9),
+            deboss_depth_mm,
+        )
+        triangles.extend(
+            (center, cavity_top[index], cavity_top[(index + 1) % len(cavity_top)])
+            for index in range(len(cavity_top))
+        )
+    return tuple(triangles)
+
+
+def debossed_cell_union_base_mesh(
+    cell_polygons: tuple[tuple[Point2MM, ...], ...],
+    fabrication_bounds_mm: tuple[float, float, float, float],
+    holes: tuple[tuple[Point2MM, ...], ...],
+    *,
+    top_z_mm: float,
+    deboss_depth_mm: float,
+) -> tuple[Triangle3, ...]:
+    """Mesh a contiguous union of parent cells with backside ID cavities."""
+
+    if not cell_polygons:
+        raise ValueError("A panel Base requires at least one parent cell.")
+    if not 0.0 < deboss_depth_mm < top_z_mm:
+        raise ValueError("Backside deboss depth must remain inside the Base.")
+    left, top, right, bottom = fabrication_bounds_mm
+    xs = {left, right}
+    ys = {top, bottom}
+    for hole in holes:
+        if len(hole) != 4:
+            raise ValueError("Backside marking cells must be rectangles.")
+        xs.update(point[0] for point in hole)
+        ys.update(point[1] for point in hole)
+    x_values = tuple(sorted(round(value, 9) for value in xs))
+    y_values = tuple(sorted(round(value, 9) for value in ys))
+
+    def clip_axis(
+        polygon: tuple[Point2MM, ...], axis: int, plane: float,
+        keep_greater: bool,
+    ) -> tuple[Point2MM, ...]:
+        def signed(point: Point2MM) -> float:
+            return point[axis] - plane if keep_greater else plane - point[axis]
+
+        result = []
+        for first, second in zip(polygon, polygon[1:] + polygon[:1]):
+            first_distance, second_distance = signed(first), signed(second)
+            first_inside, second_inside = first_distance >= -1e-9, second_distance >= -1e-9
+            if first_inside:
+                result.append(first)
+            if first_inside != second_inside:
+                line_first, line_second = sorted((first, second))
+                scale = (
+                    (plane - line_first[axis])
+                    / (line_second[axis] - line_first[axis])
+                )
+                result.append(tuple(round(
+                    plane if index == axis
+                    else line_first[index] + scale * (
+                        line_second[index] - line_first[index]
+                    ), 9,
+                ) for index in range(2)))
+        deduplicated = []
+        for point in result:
+            if not deduplicated or point != deduplicated[-1]:
+                deduplicated.append(point)
+        if len(deduplicated) > 1 and deduplicated[0] == deduplicated[-1]:
+            deduplicated.pop()
+        return tuple(deduplicated)
+
+    def clipped_to_rectangle(
+        polygon: tuple[Point2MM, ...], bounds: tuple[float, float, float, float],
+    ) -> tuple[Point2MM, ...]:
+        result = polygon
+        for axis, plane, keep_greater in (
+            (0, bounds[0], True), (0, bounds[2], False),
+            (1, bounds[1], True), (1, bounds[3], False),
+        ):
+            result = clip_axis(result, axis, plane, keep_greater)
+            if len(result) < 3:
+                return ()
+        return result if abs(_area(result)) > 1e-10 else ()
+
+    def in_hole(x: float, y: float) -> bool:
+        return any(
+            min(point[0] for point in hole) < x < max(point[0] for point in hole)
+            and min(point[1] for point in hole) < y < max(point[1] for point in hole)
+            for hole in holes
+        )
+
+    top_triangles: list[Triangle3] = []
+    bottom_triangles: list[Triangle3] = []
+    for source in cell_polygons:
+        source = clipped_to_rectangle(_ccw(source), fabrication_bounds_mm)
+        if not source:
+            continue
+        source_left = min(point[0] for point in source)
+        source_top = min(point[1] for point in source)
+        source_right = max(point[0] for point in source)
+        source_bottom = max(point[1] for point in source)
+        for x0, x1 in zip(x_values, x_values[1:]):
+            if x1 <= source_left + 1e-9 or x0 >= source_right - 1e-9:
+                continue
+            for y0, y1 in zip(y_values, y_values[1:]):
+                if y1 <= source_top + 1e-9 or y0 >= source_bottom - 1e-9:
+                    continue
+                cell = clipped_to_rectangle(source, (x0, y0, x1, y1))
+                if not cell:
+                    continue
+                cell = _ccw(cell)
+                top_triangles.extend(_cap(cell, top_z_mm, True))
+                midpoint = (
+                    sum(point[0] for point in cell) / len(cell),
+                    sum(point[1] for point in cell) / len(cell),
+                )
+                if not in_hole(*midpoint):
+                    bottom_triangles.extend(_cap(cell, 0.0, False))
+
+    weld_buckets: dict[tuple[int, int, int], list[Point3MM]] = {}
+
+    def weld(values: list[Triangle3], tolerance: float = 1e-7) -> list[Triangle3]:
+        result = []
+        for triangle in values:
+            welded = []
+            for point in triangle:
+                key = tuple(round(value / tolerance) for value in point)
+                canonical = None
+                for offsets in product((-1, 0, 1), repeat=3):
+                    neighbor = tuple(key[index] + offsets[index] for index in range(3))
+                    for candidate in weld_buckets.get(neighbor, ()):
+                        if all(abs(candidate[index] - point[index]) <= tolerance for index in range(3)):
+                            canonical = candidate
+                            break
+                    if canonical is not None:
+                        break
+                if canonical is None:
+                    canonical = point
+                    weld_buckets.setdefault(key, []).append(point)
+                welded.append(canonical)
+            candidate_triangle = tuple(welded)  # type: ignore[assignment]
+            if sum(value * value for value in _triangle_normal_raw(candidate_triangle)) > 1e-18:
+                result.append(candidate_triangle)
+        return result
+
+    top_triangles = weld(top_triangles)
+    bottom_triangles = weld(bottom_triangles)
     boundary_top = _surface_boundary_loop(tuple(top_triangles))
     boundary_bottom = tuple((x, y, 0.0) for x, y, _ in boundary_top)
     triangles = top_triangles + bottom_triangles

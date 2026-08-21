@@ -12,6 +12,8 @@ mosaic_output/*.3mf
 /fabricate_phase2a_review/
 /fabricate_phase2b_review/
 /fabricate_production_review/
+/fabricate_panelized_review/
+/fabricate_thin_stack_review/
 /fabrication_output/
 /print_parts/
 /archive/veradura/viability/fabricate_phase1_1_review/*.3mf

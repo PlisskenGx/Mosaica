@@ -41,20 +41,17 @@ Designer full-parent polygons used for hover/hit testing are retained only as
 debug metadata. Fabrication always uses the clipped visible polygon. Finished
 artwork dimensions are authoritative and are never scaled.
 
-The fixed Designer grout gap is 1.8 mm for S/M/L. The known V4 Rounded tile
-relief is 1.6 mm of straight side plus a 0.8 mm rounded crown, for 2.4 mm above
-the flat grout surface. The repository does **not** contain authoritative base
-or Grout/Thinset body thicknesses, nor a historical crown tessellation value.
-Consequently base and grout thickness are mandatory profile inputs; Phase 1
-does not silently establish product values. Crown segment count is likewise
-profile-versioned. A fixture profile used by tests is validation data, not a
-shipping fabrication specification.
+The fixed Designer grout gap is 1.8 mm for S/M/L. The current production V4
+Rounded tile relief is 1.3 mm of straight side plus the frozen 0.8 mm rounded
+crown, for 2.1 mm above the grout datum. Base, grout, relief, and crown segment
+count remain explicit versioned profile inputs. Historical fixture profiles
+used by tests are validation data, not competing shipping specifications.
 
 The Phase 1 body stack is support-free:
 
 1. Base: rectangular slab from Z=0 to the configured base top.
 2. Grout/Thinset: aligned rectangular slab from the base top to grout top.
-3. Tiles: resolved visible polygons beginning at grout top, with 1.6 mm
+3. Tiles: resolved visible polygons beginning at grout top, with 1.3 mm
    straight sides and a deterministic quarter-round 0.8 mm crown.
 
 This creates exact, non-overlapping material interfaces while grout rises to
@@ -231,18 +228,16 @@ design.
 
 ## Phase 2B physical decision and production baseline
 
-Phase 2B physically evaluated a 1.0 mm straight wall, producing 1.8 mm tile
-relief and a 4.8 mm finished stack. That reduced-height experiment was rejected
-as the production baseline: the earlier 1.6 mm straight wall provides visibly
-preferable depth, quality, and perceived craftsmanship. Production therefore
-retains a 2.0 mm Base, 1.0 mm Grout/Thinset layer, 1.6 mm straight wall, and
-0.8 mm crown for 2.4 mm tile relief and 5.4 mm total Z.
+The original validated baseline used a 2.0 mm Base, 1.0 mm Grout/Thinset layer,
+1.6 mm straight wall, and 0.8 mm crown for 5.4 mm total Z. It remains recorded
+as legacy physical provenance. Subsequent physical review approved the thinner
+stack as the single production default: 1.5 mm Base, 1.0 mm Grout/Thinset,
+1.3 mm straight wall, and 0.8 mm crown for 2.1 mm tile relief and 4.6 mm total
+Z.
 
 The physically approved V4 crown is frozen exactly, including its 0.8 mm
 height, inset, six-segment curvature, XY coordinates, and clipped-edge behavior.
-The corrected orientation-independent 0.30 mm concave grout remains
-provisionally retained because physical review found no sufficient downside to
-justify another geometry change.
+The corrected orientation-independent 0.30 mm concave grout is retained.
 
 Panels use spreadsheet-style identities: alphabetic rows from top to bottom and
 numeric columns from left to right (`A1`, `A2`, `B1`, and so on). Export object
@@ -253,8 +248,9 @@ row. The current fixture uses `A1` and `A2`.
 The dependency-free dot-matrix panel ID was physically approved. Each Base
 contains only its normally ordered, backside-readable panel ID using 1.0 mm
 cells debossed 0.35 mm. There is no TOP arrow, mirrored text, wordmark, or
-decorative content. The cavities remain within the 2.0 mm Base, clear of the
-perimeter and natural seam, and nonstructural.
+decorative content. The cavities remain within the 1.5 mm Base, leave 1.15 mm
+above their deepest surface, remain clear of the perimeter and natural seam,
+and are nonstructural.
 
 Generate the comparison package with:
 
@@ -262,9 +258,94 @@ Generate the comparison package with:
 python -m mosaica.fabricate.phase2b --out fabricate_production_review
 ```
 
-The current non-binding P1S process candidate is Bambu's 0.20 mm Standard
-profile with two wall loops, variable layer height off, and ironing of topmost
-surfaces using Concentric pattern, 18% flow, 30 mm/s speed, and 0.15 mm line
-spacing. These are slicer/process metadata, not modeled geometry. The future
-production 3MF and assembly-map systems may consume this information; Phase 2B
-does not implement either system.
+The current intended P1S production direction is Bambu's 0.20 mm Standard
+profile with two wall loops and Adaptive Variable Layer Height on. Standard/no
+ironing is the default export surface finish. Ironing is optional; the
+validated premium choice irons Topmost surfaces using Concentric pattern, 18%
+flow, 30 mm/s speed, and 0.15 mm line spacing. These are process metadata, not
+modeled geometry. Future production 3MF and assembly-map systems may consume
+them; this phase does not implement either system.
+
+## Phase 3A automatic grout-line panelization
+
+Mosaica v1 uses a fixed **210 × 210 mm safe fabrication envelope** for P1S
+panel output. This is an intentionally conservative Mosaica production
+constraint, not the printer's nominal build volume. It reserves practical
+space for the prime tower and normal slicer margins. One finished mosaic panel
+is intended to become one future build plate.
+
+Automatic panelization begins with `ceil(fabricated width / 210)` columns and
+`ceil(fabricated height / 210)` rows. Ideal evenly spaced divisions are targets
+only. Candidate cuts are selected from shared expanded-parent-cell boundaries,
+so each seam follows the existing grout network and every tile remains whole.
+Actual irregular cell-union bounds—not nominal grid-cell dimensions—must fit
+the safe envelope.
+
+The deterministic optimization order is:
+
+1. minimum total panel count;
+2. minimum worst normalized deviation from mean panel area;
+3. fewest seam direction changes, then seam vertices and total length;
+4. least deviation from ideal divisions and stable row/column order.
+
+Nearby alternate seams are evaluated before panel count increases. If the
+theoretical layout cannot fit, plausible row/column factorizations are tested
+in increasing total-panel order. Every accepted logical grid cell must contain
+one contiguous, hole-free parent-cell region; islands, wrapped ownership, empty
+micro-panels, tile cuts, and connector geometry are rejected.
+
+Panel IDs retain spreadsheet order (`A1`, `A2`, `B1`, and so on) and drive the
+approved 1.0 mm-cell, 0.35 mm-deep backside mark. Manifest neighbors explicitly
+record top/bottom/left/right assembly relationships. A per-panel print rotation
+field supports 0° or future 90° plate placement without changing artwork-space
+orientation or panel identity. With the current square envelope, rotation does
+not change fit eligibility.
+
+Panel component STLs remain in shared global artwork coordinates within each
+panel directory. Loading one directory's Base, Grout/Thinset, and used Tile
+Color bodies as a multipart object therefore preserves alignment. The manifest
+also retains bounds, row/column identity, neighbors, seams, tile ownership,
+orientation, and signatures needed for a later assembly map without rerunning
+panelization.
+
+Run saved MosaicProject panelization with:
+
+```bash
+python -m mosaica.fabricate.panelize --project PROJECT.json --out fabricate_panelized_review
+```
+
+Phase 3A does not generate production 3MF files or slicer plates. Production
+3MF packaging remains a later stage and will consume the validated P1S process
+candidate without changing panel geometry. Phase 3B plate planning should
+reserve a predictable prime-tower region and place the panel toward the
+opposite usable area instead of simply centering it. Until that slicer-aware
+planning exists, 210 × 210 mm remains the fixed Mosaica v1 envelope.
+
+The known-good future Phase 3B placement reference centers the **mosaic panel**
+at **X = 132 mm, Y = 110 mm** on the P1S plate. These are panel-placement
+coordinates, not Prime Tower coordinates. Bambu Studio determines Prime Tower
+position automatically; its brim width is 0 mm. The reference clears the
+automatic tower and restricted/off-limits area, but is documentation only and
+does not implement plate placement.
+
+## Approved 4.6 mm production stack
+
+Physical review approved the 1.5 mm Base and 1.3 mm straight wall while
+retaining the 1.0 mm Grout/Thinset layer and geometrically identical 0.8 mm
+crown. The resulting 4.6 mm stack is the production default. The former 5.4 mm
+stack remains only as explicit legacy provenance and regression evidence.
+
+The production nominal grout datum is Z 2.5 mm, its unchanged 0.30 mm
+concave trough reaches Z 2.2 mm, the straight wall ends at Z 3.8 mm, and the
+crown ends at Z 4.6 mm. The approved 1.0 mm-cell backside panel ID remains
+0.35 mm deep, leaving 1.15 mm of Base above its cavity. Natural seams, whole
+tiles, clipped geometry, grout width, panelization, and connector-free assembly
+are unchanged.
+
+Generate the compact A1/A2 production fixture with:
+
+```bash
+python -m mosaica.fabricate.phase2b --out fabricate_production_review
+```
+
+Production 3MF packaging and slicer-setting injection remain deferred.
