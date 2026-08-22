@@ -25,6 +25,7 @@ from .modes import (
     resolve_legacy_surface_finish,
 )
 from .phase2b import PANEL_ID_CELL_MM, PANEL_ID_DEBOSS_DEPTH_MM, PRODUCTION_PROFILE
+from .print_guide import GUIDE_FILENAME, generate_print_guide
 from .resolve import resolve_mosaic_project
 
 
@@ -46,6 +47,7 @@ class ThreeMFExportPackage:
     manifest_path: Path
     three_mf_paths: tuple[Path, ...]
     geometry_signature: str
+    print_guide_path: Path
 
 
 def _q(namespace: str, local: str) -> str:
@@ -402,6 +404,7 @@ def export_panelized_three_mf_package(
     *,
     mode: FabricationMode | str | None = None,
     surface_finish: SurfaceFinish | None = None,
+    project_name: str | None = None,
 ) -> ThreeMFExportPackage:
     plan = fabrication.plan
     mode_definition = _resolve_export_mode(
@@ -448,6 +451,7 @@ def export_panelized_three_mf_package(
     signature = sha256(
         json.dumps(signature_payload, separators=(",", ":")).encode()
     ).hexdigest()
+    model = plan.model
     manifest = {
         "schema": {"name": THREE_MF_SCHEMA, "version": THREE_MF_SCHEMA_VERSION},
         "application_version": __version__,
@@ -455,6 +459,32 @@ def export_panelized_three_mf_package(
             "id": mode_definition.mode_id,
             "display_name": mode_definition.display_name,
             "quality_tradeoff": mode_definition.quality_tradeoff,
+        },
+        "project": {
+            "name": project_name or "Mosaica Project",
+            "finished_dimensions_mm": {
+                "width": model.artwork_width_mm,
+                "height": model.artwork_height_mm,
+            },
+            "tile_system": {
+                "preset_id": model.tile_preset_id,
+                "flat_to_flat_mm": model.tile_flat_to_flat_mm,
+                "orientation": model.tile_orientation,
+                "grout_gap_mm": model.grout_gap_mm,
+            },
+            "palette": [
+                {
+                    "channel_id": channel.channel_id,
+                    "name": channel.name,
+                    "display_color": channel.display_color or "#808080",
+                }
+                for channel in model.channels
+                if channel.kind == "tile_color"
+            ],
+        },
+        "artifacts": {
+            "print_guide": GUIDE_FILENAME,
+            "manifest": "manifest.json",
         },
         "architecture": {
             "package_strategy": "one_standard_3mf_per_panel",
@@ -523,7 +553,12 @@ def export_panelized_three_mf_package(
     manifest_path.write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8",
     )
-    return ThreeMFExportPackage(output, manifest_path, tuple(paths), signature)
+    print_guide_path = generate_print_guide(
+        plan, manifest, output / GUIDE_FILENAME,
+    )
+    return ThreeMFExportPackage(
+        output, manifest_path, tuple(paths), signature, print_guide_path,
+    )
 
 
 def export_three_mf_package(
@@ -532,12 +567,14 @@ def export_three_mf_package(
     *,
     mode: FabricationMode | str | None = None,
     surface_finish: SurfaceFinish | None = None,
+    project_name: str | None = None,
 ) -> ThreeMFExportPackage:
     mode_definition = _resolve_export_mode(mode, surface_finish)
     plan = panelize_model(model, mode=mode_definition.mode)
     return export_panelized_three_mf_package(
         build_panelized_fabrication(plan), output_directory,
         mode=mode_definition.mode,
+        project_name=project_name,
     )
 
 
@@ -561,10 +598,12 @@ def main(argv: list[str] | None = None) -> int:
     package = export_three_mf_package(
         model, arguments.out, mode=arguments.mode,
         surface_finish=arguments.surface_finish,
+        project_name=Path(arguments.project).stem,
     )
     print(f"Fabricate 3MF export: {package.output_directory}")
     print(f"Panels: {len(package.three_mf_paths)}")
     print(f"Manifest: {package.manifest_path}")
+    print(f"Print guide: {package.print_guide_path}")
     print(f"Geometry signature: {package.geometry_signature}")
     return 0
 

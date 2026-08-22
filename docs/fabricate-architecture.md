@@ -413,5 +413,23 @@ rather than undeclared vendor-prefixed Core model metadata.
 Bambu Studio currently warns that Mosaica's 3MF is not from Bambu Lab and will
 load geometry and color data only. That warning is expected: reliable multipart
 geometry/color import is the current compatibility target, not proprietary
-Bambu project persistence. A later mode-specific Print Guide PDF will consume
-the same structured mode definitions and manifest instructions.
+Bambu project persistence.
+
+Every Phase 3C package now includes a deterministic three-page
+`Mosaica_Print_Guide.pdf` generated from the same immutable panelization plan,
+resolved fabrication model, and finalized manifest as its 3MF files. Page 1
+records project dimensions, tile system, palette channels, the actual
+artwork-space panel map, and every debossed backside panel ID. Page 2 explains
+Core 3MF import, logical-part filament assignment, manual plate positioning,
+the P1S / 0.4 mm nozzle / 0.20 mm Standard / two-loop baseline, complete-panel
+Adaptive Variable Layer Height, and the selected Fast or Museum actions. Page 3
+provides the one-panel-per-plate and assembly checklist.
+
+The guide repeats Bambu Studio's expected non-Bambu Core 3MF warning and tells
+the operator to continue. Fast explicitly turns the Prime Tower off, requires
+No Brim, leaves ironing off, and notes that disabling the tower does not disable
+nozzle flushing. Museum keeps the Prime Tower on, uses Bambu's default brim
+without prescribing a width, records the approved ironing values, and requires
+a post-slice interference check. Assembly uses natural grout-line seams, a
+common rigid ACP/backer, and a compatible adhesive chosen by the builder; the
+guide does not prescribe an adhesive product or method.
