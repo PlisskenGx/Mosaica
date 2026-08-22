@@ -71,6 +71,7 @@ class LogicalMaterialChannel:
     display_color: str | None = None
     source_color_id: str | None = None
     palette_index: int | None = None
+    project_color_name: str | None = None
 
 
 @dataclass(frozen=True)

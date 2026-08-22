@@ -43,6 +43,7 @@ class PrintGuideContent:
     panel_columns: int
     panels: tuple[PrintGuidePanel, ...]
     palette: tuple[tuple[str, str, str], ...]
+    part_mapping: tuple[tuple[str, str, str], ...]
     mode_instructions: tuple[tuple[str, str, str, str], ...]
     core_warning: str = BAMBU_CORE_WARNING
 
@@ -125,6 +126,18 @@ def build_print_guide_content(
                 item.get("display_color") or "#808080",
             )
             for item in project["palette"]
+        ),
+        part_mapping=tuple(
+            (
+                item["user_facing_name"],
+                (
+                    "Base" if item["part_role"] == "base" else
+                    "Grout" if item["part_role"] == "grout_thinset" else
+                    item.get("project_color_name") or item.get("project_color_value")
+                ),
+                item.get("project_color_value") or "#808080",
+            )
+            for item in manifest["part_mapping"]
         ),
         mode_instructions=tuple(
             (
@@ -378,16 +391,16 @@ def _page_one(content: PrintGuideContent) -> _Page:
         "Use this artwork-space map for plate order and final assembly. Panel IDs match the debossed marks on each backside.",
     )
     y = _draw_panel_map(page, content, y)
-    page.text(42, y, "PALETTE / TILE CHANNELS", size=8.5, bold=True, color="#71717A")
-    x = 42.0
-    for channel_id, name, color in content.palette:
-        page.rect(x, y + 10, 18, 18, fill=color, stroke="#71717A", line_width=0.6)
-        page.text(
-            x + 24, y + 20, f"{name} {color.upper()}",
-            size=7.5, bold=True,
-        )
-        x += 126
-    y += 49
+    page.text(42, y, "EXPORTED PART / PROJECT COLOR", size=8.5, bold=True, color="#71717A")
+    y += 15
+    for part_name, project_color, color in content.part_mapping:
+        page.rect(42, y - 8, 10, 10, fill=color, stroke="#71717A", line_width=0.5)
+        page.text(60, y, part_name, size=7.5, bold=True)
+        page.text(305, y, project_color, size=7.5, color="#52525B")
+        if part_name.startswith("Tile "):
+            page.text(470, y, color.upper(), size=7.5, color="#52525B")
+        y += 14
+    y += 8
     page.rect(42, y, 528, 48, fill="#F4F4F5", stroke="#D4D4D8")
     page.text(56, y + 18, "BACKSIDE PANEL ID", size=8.5, bold=True, color="#52525B")
     page.wrapped_text(
@@ -425,7 +438,7 @@ def _page_two(content: PrintGuideContent) -> _Page:
     )
     y = _numbered_step(
         page, y, 3, "Map logical parts to filaments",
-        "Assign Base, Grout-Thinset, Tile Color 1, Tile Color 2, Tile Color 3, and Tile Color 4 when used to the intended filament. Shared colors may use the same physical filament.",
+        "Use the exact exported-part mapping on page 1. Assign Base, Grout-Thinset, and each named Tile part to the intended filament. Shared colors may use the same physical filament.",
     )
     y = _numbered_step(
         page, y, 4, "Position the panel manually",

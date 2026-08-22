@@ -71,7 +71,10 @@ def test_fast_guide_contains_exact_operator_actions_without_false_claims(tmp_pat
         b"does not disable nozzle flushing",
         b"panels up to 228 x 228 mm",
         b"one object with multiple logical parts",
-        b"Tile Color 4 when used",
+        b"exact exported-part mapping on page 1",
+        b"Tile 1 - Ivory",
+        b"Tile 2 - Black",
+        b"Tile 3 - Clay",
         b"Position the panel manually",
         b"complete panel",
         BAMBU_CORE_WARNING.encode(),
@@ -80,6 +83,13 @@ def test_fast_guide_contains_exact_operator_actions_without_false_claims(tmp_pat
     assert b"automatically positioned" not in pdf
     assert b"two-part epoxy" not in pdf
     assert b"cyanoacrylate" not in pdf
+    assert content.part_mapping == (
+        ("Base", "Base", "#808080"),
+        ("Grout-Thinset", "Grout", "#FAF9F6"),
+        ("Tile 1 - Ivory", "Ivory", "#FAF9F6"),
+        ("Tile 2 - Black", "Black", "#000000"),
+        ("Tile 3 - Clay", "Clay", "#B56F52"),
+    )
 
 
 def test_museum_guide_contains_exact_finish_actions_and_interference_check(tmp_path):

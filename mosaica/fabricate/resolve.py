@@ -74,6 +74,7 @@ def resolve_mosaic_project(
             "#%02X%02X%02X" % color.rgb,
             source_color_id=f"palette-{palette_index}",
             palette_index=palette_index,
+            project_color_name=color.name or None,
         ))
     tiles = tuple(
         ResolvedTile(
@@ -138,7 +139,7 @@ def resolve_designer_project(
         color = project.color_system.by_id(color_id)
         channels.append(LogicalMaterialChannel(
             _channel_id(index), f"Tile Color {index + 1}", "tile_color",
-            color.display_color, color_id,
+            color.display_color, color_id, color.order, color.name or None,
         ))
     border = build_border_layer(project.geometry, project.border_preset_id)
     border_by_id = {value.tile_id: value for value in border.assignments}

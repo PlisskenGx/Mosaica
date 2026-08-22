@@ -12,12 +12,14 @@ from mosaica.fabricate.panelize import (
 from mosaica.fabricate.phase2b import PRODUCTION_PROFILE, build_production_model
 from mosaica.fabricate.resolve import resolve_designer_project
 from mosaica.fabricate.three_mf import (
+    _part_identity,
     apply_transform,
     export_three_mf_package,
     export_panelized_three_mf_package,
     inspect_panel_3mf,
     panel_plate_transform,
 )
+from mosaica.fabricate.model import LogicalMaterialChannel
 
 
 def _single_panel_fabrication(mode="fast"):
@@ -36,6 +38,7 @@ def test_standard_3mf_package_is_valid_deterministic_and_round_trips(tmp_path):
     inspected = inspect_panel_3mf(first.three_mf_paths[0])
     assert set(inspected["package_parts"]) == {
         "[Content_Types].xml", "_rels/.rels", "3D/3dmodel.model",
+        "Metadata/model_settings.config",
     }
     assert len(inspected["meshes"]) == len(fabrication.panels[0].bodies)
     assert inspected["metadata"] == {
@@ -102,14 +105,15 @@ def test_multipart_names_channels_and_materials_remain_separate(tmp_path):
     names = [value["name"] for value in inspected["meshes"].values()]
     materials = [value["name"] for value in inspected["materials"]]
     assert names == [
-        "Panel A1 Base", "Panel A1 Grout-Thinset", "Panel A1 Tile Color 1",
-        "Panel A1 Tile Color 2", "Panel A1 Tile Color 3",
+        "Base", "Grout-Thinset", "Tile 1 - Ivory",
+        "Tile 2 - Black", "Tile 3 - Clay",
     ]
     assert materials == [
         "Base", "Grout-Thinset", "Tile Color 1", "Tile Color 2", "Tile Color 3",
     ]
     assert "Tile Color 4" not in materials
     assert len(inspected["components"][inspected["build_object_id"]]) == 5
+    assert list(inspected["bambu_part_names"].values()) == names
 
 
 def test_embedded_transform_preserves_geometry_but_is_not_a_placement_contract(tmp_path):
@@ -191,7 +195,49 @@ def test_adaptive_layer_height_is_intent_not_false_embedded_metadata(tmp_path):
     assert manifest["process_intent"]["adaptive_variable_layer_height"] == {
         "enabled": True, "embedded_in_3mf": False,
     }
-    assert manifest["architecture"]["bambu_specific_metadata_emitted"] is False
+    assert manifest["architecture"]["bambu_specific_metadata_emitted"] is True
+    assert manifest["architecture"]["bambu_metadata_scope"] == "part_names_only"
+    assert manifest["architecture"]["bambu_metadata_files"] == [
+        "Metadata/model_settings.config",
+    ]
+
+
+def test_manifest_part_mapping_matches_core_and_bambu_names(tmp_path):
+    package = export_panelized_three_mf_package(
+        _single_panel_fabrication(), tmp_path / "export",
+    )
+    manifest = json.loads(package.manifest_path.read_text())
+    inspected = inspect_panel_3mf(package.three_mf_paths[0])
+    mapping = manifest["part_mapping"]
+    assert [item["user_facing_name"] for item in mapping] == [
+        "Base", "Grout-Thinset", "Tile 1 - Ivory",
+        "Tile 2 - Black", "Tile 3 - Clay",
+    ]
+    assert [item["project_color_name"] for item in mapping[2:]] == [
+        "Ivory", "Black", "Clay",
+    ]
+    assert [item["project_color_value"] for item in mapping[2:]] == [
+        "#FAF9F6", "#000000", "#B56F52",
+    ]
+    assert [item["user_facing_name"] for item in mapping] == [
+        item["name"] for item in inspected["meshes"].values()
+    ]
+    assert manifest["schema"]["version"] == 3
+    assert all("Bambu" not in item["user_facing_name"] for item in mapping)
+
+
+def test_tile_part_identity_falls_back_to_authoritative_hex_value():
+    identity = _part_identity(LogicalMaterialChannel(
+        "tile-color-4", "Tile Color 4", "tile_color",
+        "#12ab34", "project-color-17", 16, None,
+    ))
+    assert identity == {
+        "part_role": "tile_color",
+        "user_facing_name": "Tile 4 - #12AB34",
+        "project_palette_index": 16,
+        "project_color_name": None,
+        "project_color_value": "#12AB34",
+    }
 
 
 def test_panel_identity_marking_zero_cuts_and_no_connectors_survive_package(tmp_path):

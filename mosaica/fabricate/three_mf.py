@@ -35,7 +35,8 @@ CONTENT_TYPES_NS = "http://schemas.openxmlformats.org/package/2006/content-types
 THREE_MF_RELATIONSHIP = "http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"
 P1S_PANEL_CENTER_MM = (132.0, 110.0)
 THREE_MF_SCHEMA = "mosaica-fabricate-3mf"
-THREE_MF_SCHEMA_VERSION = 2
+THREE_MF_SCHEMA_VERSION = 3
+BAMBU_MODEL_SETTINGS = "Metadata/model_settings.config"
 SurfaceFinish = Literal["standard", "ironed"]
 
 ET.register_namespace("", CORE_NS)
@@ -125,6 +126,31 @@ def _body_label(channel: LogicalMaterialChannel) -> str:
     return "Grout-Thinset" if channel.channel_id == "grout-thinset" else channel.name
 
 
+def _part_identity(channel: LogicalMaterialChannel) -> dict[str, object]:
+    if channel.channel_id == "base":
+        return {
+            "part_role": "base", "user_facing_name": "Base",
+            "project_palette_index": None, "project_color_name": None,
+            "project_color_value": None,
+        }
+    if channel.channel_id == "grout-thinset":
+        return {
+            "part_role": "grout_thinset", "user_facing_name": "Grout-Thinset",
+            "project_palette_index": None, "project_color_name": None,
+            "project_color_value": channel.display_color,
+        }
+    number = int(channel.channel_id.rsplit("-", 1)[-1])
+    color_value = (channel.display_color or "#808080").upper()
+    color_identity = (channel.project_color_name or "").strip() or color_value
+    return {
+        "part_role": "tile_color",
+        "user_facing_name": f"Tile {number} - {color_identity}",
+        "project_palette_index": channel.palette_index,
+        "project_color_name": channel.project_color_name,
+        "project_color_value": color_value,
+    }
+
+
 def _mesh_elements(parent: ET.Element, body: MeshBody) -> tuple[int, int]:
     vertices: list[tuple[float, float, float]] = []
     vertex_indices: dict[tuple[float, float, float], int] = {}
@@ -184,7 +210,7 @@ def _model_xml(
         object_element = ET.SubElement(resources, _q(CORE_NS, "object"), {
             "id": str(object_id),
             "type": "model",
-            "name": f"Panel {panel.panel_id} {_body_label(channel)}",
+            "name": str(_part_identity(channel)["user_facing_name"]),
             "pid": "1",
             "pindex": str(material_index[channel.channel_id]),
         })
@@ -194,6 +220,7 @@ def _model_xml(
             "name": object_element.attrib["name"],
             "channel_id": channel.channel_id,
             "logical_channel_name": _body_label(channel),
+            **_part_identity(channel),
             "vertex_count": vertex_count,
             "triangle_count": triangle_count,
             "source_bounds_mm": list(body.bounds_mm),
@@ -218,6 +245,38 @@ def _model_xml(
     })
     ET.indent(model, space="  ")
     return ET.tostring(model, encoding="utf-8", xml_declaration=True), transform, records
+
+
+def _bambu_model_settings_xml(
+    panel: PanelPlan,
+    assembly_id: int,
+    records: list[dict[str, object]],
+) -> bytes:
+    """Emit only Bambu's proven object/part naming bridge."""
+
+    root = ET.Element("config")
+    object_element = ET.SubElement(root, "object", {"id": str(assembly_id)})
+    ET.SubElement(object_element, "metadata", {
+        "key": "name", "value": f"Panel {panel.panel_id}",
+    })
+    for record in records:
+        part = ET.SubElement(object_element, "part", {
+            "id": str(record["object_id"]), "subtype": "normal_part",
+        })
+        ET.SubElement(part, "metadata", {
+            "key": "name", "value": str(record["user_facing_name"]),
+        })
+        ET.SubElement(part, "metadata", {
+            "key": "matrix", "value": "1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1",
+        })
+        ET.SubElement(part, "mesh_stat", {
+            "face_count": str(record["triangle_count"]),
+            "edges_fixed": "0", "degenerate_facets": "0",
+            "facets_removed": "0", "facets_reversed": "0",
+            "backwards_edges": "0",
+        })
+    ET.indent(root, space="  ")
+    return ET.tostring(root, encoding="utf-8", xml_declaration=True)
 
 
 def _relationships_xml() -> bytes:
@@ -260,12 +319,15 @@ def write_panel_3mf(
     if surface_finish is not None and surface_finish not in {"standard", "ironed"}:
         raise ValueError("Surface finish must be 'standard' or 'ironed'.")
     model_xml, transform, records = _model_xml(geometry, panel)
+    assembly_id = len(geometry.bodies) + 2
+    naming_xml = _bambu_model_settings_xml(panel, assembly_id, records)
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with ZipFile(path, "w") as archive:
         _zip_write(archive, "[Content_Types].xml", _content_types_xml())
         _zip_write(archive, "_rels/.rels", _relationships_xml())
         _zip_write(archive, "3D/3dmodel.model", model_xml)
+        _zip_write(archive, BAMBU_MODEL_SETTINGS, naming_xml)
     return path, transform, records
 
 
@@ -276,12 +338,16 @@ def inspect_panel_3mf(path: str | Path) -> dict[str, object]:
         if bad_file is not None:
             raise ValueError(f"3MF ZIP integrity failed at {bad_file}.")
         names = tuple(archive.namelist())
-        required = {"[Content_Types].xml", "_rels/.rels", "3D/3dmodel.model"}
+        required = {
+            "[Content_Types].xml", "_rels/.rels", "3D/3dmodel.model",
+            BAMBU_MODEL_SETTINGS,
+        }
         if set(names) != required:
             raise ValueError(f"3MF package parts are invalid: {names}.")
         model_xml = archive.read("3D/3dmodel.model")
         ET.fromstring(archive.read("[Content_Types].xml"))
         relationships = ET.fromstring(archive.read("_rels/.rels"))
+        naming_root = ET.fromstring(archive.read(BAMBU_MODEL_SETTINGS))
     relationship = relationships.find(_q(REL_NS, "Relationship"))
     if relationship is None or relationship.attrib.get("Target") != "/3D/3dmodel.model":
         raise ValueError("3MF model relationship is missing.")
@@ -330,6 +396,15 @@ def inspect_panel_3mf(path: str | Path) -> dict[str, object]:
     if len(build_items) != 1:
         raise ValueError("Each Phase 3B 3MF must contain exactly one panel build item.")
     transform = tuple(float(value) for value in build_items[0].attrib["transform"].split())
+    naming_object = naming_root.find("object")
+    naming_parts = {} if naming_object is None else {
+        int(part.attrib["id"]): next(
+            metadata.attrib["value"]
+            for metadata in part.findall("metadata")
+            if metadata.attrib.get("key") == "name"
+        )
+        for part in naming_object.findall("part")
+    }
     return {
         "package_parts": names,
         "metadata": metadata,
@@ -338,6 +413,7 @@ def inspect_panel_3mf(path: str | Path) -> dict[str, object]:
         "components": components,
         "build_object_id": int(build_items[0].attrib["objectid"]),
         "transform": transform,
+        "bambu_part_names": naming_parts,
     }
 
 
@@ -365,6 +441,8 @@ def validate_panel_3mf(
             for source, result in zip(source_triangle, extracted_triangle):
                 if any(abs(first - second) > 1e-8 for first, second in zip(source, result)):
                     raise ValueError(f"Panel {panel.panel_id} {body.name} geometry changed.")
+        if inspected["bambu_part_names"].get(object_id) != meshes[object_id]["name"]:
+            raise ValueError(f"Panel {panel.panel_id} part identity mapping changed.")
     return {
         "zip_integrity": True,
         "xml_valid": True,
@@ -452,6 +530,17 @@ def export_panelized_three_mf_package(
         json.dumps(signature_payload, separators=(",", ":")).encode()
     ).hexdigest()
     model = plan.model
+    part_mapping = [
+        {
+            "logical_channel_id": channel.channel_id,
+            **_part_identity(channel),
+        }
+        for channel in sorted(model.channels, key=_channel_order)
+        if any(
+            body.material_channel_id == channel.channel_id
+            for geometry in geometries.values() for body in geometry.bodies
+        )
+    ]
     manifest = {
         "schema": {"name": THREE_MF_SCHEMA, "version": THREE_MF_SCHEMA_VERSION},
         "application_version": __version__,
@@ -475,13 +564,14 @@ def export_panelized_three_mf_package(
             "palette": [
                 {
                     "channel_id": channel.channel_id,
-                    "name": channel.name,
+                    "name": channel.project_color_name or channel.display_color or "#808080",
                     "display_color": channel.display_color or "#808080",
                 }
                 for channel in model.channels
                 if channel.kind == "tile_color"
             ],
         },
+        "part_mapping": part_mapping,
         "artifacts": {
             "print_guide": GUIDE_FILENAME,
             "manifest": "manifest.json",
@@ -492,7 +582,9 @@ def export_panelized_three_mf_package(
             "multi_plate_bambu_project": False,
             "reason": "Bambu multi-plate metadata is not emitted without a documented stable contract.",
             "standard_3mf_core": True,
-            "bambu_specific_metadata_emitted": False,
+            "bambu_specific_metadata_emitted": True,
+            "bambu_metadata_scope": "part_names_only",
+            "bambu_metadata_files": [BAMBU_MODEL_SETTINGS],
         },
         "safe_panel_envelope_mm": {
             "width": plan.safe_envelope_mm[0], "height": plan.safe_envelope_mm[1],
@@ -516,8 +608,7 @@ def export_panelized_three_mf_package(
             "intent_embedded_in_3mf": False,
         },
         "logical_channel_order": [
-            "Base", "Grout-Thinset", "Tile Color 1", "Tile Color 2",
-            "Tile Color 3", "Tile Color 4",
+            item["logical_channel_id"] for item in part_mapping
         ],
         "filament_mapping": {
             "responsibility": "user_maps_logical_channels_in_bambu_studio",
@@ -540,7 +631,7 @@ def export_panelized_three_mf_package(
         "bambu_studio_review": [
             "Open one Mosaica_<panel-id>.3mf at a time; each file is one physical plate.",
             "Position each imported panel manually in Bambu Studio.",
-            "Map Base, Grout-Thinset, and each used Tile Color to available filaments.",
+            "Map Base, Grout-Thinset, and each explicitly named Tile part to available filaments.",
             *[
                 f"{setting}: {action} ({tab} tab, {control})."
                 for setting, tab, control, action
