@@ -17,6 +17,7 @@ from .mesh import (
     debossed_cell_union_base_mesh, fabrication_perimeter_bounds,
     mesh_validation,
 )
+from .modes import FabricationMode, resolve_fabrication_mode
 from .model import Point2MM, ResolvedFabricationModel, ResolvedTile
 from .phase2a import _panel_tile_body
 from .phase2b import (
@@ -26,9 +27,11 @@ from .phase2b import (
 from .resolve import resolve_mosaic_project
 
 
+# Compatibility alias for the former single production envelope. New work
+# resolves its envelope from FabricationMode before panelization.
 P1S_V1_SAFE_ENVELOPE_MM = (210.0, 210.0)
 PANELIZATION_SCHEMA = "mosaica-fabricate-panelization"
-PANELIZATION_SCHEMA_VERSION = 1
+PANELIZATION_SCHEMA_VERSION = 2
 
 
 class PanelizationError(ValueError):
@@ -59,6 +62,7 @@ class PanelPlan:
 @dataclass(frozen=True)
 class PanelizationPlan:
     model: ResolvedFabricationModel
+    fabrication_mode: FabricationMode
     safe_envelope_mm: tuple[float, float]
     theoretical_rows: int
     theoretical_columns: int
@@ -89,11 +93,14 @@ class PanelizationPackage:
 
 def theoretical_grid_counts(
     width_mm: float, height_mm: float,
-    safe_envelope_mm: tuple[float, float] = P1S_V1_SAFE_ENVELOPE_MM,
+    safe_envelope_mm: tuple[float, float] | None = None,
 ) -> tuple[int, int]:
     if width_mm <= 0 or height_mm <= 0:
         raise ValueError("Fabricated dimensions must be positive.")
-    safe_width, safe_height = safe_envelope_mm
+    safe_width, safe_height = (
+        resolve_fabrication_mode().safe_envelope_mm
+        if safe_envelope_mm is None else safe_envelope_mm
+    )
     if safe_width <= 0 or safe_height <= 0:
         raise ValueError("Panel safe-envelope dimensions must be positive.")
     return ceil(height_mm / safe_height), ceil(width_mm / safe_width)
@@ -403,9 +410,15 @@ def _evaluate_candidate(
 def panelize_model(
     model: ResolvedFabricationModel,
     *,
-    safe_envelope_mm: tuple[float, float] = P1S_V1_SAFE_ENVELOPE_MM,
+    mode: FabricationMode | str | None = None,
+    safe_envelope_mm: tuple[float, float] | None = None,
     maximum_extra_panels: int | None = None,
 ) -> PanelizationPlan:
+    mode_definition = resolve_fabrication_mode(mode)
+    safe_envelope_mm = (
+        mode_definition.safe_envelope_mm
+        if safe_envelope_mm is None else safe_envelope_mm
+    )
     bounds = fabrication_perimeter_bounds(model)
     width, height = bounds[2] - bounds[0], bounds[3] - bounds[1]
     theoretical_rows, theoretical_columns = theoretical_grid_counts(
@@ -451,7 +464,8 @@ def panelize_model(
                 valid, key=lambda value: (value[0], value[1], value[2]),
             )
             return PanelizationPlan(
-                model, safe_envelope_mm, theoretical_rows, theoretical_columns,
+                model, mode_definition.mode, safe_envelope_mm,
+                theoretical_rows, theoretical_columns,
                 panels[-1].row + 1, max(panel.column for panel in panels) + 1,
                 x_cuts, y_cuts, panels, tuple(sorted(ownership.items())), score,
                 tuple(attempted),
@@ -596,8 +610,11 @@ def _shared_seams(plan: PanelizationPlan) -> list[dict[str, object]]:
 def generate_panelization_package(
     model: ResolvedFabricationModel,
     output_directory: str | Path,
+    *,
+    mode: FabricationMode | str | None = None,
 ) -> PanelizationPackage:
-    plan = panelize_model(model)
+    mode_definition = resolve_fabrication_mode(mode)
+    plan = panelize_model(model, mode=mode_definition.mode)
     fabrication = build_panelized_fabrication(plan)
     output = Path(output_directory)
     output.mkdir(parents=True, exist_ok=True)
@@ -651,8 +668,14 @@ def generate_panelization_package(
     manifest = {
         "schema": {"name": PANELIZATION_SCHEMA, "version": PANELIZATION_SCHEMA_VERSION},
         "application_version": __version__,
-        "printer_profile_id": "bambu-p1s-mosaica-v1-safe-envelope",
-        "safe_envelope_mm": {"width": plan.safe_envelope_mm[0], "height": plan.safe_envelope_mm[1]},
+        "fabrication_mode": {
+            "id": mode_definition.mode_id,
+            "display_name": mode_definition.display_name,
+        },
+        "printer_profile_id": "bambu-p1s-mosaica-mode-envelope-v1",
+        "safe_panel_envelope_mm": {
+            "width": plan.safe_envelope_mm[0], "height": plan.safe_envelope_mm[1],
+        },
         "source_fabricated_dimensions_mm": {"width": bounds[2] - bounds[0], "height": bounds[3] - bounds[1]},
         "theoretical_starting_grid": {"rows": plan.theoretical_rows, "columns": plan.theoretical_columns},
         "final_grid": {"rows": plan.rows, "columns": plan.columns, "panel_count": len(plan.panels)},
@@ -678,10 +701,13 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Panelize a saved Mosaica project along natural grout lines.")
     parser.add_argument("--project", required=True, help="saved MosaicProject JSON")
     parser.add_argument("--out", default="fabricate_panelized_review")
+    parser.add_argument(
+        "--mode", choices=tuple(value.value for value in FabricationMode), default="fast",
+    )
     arguments = parser.parse_args(argv)
     project = MosaicProject.load(arguments.project)
     model = resolve_mosaic_project(project, PRODUCTION_PROFILE)
-    package = generate_panelization_package(model, arguments.out)
+    package = generate_panelization_package(model, arguments.out, mode=arguments.mode)
     print(f"Fabricate panelized review: {package.output_directory}")
     print(f"Manifest: {package.manifest_path}")
     print(f"Geometry signature: {package.geometry_signature}")

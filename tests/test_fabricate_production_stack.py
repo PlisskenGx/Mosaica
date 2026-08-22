@@ -102,7 +102,7 @@ def test_production_grout_datums_concavity_and_finished_height_are_exact():
 
 def test_production_profile_remains_compatible_with_unchanged_panelization():
     prototype = build_production_prototype()
-    plan = panelize_model(prototype.model)
+    plan = panelize_model(prototype.model, mode="museum")
     assert P1S_V1_SAFE_ENVELOPE_MM == (210.0, 210.0)
     assert [panel.panel_id for panel in plan.panels] == ["A1"]
     assert len(plan.tile_ownership) == len(prototype.model.tiles)

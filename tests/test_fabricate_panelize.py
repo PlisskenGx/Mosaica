@@ -4,6 +4,7 @@ import pytest
 
 from mosaica.designer import DesignerProjectShell
 from mosaica.fabricate.mesh import mesh_validation
+from mosaica.fabricate.modes import FabricationMode
 from mosaica.fabricate.panelize import (
     P1S_V1_SAFE_ENVELOPE_MM,
     PanelizationError,
@@ -31,12 +32,12 @@ def _model(
     )
 
 
-def test_theoretical_grid_uses_the_fixed_210_mm_safe_envelope():
+def test_theoretical_grid_defaults_to_the_fast_228_mm_safe_envelope():
     assert P1S_V1_SAFE_ENVELOPE_MM == (210.0, 210.0)
     assert theoretical_grid_counts(129.0, 102.0) == (1, 1)
-    assert theoretical_grid_counts(209.999, 209.999) == (1, 1)
-    assert theoretical_grid_counts(210.001, 200.0) == (1, 2)
-    assert theoretical_grid_counts(200.0, 210.001) == (2, 1)
+    assert theoretical_grid_counts(227.999, 227.999) == (1, 1)
+    assert theoretical_grid_counts(228.001, 200.0) == (1, 2)
+    assert theoretical_grid_counts(200.0, 228.001) == (2, 1)
     assert theoretical_grid_counts(610.0, 610.0) == (3, 3)
     assert theoretical_grid_counts(610.0, 915.0) == (5, 3)
 
@@ -49,8 +50,8 @@ def test_small_fixture_is_one_contiguous_a1_panel():
 
 
 def test_just_above_width_and_height_thresholds_split_on_natural_seams():
-    width_plan = panelize_model(_model(8, 7, "point_top"))
-    height_plan = panelize_model(_model(7, 8, "flat_top"))
+    width_plan = panelize_model(_model(8, 7, "point_top"), mode="museum")
+    height_plan = panelize_model(_model(7, 8, "flat_top"), mode="museum")
     assert (width_plan.theoretical_rows, width_plan.theoretical_columns) == (1, 2)
     assert (width_plan.rows, width_plan.columns) == (1, 2)
     assert (height_plan.theoretical_rows, height_plan.theoretical_columns) == (2, 1)
@@ -60,7 +61,7 @@ def test_just_above_width_and_height_thresholds_split_on_natural_seams():
 def test_actual_irregular_bounds_are_enforced_and_can_escalate_panel_count():
     # The 404 mm field theoretically needs two rows, but every two-row natural
     # split leaves one irregular cell-union bound over 210 mm. Three rows fit.
-    plan = panelize_model(_model(2, 21, "point_top", "s"))
+    plan = panelize_model(_model(2, 21, "point_top", "s"), mode="museum")
     assert (plan.theoretical_rows, plan.theoretical_columns) == (2, 1)
     assert (plan.rows, plan.columns) == (3, 1)
     assert len(plan.panels) == 3
@@ -144,23 +145,32 @@ def test_panelized_bodies_preserve_tile_geometry_labels_and_concave_grout():
     assert sorted(exported_tile_ids) == sorted(tile.tile_id for tile in model.tiles)
 
 
-def test_24_inch_square_escalates_from_3_by_3_to_the_minimum_valid_grid():
+def test_24_inch_square_differs_between_fast_and_museum_modes():
     model = resolve_designer_project(
         DesignerProjectShell.create("square", "l"), PRODUCTION_PROFILE,
     )
-    plan = panelize_model(model)
-    assert (plan.theoretical_rows, plan.theoretical_columns) == (3, 3)
-    assert (plan.rows, plan.columns, len(plan.panels)) == (4, 3, 12)
-    assert plan.attempted_layouts == ((3, 3), (3, 4), (4, 3))
-    assert max(panel.width_mm for panel in plan.panels) <= 210.0
-    assert max(panel.height_mm for panel in plan.panels) <= 210.0
+    fast = panelize_model(model, mode="fast")
+    museum = panelize_model(model, mode="museum")
+    assert fast.fabrication_mode is FabricationMode.FAST
+    assert museum.fabrication_mode is FabricationMode.MUSEUM
+    assert (fast.theoretical_rows, fast.theoretical_columns) == (3, 3)
+    assert (fast.rows, fast.columns, len(fast.panels)) == (3, 3, 9)
+    assert (museum.theoretical_rows, museum.theoretical_columns) == (3, 3)
+    assert (museum.rows, museum.columns, len(museum.panels)) == (4, 3, 12)
+    assert fast.tile_ownership != museum.tile_ownership
+    for plan, limit in ((fast, 228.0), (museum, 210.0)):
+        assigned = [tile_id for panel in plan.panels for tile_id in panel.tile_ids]
+        assert len(assigned) == len(set(assigned)) == len(model.tiles)
+        assert max(panel.width_mm for panel in plan.panels) <= limit
+        assert max(panel.height_mm for panel in plan.panels) <= limit
+        assert panelize_model(model, mode=plan.fabrication_mode) == plan
 
 
 def test_24_by_36_portrait_uses_the_minimum_5_by_3_grid():
     model = resolve_designer_project(
         DesignerProjectShell.create("portrait", "l"), PRODUCTION_PROFILE,
     )
-    plan = panelize_model(model)
+    plan = panelize_model(model, mode="museum")
     assert (plan.theoretical_rows, plan.theoretical_columns) == (5, 3)
     assert (plan.rows, plan.columns, len(plan.panels)) == (5, 3, 15)
     assert [panel.panel_id for panel in plan.panels[:4]] == ["A1", "A2", "A3", "B1"]
@@ -170,8 +180,8 @@ def test_24_by_36_portrait_uses_the_minimum_5_by_3_grid():
 
 
 def test_point_and_flat_top_panelization_are_both_supported():
-    point = panelize_model(_model(8, 7, "point_top"))
-    flat = panelize_model(_model(7, 8, "flat_top"))
+    point = panelize_model(_model(8, 7, "point_top"), mode="museum")
+    flat = panelize_model(_model(7, 8, "flat_top"), mode="museum")
     assert point.model.tile_orientation == "point_top"
     assert flat.model.tile_orientation == "flat_top"
     assert all(panel.fits_safe_envelope for panel in point.panels + flat.panels)

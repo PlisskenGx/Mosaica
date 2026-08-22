@@ -1,0 +1,240 @@
+import json
+from xml.etree import ElementTree as ET
+from zipfile import ZipFile
+
+import pytest
+
+from mosaica.designer import DesignerProjectShell
+from mosaica.fabricate.panelize import (
+    build_panelized_fabrication,
+    panelize_model,
+)
+from mosaica.fabricate.phase2b import PRODUCTION_PROFILE, build_production_model
+from mosaica.fabricate.resolve import resolve_designer_project
+from mosaica.fabricate.three_mf import (
+    apply_transform,
+    export_three_mf_package,
+    export_panelized_three_mf_package,
+    inspect_panel_3mf,
+    panel_plate_transform,
+)
+
+
+def _single_panel_fabrication(mode="fast"):
+    model = build_production_model()
+    return build_panelized_fabrication(panelize_model(model, mode=mode))
+
+
+def test_standard_3mf_package_is_valid_deterministic_and_round_trips(tmp_path):
+    fabrication = _single_panel_fabrication()
+    first = export_panelized_three_mf_package(fabrication, tmp_path / "first")
+    second = export_panelized_three_mf_package(fabrication, tmp_path / "second")
+    assert first.geometry_signature == second.geometry_signature
+    assert first.manifest_path.read_bytes() == second.manifest_path.read_bytes()
+    assert [path.name for path in first.three_mf_paths] == ["Mosaica_A1.3mf"]
+    assert first.three_mf_paths[0].read_bytes() == second.three_mf_paths[0].read_bytes()
+    inspected = inspect_panel_3mf(first.three_mf_paths[0])
+    assert set(inspected["package_parts"]) == {
+        "[Content_Types].xml", "_rels/.rels", "3D/3dmodel.model",
+    }
+    assert len(inspected["meshes"]) == len(fabrication.panels[0].bodies)
+    assert inspected["metadata"] == {
+        "Title": "Mosaica Panel A1", "Application": "Mosaica 2.0.0",
+    }
+    with ZipFile(first.three_mf_paths[0]) as archive:
+        assert archive.testzip() is None
+
+
+def test_opc_documents_use_bambu_compatible_default_namespace_serialization(tmp_path):
+    package = export_panelized_three_mf_package(
+        _single_panel_fabrication(), tmp_path / "export",
+    )
+    with ZipFile(package.three_mf_paths[0]) as archive:
+        content_types = archive.read("[Content_Types].xml")
+        relationships = archive.read("_rels/.rels")
+        model = archive.read("3D/3dmodel.model")
+
+    assert b"ns0:" not in content_types
+    assert b"ns0:" not in relationships
+    assert (
+        b'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        in content_types
+    )
+    assert (
+        b'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        in relationships
+    )
+    content_root = ET.fromstring(content_types)
+    relationship_root = ET.fromstring(relationships)
+    assert content_root.tag == (
+        "{http://schemas.openxmlformats.org/package/2006/content-types}Types"
+    )
+    relationship = relationship_root.find(
+        "{http://schemas.openxmlformats.org/package/2006/relationships}Relationship"
+    )
+    assert relationship is not None
+    assert relationship.attrib == {
+        "Target": "/3D/3dmodel.model",
+        "Id": "rel0",
+        "Type": "http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel",
+    }
+    model_root = ET.fromstring(model)
+    metadata_names = [
+        item.attrib["name"]
+        for item in model_root.findall(
+            "{http://schemas.microsoft.com/3dmanufacturing/core/2015/02}metadata"
+        )
+    ]
+    assert metadata_names == ["Title", "Application"]
+    assert all(":" not in name for name in metadata_names)
+    build_item = model_root.find(
+        "{http://schemas.microsoft.com/3dmanufacturing/core/2015/02}build/"
+        "{http://schemas.microsoft.com/3dmanufacturing/core/2015/02}item"
+    )
+    assert build_item is not None
+    assert build_item.attrib["printable"] == "1"
+
+
+def test_multipart_names_channels_and_materials_remain_separate(tmp_path):
+    fabrication = _single_panel_fabrication()
+    package = export_panelized_three_mf_package(fabrication, tmp_path / "export")
+    inspected = inspect_panel_3mf(package.three_mf_paths[0])
+    names = [value["name"] for value in inspected["meshes"].values()]
+    materials = [value["name"] for value in inspected["materials"]]
+    assert names == [
+        "Panel A1 Base", "Panel A1 Grout-Thinset", "Panel A1 Tile Color 1",
+        "Panel A1 Tile Color 2", "Panel A1 Tile Color 3",
+    ]
+    assert materials == [
+        "Base", "Grout-Thinset", "Tile Color 1", "Tile Color 2", "Tile Color 3",
+    ]
+    assert "Tile Color 4" not in materials
+    assert len(inspected["components"][inspected["build_object_id"]]) == 5
+
+
+def test_embedded_transform_preserves_geometry_but_is_not_a_placement_contract(tmp_path):
+    fabrication = _single_panel_fabrication()
+    panel = fabrication.plan.panels[0]
+    transform = panel_plate_transform(panel.bounds_mm)
+    points = [
+        apply_transform(point, transform)
+        for body in fabrication.panels[0].bodies
+        for triangle in body.triangles for point in triangle
+    ]
+    source_points = [
+        point for body in fabrication.panels[0].bodies
+        for triangle in body.triangles for point in triangle
+    ]
+    assert round(max(p[0] for p in points) - min(p[0] for p in points), 9) == round(
+        max(p[0] for p in source_points) - min(p[0] for p in source_points), 9,
+    )
+    assert round(max(p[1] for p in points) - min(p[1] for p in points), 9) == round(
+        max(p[1] for p in source_points) - min(p[1] for p in source_points), 9,
+    )
+    rotated = panel_plate_transform(panel.bounds_mm, 90)
+    assert rotated != transform
+    package = export_panelized_three_mf_package(fabrication, tmp_path / "export")
+    manifest = json.loads(package.manifest_path.read_text())
+    assert manifest["panel_placement"]["automatic_position_guaranteed"] is False
+
+
+def test_fast_manifest_records_mode_actions_without_claiming_plate_placement(tmp_path):
+    package = export_panelized_three_mf_package(
+        _single_panel_fabrication(), tmp_path / "export",
+    )
+    manifest = json.loads(package.manifest_path.read_text())
+    assert manifest["fabrication_mode"]["id"] == "fast"
+    assert manifest["safe_panel_envelope_mm"] == {"width": 228.0, "height": 228.0}
+    assert manifest["panel_placement"] == {
+        "responsibility": "user_positions_imported_panel_in_bambu_studio",
+        "automatic_position_guaranteed": False,
+        "proprietary_bambu_placement_metadata_emitted": False,
+    }
+    assert manifest["process_intent"]["prime_tower"]["user_action"] == {
+        "tab": "Others", "control": "Enable", "action": "Uncheck",
+    }
+    assert manifest["process_intent"]["brim"]["user_action"] == {
+        "tab": "Others", "control": "Brim type", "action": "Set to No Brim",
+    }
+
+
+def test_fast_and_museum_process_intent_do_not_change_same_panel_geometry(tmp_path):
+    fast = export_panelized_three_mf_package(
+        _single_panel_fabrication("fast"), tmp_path / "fast",
+    )
+    museum = export_panelized_three_mf_package(
+        _single_panel_fabrication("museum"), tmp_path / "museum",
+    )
+    fast_manifest = json.loads(fast.manifest_path.read_text())
+    museum_manifest = json.loads(museum.manifest_path.read_text())
+    assert fast_manifest["process_intent"]["ironing"] == {"enabled": False}
+    assert museum_manifest["process_intent"]["ironing"] == {
+        "enabled": True, "type": "Topmost surfaces", "pattern": "Concentric",
+        "flow_percent": 18, "speed_mm_s": 30, "line_spacing_mm": 0.15,
+    }
+    assert museum_manifest["process_intent"]["brim"] == {
+        "recommendation": "Bambu default",
+    }
+    assert "width_mm" not in museum_manifest["process_intent"]["brim"]
+    fast_meshes = inspect_panel_3mf(fast.three_mf_paths[0])["meshes"]
+    museum_meshes = inspect_panel_3mf(museum.three_mf_paths[0])["meshes"]
+    assert [value["triangles"] for value in fast_meshes.values()] == [
+        value["triangles"] for value in museum_meshes.values()
+    ]
+
+
+def test_adaptive_layer_height_is_intent_not_false_embedded_metadata(tmp_path):
+    package = export_panelized_three_mf_package(
+        _single_panel_fabrication(), tmp_path / "export",
+    )
+    manifest = json.loads(package.manifest_path.read_text())
+    assert manifest["process_intent"]["adaptive_variable_layer_height"] == {
+        "enabled": True, "embedded_in_3mf": False,
+    }
+    assert manifest["architecture"]["bambu_specific_metadata_emitted"] is False
+
+
+def test_panel_identity_marking_zero_cuts_and_no_connectors_survive_package(tmp_path):
+    package = export_panelized_three_mf_package(
+        _single_panel_fabrication(), tmp_path / "export",
+    )
+    manifest = json.loads(package.manifest_path.read_text())
+    panel = manifest["panels"][0]
+    assert panel["panel_id"] == panel["plate_id"] == "A1"
+    assert panel["filename"] == "Mosaica_A1.3mf"
+    assert panel["backside_marking"] == {
+        "content": "A1", "cell_size_mm": 1.0, "deboss_depth_mm": 0.35,
+    }
+    assert panel["validation"]["geometry_round_trip"] is True
+    assert manifest["panelization"]["tile_cuts_created"] == 0
+    assert manifest["panelization"]["dedicated_connector_geometry"] is False
+
+
+def test_24_inch_project_exports_one_stable_3mf_per_panel(tmp_path):
+    model = resolve_designer_project(
+        DesignerProjectShell.create("square", "l"), PRODUCTION_PROFILE,
+    )
+    fabrication = build_panelized_fabrication(panelize_model(model, mode="fast"))
+    package = export_panelized_three_mf_package(fabrication, tmp_path / "export")
+    manifest = json.loads(package.manifest_path.read_text())
+    assert manifest["panelization"] == {
+        "theoretical_rows": 3, "theoretical_columns": 3,
+        "final_rows": 3, "final_columns": 3, "panel_count": 9,
+        "tile_cuts_created": 0, "dedicated_connector_geometry": False,
+    }
+    assert [path.name for path in package.three_mf_paths] == [
+        f"Mosaica_{row}{column}.3mf"
+        for row in "ABC" for column in range(1, 4)
+    ]
+    assert all(panel["validation"]["geometry_round_trip"] for panel in manifest["panels"])
+    assert all(panel["logical_channel_count"] >= 3 for panel in manifest["panels"])
+
+
+def test_legacy_surface_finish_maps_to_mode_before_panelization(tmp_path):
+    with pytest.warns(DeprecationWarning):
+        package = export_three_mf_package(
+            build_production_model(), tmp_path / "legacy", surface_finish="ironed",
+        )
+    manifest = json.loads(package.manifest_path.read_text())
+    assert manifest["fabrication_mode"]["id"] == "museum"
+    assert manifest["safe_panel_envelope_mm"] == {"width": 210.0, "height": 210.0}

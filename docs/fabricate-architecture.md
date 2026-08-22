@@ -314,19 +314,11 @@ Run saved MosaicProject panelization with:
 python -m mosaica.fabricate.panelize --project PROJECT.json --out fabricate_panelized_review
 ```
 
-Phase 3A does not generate production 3MF files or slicer plates. Production
-3MF packaging remains a later stage and will consume the validated P1S process
-candidate without changing panel geometry. Phase 3B plate planning should
-reserve a predictable prime-tower region and place the panel toward the
-opposite usable area instead of simply centering it. Until that slicer-aware
-planning exists, 210 × 210 mm remains the fixed Mosaica v1 envelope.
-
-The known-good future Phase 3B placement reference centers the **mosaic panel**
-at **X = 132 mm, Y = 110 mm** on the P1S plate. These are panel-placement
-coordinates, not Prime Tower coordinates. Bambu Studio determines Prime Tower
-position automatically; its brim width is 0 mm. The reference clears the
-automatic tower and restricted/off-limits area, but is documentation only and
-does not implement plate placement.
+Phase 3A itself does not generate 3MF files or slicer plates. Phase 3C resolves
+the fabrication mode before invoking the unchanged natural-seam panelizer.
+Fast supplies a 228 × 228 mm envelope; Museum supplies 210 × 210 mm. The mode
+may therefore change the panel grid, seams, IDs, and neighbors without changing
+tile geometry or the optimizer's priorities.
 
 ## Approved 4.6 mm production stack
 
@@ -348,4 +340,78 @@ Generate the compact A1/A2 production fixture with:
 python -m mosaica.fabricate.phase2b --out fabricate_production_review
 ```
 
-Production 3MF packaging and slicer-setting injection remain deferred.
+Slicer-setting injection remains deferred.
+
+## Phase 3B production 3MF and P1S plate planning
+
+Phase 3B writes one standards-compliant multipart 3MF file per physical panel,
+plus a project-level JSON manifest. Files use deterministic identities such as
+`Mosaica_A1.3mf`; each contains one build item named `Panel A1`, composed from
+separate Base, Grout-Thinset, and used Tile Color mesh objects. Unused Tile
+Color channels are omitted. The logical bodies remain independent even when a
+user later assigns several of them to one physical filament.
+
+This one-file-per-panel strategy is the deliberate v1 fallback because the
+repository does not have a documented, stable contract for Bambu's proprietary
+multi-plate project metadata. The files contain standard 3MF Core model,
+component, Base Materials, build-item, and affine-transform structures. No
+Bambu-specific extension is claimed or synthesized. Bambu Studio owns the
+user's AMS/filament mapping and may map six logical channels across more than
+one AMS or map several logical channels to one filament.
+
+Every panel retains global artwork-space mesh coordinates and logical bounds.
+Bambu Studio does not preserve Mosaica's requested plate location when it
+imports a non-Bambu 3MF, so the export no longer promises automatic X/Y
+placement. The user positions each imported panel in Bambu Studio. Print
+rotation metadata accepts 0° or 90° without changing logical panel identity or
+backside-mark semantics.
+
+Phase 3C defines two fabrication modes from one authoritative mode profile:
+
+- **Fast** uses the physically validated 228 × 228 mm envelope, disables the
+  Prime Tower, requires **Others → Brim type → No Brim**, leaves ironing off,
+  and enables Adaptive Variable Layer Height. It targets good finished quality
+  with fewer/larger panels while accepting a small risk of minor color transfer.
+- **Museum** uses the 210 × 210 mm envelope, enables the Prime Tower, leaves
+  brim behavior at the Bambu default, enables Adaptive Variable Layer Height,
+  and uses Topmost surfaces / Concentric ironing at 18% flow, 30 mm/s, and
+  0.15 mm spacing. It prioritizes maximum finish quality and color purity.
+
+These settings are structured process intent in `manifest.json`; they are not
+embedded as undocumented slicer state. Museum intentionally contains no Prime
+Tower brim-width recommendation.
+
+Generate a saved-project package with:
+
+```bash
+python -m mosaica.fabricate.three_mf \
+  --project PROJECT.json \
+  --out fabricate_3mf_export \
+  --mode fast
+```
+
+Use `--mode museum` for the premium workflow. The former `--surface-finish`
+option remains a deprecated CLI/API bridge (`standard` maps to Fast; `ironed`
+maps to Museum) so the mode still resolves before panelization.
+
+The manifest records the panel grid, identities, neighbors, logical and plate
+coordinates, channel ordering, physical profile, process intent, SHA-256
+signatures, zero tile cuts, no connectors, and round-trip validation. Print
+time and filament estimates remain unavailable until an actual slicer provides
+them. Future UI integration can expose export and logical-to-physical filament
+mapping without changing generation or panelization.
+
+Bambu Studio compatibility requires the OPC package documents to serialize
+their Content Types and Relationships namespaces as default namespaces.
+Namespace-equivalent `ns0:Types` and `ns0:Relationships` output was rejected by
+Bambu Studio as containing no geometry; the corresponding default-namespace
+form loaded successfully. This requirement was isolated with a controlled
+Bambu-generated R1/R5 comparison and is enforced with raw-byte regression
+tests. Mosaica-specific process and panel metadata remains in `manifest.json`
+rather than undeclared vendor-prefixed Core model metadata.
+
+Bambu Studio currently warns that Mosaica's 3MF is not from Bambu Lab and will
+load geometry and color data only. That warning is expected: reliable multipart
+geometry/color import is the current compatibility target, not proprietary
+Bambu project persistence. A later mode-specific Print Guide PDF will consume
+the same structured mode definitions and manifest instructions.

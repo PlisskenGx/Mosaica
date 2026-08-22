@@ -14,7 +14,14 @@ mosaic_output/*.3mf
 /fabricate_production_review/
 /fabricate_panelized_review/
 /fabricate_thin_stack_review/
+/fabricate_3mf_review/
+/fabricate_3mf_bambu_validation/
+/fabricate_phase3c_review/
+/three_mf_compatibility_probes/
+/three_mf_bambu_reduction_probes/
+/three_mf_bambu_additive_probes/
 /fabrication_output/
 /print_parts/
 /archive/veradura/viability/fabricate_phase1_1_review/*.3mf
 *.egg-info/
+/reference/bambu_3mf/
