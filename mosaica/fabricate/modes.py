@@ -5,7 +5,7 @@ from enum import Enum
 
 
 class FabricationMode(str, Enum):
-    FAST = "fast"
+    STUDIO = "studio"
     MUSEUM = "museum"
 
 
@@ -28,7 +28,7 @@ class FabricationModeDefinition:
     def process_intent(self) -> dict[str, object]:
         prime_tower: dict[str, object] = {"enabled": self.prime_tower_enabled}
         brim: dict[str, object]
-        if self.mode is FabricationMode.FAST:
+        if self.mode is FabricationMode.STUDIO:
             prime_tower["user_action"] = {
                 "tab": "Others", "control": "Enable", "action": "Uncheck",
             }
@@ -59,9 +59,9 @@ class FabricationModeDefinition:
         }
 
 
-FAST_MODE = FabricationModeDefinition(
-    FabricationMode.FAST, "Fast", (228.0, 228.0), False, "No Brim", False, True,
-    "Good finished quality with fewer or larger panels and a small risk of minor color transfer.",
+STUDIO_MODE = FabricationModeDefinition(
+    FabricationMode.STUDIO, "Studio", (228.0, 228.0), False, "No Brim", False, True,
+    "Efficient production with fewer panels and a small risk of minor color transfer.",
     (
         ("Prime Tower", "Others", "Enable", "Uncheck"),
         ("Brim", "Others", "Brim type", "Set to No Brim"),
@@ -82,7 +82,7 @@ MUSEUM_MODE = FabricationModeDefinition(
 )
 
 FABRICATION_MODES = {
-    FabricationMode.FAST: FAST_MODE,
+    FabricationMode.STUDIO: STUDIO_MODE,
     FabricationMode.MUSEUM: MUSEUM_MODE,
 }
 
@@ -91,7 +91,7 @@ def resolve_fabrication_mode(
     mode: FabricationMode | str | None = None,
 ) -> FabricationModeDefinition:
     if mode is None:
-        return FAST_MODE
+        return STUDIO_MODE
     try:
         resolved = mode if isinstance(mode, FabricationMode) else FabricationMode(mode)
     except ValueError as error:
@@ -102,6 +102,6 @@ def resolve_fabrication_mode(
 
 def resolve_legacy_surface_finish(surface_finish: str) -> FabricationModeDefinition:
     try:
-        return {"standard": FAST_MODE, "ironed": MUSEUM_MODE}[surface_finish]
+        return {"standard": STUDIO_MODE, "ironed": MUSEUM_MODE}[surface_finish]
     except KeyError as error:
         raise ValueError("Surface finish must be 'standard' or 'ironed'.") from error

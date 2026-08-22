@@ -702,7 +702,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--project", required=True, help="saved MosaicProject JSON")
     parser.add_argument("--out", default="fabricate_panelized_review")
     parser.add_argument(
-        "--mode", choices=tuple(value.value for value in FabricationMode), default="fast",
+        "--mode", choices=tuple(value.value for value in FabricationMode), default="studio",
     )
     arguments = parser.parse_args(argv)
     project = MosaicProject.load(arguments.project)

@@ -32,7 +32,7 @@ def _model(
     )
 
 
-def test_theoretical_grid_defaults_to_the_fast_228_mm_safe_envelope():
+def test_theoretical_grid_defaults_to_the_studio_228_mm_safe_envelope():
     assert P1S_V1_SAFE_ENVELOPE_MM == (210.0, 210.0)
     assert theoretical_grid_counts(129.0, 102.0) == (1, 1)
     assert theoretical_grid_counts(227.999, 227.999) == (1, 1)
@@ -145,20 +145,20 @@ def test_panelized_bodies_preserve_tile_geometry_labels_and_concave_grout():
     assert sorted(exported_tile_ids) == sorted(tile.tile_id for tile in model.tiles)
 
 
-def test_24_inch_square_differs_between_fast_and_museum_modes():
+def test_24_inch_square_differs_between_studio_and_museum_modes():
     model = resolve_designer_project(
         DesignerProjectShell.create("square", "l"), PRODUCTION_PROFILE,
     )
-    fast = panelize_model(model, mode="fast")
+    studio = panelize_model(model, mode="studio")
     museum = panelize_model(model, mode="museum")
-    assert fast.fabrication_mode is FabricationMode.FAST
+    assert studio.fabrication_mode is FabricationMode.STUDIO
     assert museum.fabrication_mode is FabricationMode.MUSEUM
-    assert (fast.theoretical_rows, fast.theoretical_columns) == (3, 3)
-    assert (fast.rows, fast.columns, len(fast.panels)) == (3, 3, 9)
+    assert (studio.theoretical_rows, studio.theoretical_columns) == (3, 3)
+    assert (studio.rows, studio.columns, len(studio.panels)) == (3, 3, 9)
     assert (museum.theoretical_rows, museum.theoretical_columns) == (3, 3)
     assert (museum.rows, museum.columns, len(museum.panels)) == (4, 3, 12)
-    assert fast.tile_ownership != museum.tile_ownership
-    for plan, limit in ((fast, 228.0), (museum, 210.0)):
+    assert studio.tile_ownership != museum.tile_ownership
+    for plan, limit in ((studio, 228.0), (museum, 210.0)):
         assigned = [tile_id for panel in plan.panels for tile_id in panel.tile_ids]
         assert len(assigned) == len(set(assigned)) == len(model.tiles)
         assert max(panel.width_mm for panel in plan.panels) <= limit

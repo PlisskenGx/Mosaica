@@ -41,6 +41,7 @@ class DesignerExportResult:
         return {
             "output_directory": str(self.output_directory),
             "mode": self.mode.value,
+            "mode_display_name": resolve_fabrication_mode(self.mode).display_name,
             "panel_count": self.panel_count,
             "three_mf_count": self.three_mf_count,
             "print_guide": self.print_guide_path.name,
@@ -68,7 +69,7 @@ def panelization_summary(plan: PanelizationPlan) -> dict:
         "mode": {
             "id": mode.mode_id,
             "display_name": mode.display_name,
-            "recommended": mode.mode is FabricationMode.FAST,
+            "recommended": mode.mode is FabricationMode.STUDIO,
         },
         "panel_count": len(plan.panels),
         "rows": plan.rows,
@@ -168,12 +169,23 @@ class DesignerFabricationExportService:
         snapshot: DesignerExportSnapshot,
         mode: FabricationMode | str,
         output_directory: str | Path,
+        progress: Callable[[dict[str, object]], None] | None = None,
     ) -> DesignerExportResult:
         from .fabricate.three_mf import export_three_mf_package
 
         definition = resolve_fabrication_mode(mode)
+        if progress is not None:
+            progress({
+                "phase": "resolving",
+                "current_panel": None,
+                "completed_panels": 0,
+                "total_panels": 0,
+                "panel_index": None,
+                "message": "Resolving your design…",
+            })
+        model = self._model(snapshot)
         package = export_three_mf_package(
-            self._model(snapshot),
+            model,
             output_directory,
             mode=definition.mode,
             project_name=(
@@ -181,6 +193,7 @@ class DesignerFabricationExportService:
                 if snapshot.document_title.strip().lower() in {"", "untitled"}
                 else snapshot.document_title.strip()
             ),
+            progress=progress,
         )
         return DesignerExportResult(
             output_directory=package.output_directory,

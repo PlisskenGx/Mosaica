@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from hashlib import sha256
 import json
 from pathlib import Path
-from typing import Literal
+from typing import Callable, Literal
 import warnings
 from xml.etree import ElementTree as ET
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
@@ -38,8 +38,30 @@ THREE_MF_SCHEMA = "mosaica-fabricate-3mf"
 THREE_MF_SCHEMA_VERSION = 3
 BAMBU_MODEL_SETTINGS = "Metadata/model_settings.config"
 SurfaceFinish = Literal["standard", "ironed"]
+ExportProgressCallback = Callable[[dict[str, object]], None]
 
 ET.register_namespace("", CORE_NS)
+
+
+def _notify_progress(
+    callback: ExportProgressCallback | None,
+    phase: str,
+    message: str,
+    *,
+    current_panel: str | None = None,
+    completed_panels: int = 0,
+    total_panels: int = 0,
+    panel_index: int | None = None,
+) -> None:
+    if callback is not None:
+        callback({
+            "phase": phase,
+            "current_panel": current_panel,
+            "completed_panels": completed_panels,
+            "total_panels": total_panels,
+            "panel_index": panel_index,
+            "message": message,
+        })
 
 
 @dataclass(frozen=True)
@@ -463,7 +485,7 @@ def _resolve_export_mode(
         return selected
     legacy = resolve_legacy_surface_finish(surface_finish)
     warnings.warn(
-        "--surface-finish is deprecated; use --mode fast or --mode museum.",
+        "--surface-finish is deprecated; use --mode studio or --mode museum.",
         DeprecationWarning,
         stacklevel=3,
     )
@@ -483,6 +505,7 @@ def export_panelized_three_mf_package(
     mode: FabricationMode | str | None = None,
     surface_finish: SurfaceFinish | None = None,
     project_name: str | None = None,
+    progress: ExportProgressCallback | None = None,
 ) -> ThreeMFExportPackage:
     plan = fabrication.plan
     mode_definition = _resolve_export_mode(
@@ -496,7 +519,16 @@ def export_panelized_three_mf_package(
     output.mkdir(parents=True, exist_ok=True)
     geometries = {value.panel_id: value for value in fabrication.panels}
     panel_records, paths = [], []
-    for panel in plan.panels:
+    total_panels = len(plan.panels)
+    for panel_index, panel in enumerate(plan.panels, start=1):
+        _notify_progress(
+            progress, "building_panel",
+            f"Building Panel {panel.panel_id} · {panel_index} of {total_panels}",
+            current_panel=panel.panel_id,
+            completed_panels=panel_index - 1,
+            total_panels=total_panels,
+            panel_index=panel_index,
+        )
         geometry = geometries[panel.panel_id]
         filename = f"Mosaica_{panel.panel_id}.3mf"
         path, transform, bodies = write_panel_3mf(
@@ -529,6 +561,10 @@ def export_panelized_three_mf_package(
     signature = sha256(
         json.dumps(signature_payload, separators=(",", ":")).encode()
     ).hexdigest()
+    _notify_progress(
+        progress, "writing_manifest", "Writing manifest.json…",
+        completed_panels=total_panels, total_panels=total_panels,
+    )
     model = plan.model
     part_mapping = [
         {
@@ -644,8 +680,16 @@ def export_panelized_three_mf_package(
     manifest_path.write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8",
     )
+    _notify_progress(
+        progress, "creating_print_guide", "Creating your Print Guide…",
+        completed_panels=total_panels, total_panels=total_panels,
+    )
     print_guide_path = generate_print_guide(
         plan, manifest, output / GUIDE_FILENAME,
+    )
+    _notify_progress(
+        progress, "finalizing", "Finalizing fabrication package…",
+        completed_panels=total_panels, total_panels=total_panels,
     )
     return ThreeMFExportPackage(
         output, manifest_path, tuple(paths), signature, print_guide_path,
@@ -659,13 +703,20 @@ def export_three_mf_package(
     mode: FabricationMode | str | None = None,
     surface_finish: SurfaceFinish | None = None,
     project_name: str | None = None,
+    progress: ExportProgressCallback | None = None,
 ) -> ThreeMFExportPackage:
     mode_definition = _resolve_export_mode(mode, surface_finish)
+    _notify_progress(progress, "panelizing", "Planning fabrication panels…")
     plan = panelize_model(model, mode=mode_definition.mode)
+    _notify_progress(
+        progress, "preparing_panels", "Preparing panel geometry…",
+        total_panels=len(plan.panels),
+    )
     return export_panelized_three_mf_package(
         build_panelized_fabrication(plan), output_directory,
         mode=mode_definition.mode,
         project_name=project_name,
+        progress=progress,
     )
 
 
@@ -677,11 +728,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", default="fabricate_3mf_export")
     parser.add_argument(
         "--mode", choices=tuple(value.value for value in FabricationMode), default=None,
-        help="fabrication strategy (default: fast)",
+        help="fabrication strategy (default: studio)",
     )
     parser.add_argument(
         "--surface-finish", choices=("standard", "ironed"), default=None,
-        help="deprecated compatibility option: standard=fast, ironed=museum",
+        help="deprecated compatibility option: standard=studio, ironed=museum",
     )
     arguments = parser.parse_args(argv)
     project = MosaicProject.load(arguments.project)

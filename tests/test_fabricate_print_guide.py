@@ -27,7 +27,7 @@ def _export(tmp_path, mode, *, project_name="Print Guide Fixture"):
 
 def test_print_guide_is_created_from_authoritative_project_and_panel_data(tmp_path):
     model, before, fabrication, package, manifest, content = _export(
-        tmp_path, "fast",
+        tmp_path, "studio",
     )
     assert package.print_guide_path.name == GUIDE_FILENAME
     assert package.print_guide_path.is_file()
@@ -37,7 +37,12 @@ def test_print_guide_is_created_from_authoritative_project_and_panel_data(tmp_pa
     assert pdf.count(b"/Type /Page ") == 3
     assert b"Print Guide Fixture" in pdf
     assert b"by Veradura Design" in pdf
-    assert b"FAST MODE" in pdf
+    assert b"STUDIO MODE" in pdf
+    assert manifest["fabrication_mode"] == {
+        "id": "studio",
+        "display_name": "Studio",
+        "quality_tradeoff": manifest["fabrication_mode"]["quality_tradeoff"],
+    }
     assert manifest["artifacts"]["print_guide"] == GUIDE_FILENAME
 
     assert content.project_name == "Print Guide Fixture"
@@ -55,10 +60,10 @@ def test_print_guide_is_created_from_authoritative_project_and_panel_data(tmp_pa
     assert model.to_dict() == before
 
 
-def test_fast_guide_contains_exact_operator_actions_without_false_claims(tmp_path):
-    _, _, _, package, _, content = _export(tmp_path, "fast")
+def test_studio_guide_contains_exact_operator_actions_without_false_claims(tmp_path):
+    _, _, _, package, _, content = _export(tmp_path, "studio")
     pdf = package.print_guide_path.read_bytes()
-    assert content.mode_id == "fast"
+    assert content.mode_id == "studio"
     assert content.mode_instructions == (
         ("Prime Tower", "Others", "Enable", "Uncheck"),
         ("Brim", "Others", "Brim type", "Set to No Brim"),
@@ -69,6 +74,7 @@ def test_fast_guide_contains_exact_operator_actions_without_false_claims(tmp_pat
         b"Brim: No Brim",
         b"Ironing: OFF",
         b"does not disable nozzle flushing",
+        b"Studio mode",
         b"panels up to 228 x 228 mm",
         b"one object with multiple logical parts",
         b"exact exported-part mapping on page 1",
@@ -83,6 +89,7 @@ def test_fast_guide_contains_exact_operator_actions_without_false_claims(tmp_pat
     assert b"automatically positioned" not in pdf
     assert b"two-part epoxy" not in pdf
     assert b"cyanoacrylate" not in pdf
+    assert b"Fast mode" not in pdf
     assert content.part_mapping == (
         ("Base", "Base", "#808080"),
         ("Grout-Thinset", "Grout", "#FAF9F6"),
@@ -123,8 +130,8 @@ def test_museum_guide_contains_exact_finish_actions_and_interference_check(tmp_p
 
 
 def test_print_guide_is_deterministic_and_preserves_three_mf_geometry(tmp_path):
-    first = _export(tmp_path / "first", "fast")
-    second = _export(tmp_path / "second", "fast")
+    first = _export(tmp_path / "first", "studio")
+    second = _export(tmp_path / "second", "studio")
     first_package = first[3]
     second_package = second[3]
     assert first_package.print_guide_path.read_bytes() == (

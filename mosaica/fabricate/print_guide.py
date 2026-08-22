@@ -454,16 +454,16 @@ def _page_two(content: PrintGuideContent) -> _Page:
     )
 
     y = _section_title(page, y + 2, f"{content.mode_name} mode - required actions")
-    page.rect(42, y, 528, 170 if content.mode_id == "fast" else 184, fill="#FFF8F4", stroke="#D6A08D", line_width=1.0)
+    page.rect(42, y, 528, 170 if content.mode_id == "studio" else 184, fill="#FFF8F4", stroke="#D6A08D", line_width=1.0)
     action_y = y + 21
-    if content.mode_id == "fast":
+    if content.mode_id == "studio":
         actions = (
             ("Prime Tower: OFF", "Others tab > Enable > Uncheck."),
             ("Brim: No Brim", "Others tab > Brim type > Set to No Brim."),
             ("Ironing: OFF", "Leave ironing disabled."),
             (
                 "Transfer risk",
-                "Fast mode reclaims usable plate area for panels up to 228 x 228 mm, which can reduce panel count and print time. Physical testing accepted a small risk of minor color transfer. Disabling the Prime Tower does not disable nozzle flushing; review purge behavior in the slicer.",
+                "Studio mode reclaims usable plate area for panels up to 228 x 228 mm, which can reduce panel count and print time. Physical testing accepted a small risk of minor color transfer. Disabling the Prime Tower does not disable nozzle flushing; review purge behavior in the slicer.",
             ),
         )
     else:

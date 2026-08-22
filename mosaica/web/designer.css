@@ -402,6 +402,7 @@ h1, h2, h3, p { margin-top: 0; }
 .export-progress, .export-success { min-height: 20rem; place-items: center; align-content: center; gap: .8rem; text-align: center; }
 .export-progress:not([hidden]), .export-success:not([hidden]) { display: grid; }
 .export-progress span:last-child { max-width: 32rem; color: #6a6a70; font-size: .85rem; }
+.export-progress #export-activity { min-height: 1.35rem; }
 .export-progress-control { display: grid; width: min(22rem, 100%); place-items: center; cursor: wait; }
 .export-success-mark { display: grid; width: 3rem; height: 3rem; place-items: center; border-radius: 50%; color: #fff; background: #3d8359; font-size: 1.4rem; }
 .export-success h2 { margin: 0; text-transform: uppercase; }

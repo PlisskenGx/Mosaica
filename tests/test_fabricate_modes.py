@@ -1,14 +1,17 @@
 import pytest
 
 from mosaica.fabricate.modes import (
-    FAST_MODE, MUSEUM_MODE, FabricationMode, resolve_fabrication_mode,
+    STUDIO_MODE, MUSEUM_MODE, FabricationMode, resolve_fabrication_mode,
 )
 
 
-def test_fast_mode_is_the_default_and_has_the_validated_process_contract():
+def test_studio_mode_is_the_default_and_has_the_validated_process_contract():
     mode = resolve_fabrication_mode()
-    assert mode is FAST_MODE
-    assert mode.mode is FabricationMode.FAST
+    assert mode is STUDIO_MODE
+    assert mode.mode is FabricationMode.STUDIO
+    assert mode.mode_id == "studio"
+    assert mode.display_name == "Studio"
+    assert not hasattr(FabricationMode, "FAST")
     assert mode.safe_envelope_mm == (228.0, 228.0)
     intent = mode.process_intent()
     assert intent["prime_tower"] == {
@@ -46,5 +49,7 @@ def test_museum_mode_has_the_validated_premium_process_contract():
 
 
 def test_unknown_fabrication_mode_is_rejected():
-    with pytest.raises(ValueError, match="fast, museum"):
+    with pytest.raises(ValueError, match="studio, museum"):
         resolve_fabrication_mode("draft")
+    with pytest.raises(ValueError, match="studio, museum"):
+        resolve_fabrication_mode("fast")

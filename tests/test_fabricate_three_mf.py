@@ -1,4 +1,6 @@
 import json
+from pathlib import Path
+from types import SimpleNamespace
 from xml.etree import ElementTree as ET
 from zipfile import ZipFile
 
@@ -10,6 +12,9 @@ from mosaica.fabricate.panelize import (
     panelize_model,
 )
 from mosaica.fabricate.phase2b import PRODUCTION_PROFILE, build_production_model
+from mosaica.fabricate.modes import (
+    FabricationMode, resolve_fabrication_mode,
+)
 from mosaica.fabricate.resolve import resolve_designer_project
 from mosaica.fabricate.three_mf import (
     _part_identity,
@@ -17,12 +22,13 @@ from mosaica.fabricate.three_mf import (
     export_three_mf_package,
     export_panelized_three_mf_package,
     inspect_panel_3mf,
+    main as three_mf_main,
     panel_plate_transform,
 )
 from mosaica.fabricate.model import LogicalMaterialChannel
 
 
-def _single_panel_fabrication(mode="fast"):
+def _single_panel_fabrication(mode="studio"):
     model = build_production_model()
     return build_panelized_fabrication(panelize_model(model, mode=mode))
 
@@ -142,12 +148,13 @@ def test_embedded_transform_preserves_geometry_but_is_not_a_placement_contract(t
     assert manifest["panel_placement"]["automatic_position_guaranteed"] is False
 
 
-def test_fast_manifest_records_mode_actions_without_claiming_plate_placement(tmp_path):
+def test_studio_manifest_records_mode_actions_without_claiming_plate_placement(tmp_path):
     package = export_panelized_three_mf_package(
         _single_panel_fabrication(), tmp_path / "export",
     )
     manifest = json.loads(package.manifest_path.read_text())
-    assert manifest["fabrication_mode"]["id"] == "fast"
+    assert manifest["fabrication_mode"]["id"] == "studio"
+    assert manifest["fabrication_mode"]["display_name"] == "Studio"
     assert manifest["safe_panel_envelope_mm"] == {"width": 228.0, "height": 228.0}
     assert manifest["panel_placement"] == {
         "responsibility": "user_positions_imported_panel_in_bambu_studio",
@@ -162,16 +169,63 @@ def test_fast_manifest_records_mode_actions_without_claiming_plate_placement(tmp
     }
 
 
-def test_fast_and_museum_process_intent_do_not_change_same_panel_geometry(tmp_path):
-    fast = export_panelized_three_mf_package(
-        _single_panel_fabrication("fast"), tmp_path / "fast",
+def test_studio_is_the_authoritative_default_mode():
+    default = resolve_fabrication_mode()
+    explicit = resolve_fabrication_mode("studio")
+    assert default is explicit
+    assert explicit.mode is FabricationMode.STUDIO
+    assert explicit.mode_id == "studio"
+    assert explicit.display_name == "Studio"
+    assert explicit.safe_envelope_mm == (228.0, 228.0)
+    museum = resolve_fabrication_mode("museum")
+    assert museum.display_name == "Museum"
+    assert museum.safe_envelope_mm == (210.0, 210.0)
+
+
+def test_three_mf_cli_accepts_studio_and_rejects_fast(tmp_path, monkeypatch):
+    captured = {}
+    monkeypatch.setattr(
+        "mosaica.fabricate.three_mf.MosaicProject.load", lambda _path: object(),
+    )
+    monkeypatch.setattr(
+        "mosaica.fabricate.three_mf.resolve_mosaic_project",
+        lambda _project, _profile: object(),
+    )
+
+    def fake_export(_model, output, **kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(
+            output_directory=Path(output), three_mf_paths=(),
+            manifest_path=Path(output) / "manifest.json",
+            print_guide_path=Path(output) / "Mosaica_Print_Guide.pdf",
+            geometry_signature="fixture",
+        )
+
+    monkeypatch.setattr(
+        "mosaica.fabricate.three_mf.export_three_mf_package", fake_export,
+    )
+    assert three_mf_main([
+        "--project", "project.json", "--out", str(tmp_path),
+        "--mode", "studio",
+    ]) == 0
+    assert captured["mode"] == "studio"
+    with pytest.raises(SystemExit):
+        three_mf_main([
+            "--project", "project.json", "--out", str(tmp_path),
+            "--mode", "fast",
+        ])
+
+
+def test_studio_and_museum_process_intent_do_not_change_same_panel_geometry(tmp_path):
+    studio = export_panelized_three_mf_package(
+        _single_panel_fabrication("studio"), tmp_path / "studio",
     )
     museum = export_panelized_three_mf_package(
         _single_panel_fabrication("museum"), tmp_path / "museum",
     )
-    fast_manifest = json.loads(fast.manifest_path.read_text())
+    studio_manifest = json.loads(studio.manifest_path.read_text())
     museum_manifest = json.loads(museum.manifest_path.read_text())
-    assert fast_manifest["process_intent"]["ironing"] == {"enabled": False}
+    assert studio_manifest["process_intent"]["ironing"] == {"enabled": False}
     assert museum_manifest["process_intent"]["ironing"] == {
         "enabled": True, "type": "Topmost surfaces", "pattern": "Concentric",
         "flow_percent": 18, "speed_mm_s": 30, "line_spacing_mm": 0.15,
@@ -180,9 +234,9 @@ def test_fast_and_museum_process_intent_do_not_change_same_panel_geometry(tmp_pa
         "recommendation": "Bambu default",
     }
     assert "width_mm" not in museum_manifest["process_intent"]["brim"]
-    fast_meshes = inspect_panel_3mf(fast.three_mf_paths[0])["meshes"]
+    studio_meshes = inspect_panel_3mf(studio.three_mf_paths[0])["meshes"]
     museum_meshes = inspect_panel_3mf(museum.three_mf_paths[0])["meshes"]
-    assert [value["triangles"] for value in fast_meshes.values()] == [
+    assert [value["triangles"] for value in studio_meshes.values()] == [
         value["triangles"] for value in museum_meshes.values()
     ]
 
@@ -260,7 +314,7 @@ def test_24_inch_project_exports_one_stable_3mf_per_panel(tmp_path):
     model = resolve_designer_project(
         DesignerProjectShell.create("square", "l"), PRODUCTION_PROFILE,
     )
-    fabrication = build_panelized_fabrication(panelize_model(model, mode="fast"))
+    fabrication = build_panelized_fabrication(panelize_model(model, mode="studio"))
     package = export_panelized_three_mf_package(fabrication, tmp_path / "export")
     manifest = json.loads(package.manifest_path.read_text())
     assert manifest["panelization"] == {

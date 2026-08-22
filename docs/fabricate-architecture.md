@@ -316,7 +316,7 @@ python -m mosaica.fabricate.panelize --project PROJECT.json --out fabricate_pane
 
 Phase 3A itself does not generate 3MF files or slicer plates. Phase 3C resolves
 the fabrication mode before invoking the unchanged natural-seam panelizer.
-Fast supplies a 228 × 228 mm envelope; Museum supplies 210 × 210 mm. The mode
+Studio supplies a 228 × 228 mm envelope; Museum supplies 210 × 210 mm. The mode
 may therefore change the panel grid, seams, IDs, and neighbors without changing
 tile geometry or the optimizer's priorities.
 
@@ -368,7 +368,7 @@ backside-mark semantics.
 
 Phase 3C defines two fabrication modes from one authoritative mode profile:
 
-- **Fast** uses the physically validated 228 × 228 mm envelope, disables the
+- **Studio** uses the physically validated 228 × 228 mm envelope, disables the
   Prime Tower, requires **Others → Brim type → No Brim**, leaves ironing off,
   and enables Adaptive Variable Layer Height. It targets good finished quality
   with fewer/larger panels while accepting a small risk of minor color transfer.
@@ -387,11 +387,11 @@ Generate a saved-project package with:
 python -m mosaica.fabricate.three_mf \
   --project PROJECT.json \
   --out fabricate_3mf_export \
-  --mode fast
+  --mode studio
 ```
 
 Use `--mode museum` for the premium workflow. The former `--surface-finish`
-option remains a deprecated CLI/API bridge (`standard` maps to Fast; `ironed`
+option remains a deprecated CLI/API bridge (`standard` maps to Studio; `ironed`
 maps to Museum) so the mode still resolves before panelization.
 
 The manifest records the panel grid, identities, neighbors, logical and plate
@@ -422,11 +422,11 @@ records project dimensions, tile system, palette channels, the actual
 artwork-space panel map, and every debossed backside panel ID. Page 2 explains
 Core 3MF import, logical-part filament assignment, manual plate positioning,
 the P1S / 0.4 mm nozzle / 0.20 mm Standard / two-loop baseline, complete-panel
-Adaptive Variable Layer Height, and the selected Fast or Museum actions. Page 3
+Adaptive Variable Layer Height, and the selected Studio or Museum actions. Page 3
 provides the one-panel-per-plate and assembly checklist.
 
 The guide repeats Bambu Studio's expected non-Bambu Core 3MF warning and tells
-the operator to continue. Fast explicitly turns the Prime Tower off, requires
+the operator to continue. Studio explicitly turns the Prime Tower off, requires
 No Brim, leaves ironing off, and notes that disabling the tower does not disable
 nozzle flushing. Museum keeps the Prime Tower on, uses Bambu's default brim
 without prescribing a width, records the approved ironing values, and requires

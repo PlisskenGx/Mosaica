@@ -160,10 +160,10 @@
       </header>
       <div id="export-configure">
         <div class="export-mode-cards" role="radiogroup" aria-label="Fabrication mode">
-          <button class="export-mode-card selected" type="button" data-export-mode="fast" role="radio" aria-checked="true">
+          <button class="export-mode-card selected" type="button" data-export-mode="studio" role="radio" aria-checked="true">
             <span class="recommended-badge">Recommended</span>
-            <strong>Fast</strong>
-            <span class="export-mode-idea">Faster printing with fewer panels.</span>
+            <strong>Studio</strong>
+            <span class="export-mode-idea">Efficient production with fewer panels.</span>
             <span>Up to 228 × 228 mm · Prime Tower off · No Brim · Ironing off</span>
             <span>Adaptive Variable Layer Height recommended · May produce fewer panels</span>
             <span>Small possibility of minor color transfer</span>
@@ -186,7 +186,7 @@
       </div>
       <div id="export-progress" class="export-progress" aria-live="polite" hidden>
         <div id="export-progress-control" class="export-primary export-progress-control is-loading" role="progressbar" aria-label="Generating fabrication export" aria-busy="true">Generating Export…</div>
-        <strong>Preparing your fabrication package</strong>
+        <strong id="export-activity">Preparing your fabrication package…</strong>
         <span>This can take a moment. Mosaica is creating the panels, 3MF files, manifest, and Print Guide.</span>
       </div>
       <div id="export-success" class="export-success" hidden>

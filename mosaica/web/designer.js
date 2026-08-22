@@ -18,7 +18,7 @@
   let customDown = 24;
   let artworkPreviewUrl = null;
   let artworkPreviewSource = null;
-  let exportMode = "fast";
+  let exportMode = "studio";
   let exportJobId = null;
   let exportInFlight = false;
   let exportPollTimer = null;
@@ -1435,7 +1435,7 @@
   }
 
   async function openExportDialog() {
-    setExportMode("fast");
+    setExportMode("studio");
     exportJobId = null;
     showExportStep("configure");
     byId("export-dialog").showModal();
@@ -1445,7 +1445,7 @@
   function showExportSuccess(result) {
     showExportStep("success");
     byId("export-success-summary").textContent = (
-      `${result.panel_count} ${result.panel_count === 1 ? "panel" : "panels"} prepared in ${result.mode === "fast" ? "Fast" : "Museum"} mode.`
+      `${result.panel_count} ${result.panel_count === 1 ? "panel" : "panels"} prepared in ${result.mode_display_name} mode.`
     );
     const files = byId("export-success-files");
     files.replaceChildren();
@@ -1467,6 +1467,9 @@
         undefined,
         "Check fabrication export",
       );
+      if (job.progress?.message) {
+        byId("export-activity").textContent = job.progress.message;
+      }
       if (job.status === "running") {
         exportPollTimer = window.setTimeout(pollExportJob, 500);
         return;
@@ -1495,6 +1498,7 @@
     }
     if (exportPreviewReadyMode !== exportMode) return;
     exportInFlight = true;
+    byId("export-activity").textContent = "Preparing your fabrication package…";
     showExportStep("progress");
     try {
       const job = await request(

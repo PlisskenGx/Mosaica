@@ -942,12 +942,12 @@ class MosaicDesignerApp:
             if method == "POST" and path == "/api/designer/export/preview":
                 body = self._request_json(environ)
                 summary = self._export_preview(
-                    self._export_snapshot(), body.get("mode", "fast"),
+                    self._export_snapshot(), body.get("mode", "studio"),
                 )
                 return self._json(start_response, "200 OK", summary)
             if method == "POST" and path == "/api/designer/export/start":
                 body = self._request_json(environ)
-                job = self._start_export_job(body.get("mode", "fast"))
+                job = self._start_export_job(body.get("mode", "studio"))
                 return self._json(start_response, "202 Accepted", job)
             if method == "GET" and path == "/api/designer/export/status":
                 query = parse_qs(environ.get("QUERY_STRING", ""))
@@ -1108,7 +1108,16 @@ class MosaicDesignerApp:
             "status": "running",
             "mode": preview["mode"],
             "panel_count": preview["panel_count"],
-            "message": "Preparing fabrication files...",
+            "message": "Preparing your fabrication package…",
+            "progress": {
+                "phase": "preparing",
+                "current_panel": None,
+                "completed_panels": 0,
+                "total_panels": preview["panel_count"],
+                "panel_index": None,
+                "message": "Preparing your fabrication package…",
+            },
+            "progress_events": [],
             "output_directory": str(output),
             "result": None,
             "error": None,
@@ -1147,40 +1156,65 @@ class MosaicDesignerApp:
         from .fabricate.panelize import PanelizationError
 
         try:
-            result = self.export_service.generate(snapshot, mode, output)
+            result = self.export_service.generate(
+                snapshot, mode, output,
+                progress=lambda event: self._update_export_progress(job_id, event),
+            )
         except PanelizationError as exc:
             message = (
                 "Mosaica could not divide this design into printable panels. "
                 "Review the project dimensions and try again."
             )
-            _EXPORT_LOG.exception("Designer panelization failed: %s", exc)
+            _EXPORT_LOG.exception(
+                "Designer panelization failed: %s; progress=%s",
+                exc, self._export_jobs[job_id]["progress"],
+            )
         except PermissionError as exc:
             message = (
                 "Mosaica lost permission to write the export. "
                 "Check the Downloads folder and try again."
             )
-            _EXPORT_LOG.exception("Designer export permission failure: %s", exc)
+            _EXPORT_LOG.exception(
+                "Designer export permission failure: %s; progress=%s",
+                exc, self._export_jobs[job_id]["progress"],
+            )
         except OSError as exc:
             message = (
                 "Mosaica could not finish writing the export package. "
                 "Check available disk space and folder permissions."
             )
-            _EXPORT_LOG.exception("Designer export filesystem failure: %s", exc)
+            _EXPORT_LOG.exception(
+                "Designer export filesystem failure: %s; progress=%s",
+                exc, self._export_jobs[job_id]["progress"],
+            )
         except (TypeError, ValueError, RuntimeError) as exc:
             message = f"Mosaica could not prepare this design for fabrication: {exc}"
-            _EXPORT_LOG.exception("Designer fabrication resolution failed: %s", exc)
+            _EXPORT_LOG.exception(
+                "Designer fabrication resolution failed: %s; progress=%s",
+                exc, self._export_jobs[job_id]["progress"],
+            )
         except Exception as exc:
             message = (
                 "Mosaica could not generate the fabrication package. "
                 "No existing export was replaced."
             )
-            _EXPORT_LOG.exception("Unexpected Designer export failure: %s", exc)
+            _EXPORT_LOG.exception(
+                "Unexpected Designer export failure: %s; progress=%s",
+                exc, self._export_jobs[job_id]["progress"],
+            )
         else:
             with self._state_lock:
                 job = self._export_jobs[job_id]
                 job.update({
                     "status": "complete",
                     "message": "Your mosaic is ready to print.",
+                    "progress": {
+                        **job["progress"],
+                        "phase": "complete",
+                        "current_panel": None,
+                        "completed_panels": job["panel_count"],
+                        "message": "Complete",
+                    },
                     "result": result.to_dict(),
                 })
                 self._active_export_job_id = None
@@ -1194,8 +1228,21 @@ class MosaicDesignerApp:
                 "message": "Export failed.",
                 "error": message,
                 "output_directory": None,
+                "progress": {
+                    **job["progress"], "phase": "error", "message": message,
+                },
             })
             self._active_export_job_id = None
+
+    def _update_export_progress(
+        self, job_id: str, event: dict[str, object],
+    ) -> None:
+        with self._state_lock:
+            job = self._export_jobs[job_id]
+            progress = dict(event)
+            job["progress"] = progress
+            job["message"] = progress["message"]
+            job["progress_events"].append(progress)
 
     def _export_job(self, job_id: str | None) -> dict:
         if not job_id or job_id not in self._export_jobs:
