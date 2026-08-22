@@ -18,6 +18,12 @@
   let customDown = 24;
   let artworkPreviewUrl = null;
   let artworkPreviewSource = null;
+  let exportMode = "fast";
+  let exportJobId = null;
+  let exportInFlight = false;
+  let exportPollTimer = null;
+  let exportPreviewToken = 0;
+  let exportPreviewReadyMode = null;
   const byId = (id) => document.getElementById(id);
   const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
   const orientationLabel = (orientation) => (
@@ -236,6 +242,7 @@
     }
     byId("workspace").hidden = stage !== "workspace";
     byId("back").hidden = stage !== "workspace";
+    byId("export-action").hidden = stage !== "workspace";
     document.body.classList.toggle("workspace-active", stage === "workspace");
     byId("document-name").textContent = state.document.title;
     byId("document-edited").hidden = !state.document.dirty;
@@ -1323,6 +1330,185 @@
     }
   }
 
+  function setExportMode(mode) {
+    exportMode = mode;
+    for (const card of document.querySelectorAll("[data-export-mode]")) {
+      const selected = card.dataset.exportMode === mode;
+      card.classList.toggle("selected", selected);
+      card.setAttribute("aria-checked", String(selected));
+    }
+  }
+
+  function drawExportPanelMap(summary) {
+    const svg = byId("export-panel-map");
+    svg.replaceChildren();
+    const width = summary.finished_mosaic.width_mm;
+    const height = summary.finished_mosaic.height_mm;
+    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    for (const panel of summary.panels) {
+      const [x0, y0, x1, y1] = panel.bounds_mm;
+      const rect = document.createElementNS(SVG_NS, "rect");
+      rect.setAttribute("x", x0);
+      rect.setAttribute("y", y0);
+      rect.setAttribute("width", x1 - x0);
+      rect.setAttribute("height", y1 - y0);
+      rect.classList.add("export-panel-cell");
+      svg.appendChild(rect);
+      const label = document.createElementNS(SVG_NS, "text");
+      label.setAttribute("x", (x0 + x1) / 2);
+      label.setAttribute("y", (y0 + y1) / 2);
+      label.classList.add("export-panel-label");
+      label.textContent = panel.panel_id;
+      svg.appendChild(label);
+    }
+  }
+
+  function renderExportSummary(summary) {
+    const finished = summary.finished_mosaic;
+    const tile = summary.tile;
+    byId("export-summary-copy").innerHTML = `
+      <span>${summary.mode.display_name.toUpperCase()} MODE</span>
+      <strong>${summary.panel_count} PRINT ${summary.panel_count === 1 ? "PANEL" : "PANELS"}</strong>
+      <span>${finished.width_in.toFixed(1)} × ${finished.height_in.toFixed(1)} in finished mosaic</span>
+      <span>${tile.preset_id.toUpperCase()} · ${tile.flat_to_flat_mm} mm · ${orientationLabel(tile.orientation)}</span>
+      <span>${summary.palette_color_count} tile ${summary.palette_color_count === 1 ? "color" : "colors"} · ${summary.safe_envelope_mm.width} × ${summary.safe_envelope_mm.height} mm envelope</span>`;
+    drawExportPanelMap(summary);
+  }
+
+  function setExportError(message = "") {
+    byId("export-error").textContent = message;
+  }
+
+  function setExportControl(controlState) {
+    const control = byId("export-generate");
+    const preparing = controlState === "preparing";
+    control.dataset.state = controlState;
+    control.classList.toggle("is-loading", preparing);
+    control.setAttribute("aria-busy", String(preparing));
+    control.disabled = preparing;
+    control.textContent = {
+      preparing: "Preparing Export…",
+      ready: "Generate Export",
+      error: "Retry Preparation",
+    }[controlState];
+  }
+
+  async function loadExportPreview() {
+    const token = ++exportPreviewToken;
+    const requestedMode = exportMode;
+    exportPreviewReadyMode = null;
+    setExportControl("preparing");
+    byId("export-summary").classList.add("is-preparing");
+    byId("export-summary").setAttribute("aria-busy", "true");
+    setExportError();
+    try {
+      const summary = await request(
+        "/api/designer/export/preview", { mode: requestedMode }, "Preview fabrication export",
+      );
+      if (token !== exportPreviewToken || requestedMode !== exportMode) return;
+      renderExportSummary(summary);
+      exportPreviewReadyMode = requestedMode;
+      byId("export-summary").classList.remove("is-preparing");
+      byId("export-summary").setAttribute("aria-busy", "false");
+      setExportControl("ready");
+    } catch (error) {
+      if (token !== exportPreviewToken || requestedMode !== exportMode) return;
+      byId("export-summary").classList.remove("is-preparing");
+      byId("export-summary").setAttribute("aria-busy", "false");
+      setExportControl("error");
+      setExportError(error.message);
+    }
+  }
+
+  function showExportStep(step) {
+    byId("export-configure").hidden = step !== "configure";
+    byId("export-progress").hidden = step !== "progress";
+    byId("export-success").hidden = step !== "success";
+    byId("export-close").disabled = step === "progress";
+  }
+
+  function closeExportDialog() {
+    if (exportInFlight) return;
+    if (exportPollTimer) window.clearTimeout(exportPollTimer);
+    exportPollTimer = null;
+    byId("export-dialog").close();
+  }
+
+  async function openExportDialog() {
+    setExportMode("fast");
+    exportJobId = null;
+    showExportStep("configure");
+    byId("export-dialog").showModal();
+    await loadExportPreview();
+  }
+
+  function showExportSuccess(result) {
+    showExportStep("success");
+    byId("export-success-summary").textContent = (
+      `${result.panel_count} ${result.panel_count === 1 ? "panel" : "panels"} prepared in ${result.mode === "fast" ? "Fast" : "Museum"} mode.`
+    );
+    const files = byId("export-success-files");
+    files.replaceChildren();
+    for (const text of [
+      `${result.three_mf_count} multipart 3MF ${result.three_mf_count === 1 ? "file" : "files"}`,
+      `Print Guide: ${result.print_guide}`,
+      `Manifest: ${result.manifest}`,
+    ]) {
+      const item = document.createElement("li");
+      item.textContent = text;
+      files.appendChild(item);
+    }
+  }
+
+  async function pollExportJob() {
+    try {
+      const job = await request(
+        `/api/designer/export/status?id=${encodeURIComponent(exportJobId)}`,
+        undefined,
+        "Check fabrication export",
+      );
+      if (job.status === "running") {
+        exportPollTimer = window.setTimeout(pollExportJob, 500);
+        return;
+      }
+      exportInFlight = false;
+      if (job.status === "complete") {
+        showExportSuccess(job.result);
+      } else {
+        showExportStep("configure");
+        setExportControl("ready");
+        setExportError(job.error || "Mosaica could not complete the fabrication export.");
+      }
+    } catch (error) {
+      exportInFlight = false;
+      showExportStep("configure");
+      setExportControl("ready");
+      setExportError(error.message);
+    }
+  }
+
+  async function generateDesignerExport() {
+    if (exportInFlight) return;
+    if (byId("export-generate").dataset.state === "error") {
+      await loadExportPreview();
+      return;
+    }
+    if (exportPreviewReadyMode !== exportMode) return;
+    exportInFlight = true;
+    showExportStep("progress");
+    try {
+      const job = await request(
+        "/api/designer/export/start", { mode: exportMode }, "Start fabrication export",
+      );
+      exportJobId = job.job_id;
+      pollExportJob();
+    } catch (error) {
+      exportInFlight = false;
+      showExportStep("configure");
+      setExportError(error.message);
+    }
+  }
+
   async function chooseCanvas(canvasId) {
     if (setupTransitionActive) return;
     await performDesignerMutation("/api/designer/canvas", { canvas_id: canvasId }, { name: "Choose canvas" });
@@ -1362,6 +1548,29 @@
     if (state.stage === "workspace") {
       await performDesignerMutation("/api/designer/back", {}, { name: "Back" });
     }
+  });
+  byId("export-action").addEventListener("click", openExportDialog);
+  byId("export-close").addEventListener("click", closeExportDialog);
+  byId("export-done").addEventListener("click", closeExportDialog);
+  byId("export-generate").addEventListener("click", generateDesignerExport);
+  for (const card of document.querySelectorAll("[data-export-mode]")) {
+    card.addEventListener("click", () => {
+      if (exportInFlight) return;
+      setExportMode(card.dataset.exportMode);
+      loadExportPreview();
+    });
+  }
+  byId("export-open-folder").addEventListener("click", async () => {
+    try {
+      await request(
+        "/api/designer/export/open", { id: exportJobId }, "Open fabrication export folder",
+      );
+    } catch (error) {
+      byId("export-success-summary").textContent = error.message;
+    }
+  });
+  byId("export-dialog").addEventListener("cancel", (event) => {
+    if (exportInFlight) event.preventDefault();
   });
   function navigateSetupNeighbor(event) {
     if (setupTransitionActive) return;

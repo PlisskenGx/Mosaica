@@ -17,6 +17,9 @@
         </span>
       </div>
     </div>
+    <div class="app-bar-center">
+      <button id="export-action" class="export-action" type="button" hidden>Export</button>
+    </div>
     <div id="document-title" class="document-title" aria-label="Document title">
       <span id="document-name">Untitled</span><span id="document-edited" hidden>Edited</span>
     </div>
@@ -145,6 +148,59 @@
       <footer id="workspace-status" class="workspace-status" aria-label="Project physical status"></footer>
     </section>
   </main>
+  <dialog id="export-dialog" class="export-dialog" aria-labelledby="export-title">
+    <div class="export-dialog-shell">
+      <header class="export-dialog-header">
+        <div>
+          <span class="export-eyebrow">FABRICATE</span>
+          <h1 id="export-title">Export your mosaic</h1>
+          <p>Choose how you want Mosaica to prepare the project for printing.</p>
+        </div>
+        <button id="export-close" class="export-close" type="button" aria-label="Close export">×</button>
+      </header>
+      <div id="export-configure">
+        <div class="export-mode-cards" role="radiogroup" aria-label="Fabrication mode">
+          <button class="export-mode-card selected" type="button" data-export-mode="fast" role="radio" aria-checked="true">
+            <span class="recommended-badge">Recommended</span>
+            <strong>Fast</strong>
+            <span class="export-mode-idea">Faster printing with fewer panels.</span>
+            <span>Up to 228 × 228 mm · Prime Tower off · No Brim · Ironing off</span>
+            <span>Adaptive Variable Layer Height recommended · May produce fewer panels</span>
+            <span>Small possibility of minor color transfer</span>
+          </button>
+          <button class="export-mode-card" type="button" data-export-mode="museum" role="radio" aria-checked="false">
+            <strong>Museum</strong>
+            <span class="export-mode-idea">Maximum finish quality and color purity.</span>
+            <span>Up to 210 × 210 mm · Prime Tower on · Default brim</span>
+            <span>Adaptive Variable Layer Height recommended · Mosaica Museum ironing recipe</span>
+            <span>May require more panels · Longer print time</span>
+          </button>
+        </div>
+        <section id="export-summary" class="export-summary" aria-live="polite">
+          <div id="export-summary-copy"></div>
+          <svg id="export-panel-map" class="export-panel-map" aria-label="Fabrication panel layout"></svg>
+        </section>
+        <p class="export-destination">A new, safely named project folder will be created in Downloads. Existing exports are never replaced.</p>
+        <p id="export-error" class="export-error" role="alert"></p>
+        <button id="export-generate" class="export-primary is-loading" type="button" disabled aria-busy="true">Preparing Export…</button>
+      </div>
+      <div id="export-progress" class="export-progress" aria-live="polite" hidden>
+        <div id="export-progress-control" class="export-primary export-progress-control is-loading" role="progressbar" aria-label="Generating fabrication export" aria-busy="true">Generating Export…</div>
+        <strong>Preparing your fabrication package</strong>
+        <span>This can take a moment. Mosaica is creating the panels, 3MF files, manifest, and Print Guide.</span>
+      </div>
+      <div id="export-success" class="export-success" hidden>
+        <span class="export-success-mark" aria-hidden="true">✓</span>
+        <h2>Your mosaic is ready to print</h2>
+        <p id="export-success-summary"></p>
+        <ul id="export-success-files"></ul>
+        <div class="export-success-actions">
+          <button id="export-open-folder" class="export-primary" type="button">Open Export Folder</button>
+          <button id="export-done" class="inspector-action" type="button">Done</button>
+        </div>
+      </div>
+    </div>
+  </dialog>
   <div id="design-palette" class="paint-palette" role="dialog" aria-label="Mosaica color palette" hidden></div>
   <div id="status" role="status" aria-live="polite"></div>
   <script src="/designer.js"></script>

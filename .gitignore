@@ -16,7 +16,9 @@ mosaic_output/*.3mf
 /fabricate_thin_stack_review/
 /fabricate_3mf_review/
 /fabricate_3mf_bambu_validation/
+/fabricate_3mf_bambu_naming_validation/
 /fabricate_phase3c_review/
+/designer_fabricate_review/
 /three_mf_compatibility_probes/
 /three_mf_bambu_reduction_probes/
 /three_mf_bambu_additive_probes/

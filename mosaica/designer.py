@@ -5,8 +5,11 @@ from importlib.resources import files
 import json
 import logging
 from math import ceil, sqrt
+from pathlib import Path
+import shutil
 from socketserver import ThreadingMixIn
-from threading import RLock
+from threading import RLock, Thread
+from urllib.parse import parse_qs
 import webbrowser
 from wsgiref.handlers import SimpleHandler
 from wsgiref.simple_server import (
@@ -42,6 +45,10 @@ from .designer_generation import (
     generate_designer_artwork,
     mark_generated_stale,
 )
+from .designer_export import (
+    DesignerExportSnapshot,
+    DesignerFabricationExportService,
+)
 
 
 MM_PER_INCH = 25.4
@@ -50,6 +57,7 @@ P1S_BUILD_AREA_MM = 256.0
 CUSTOM_GRID_MAX = 200
 CANVAS_PREVIEW_REM_PER_INCH = 0.20
 _TRANSPORT_LOG = logging.getLogger("mosaica.designer.transport")
+_EXPORT_LOG = logging.getLogger("mosaica.designer.export")
 if not _TRANSPORT_LOG.handlers:
     _transport_handler = logging.StreamHandler()
     _transport_handler.setFormatter(logging.Formatter("%(levelname)s %(message)s"))
@@ -467,7 +475,12 @@ DESIGNER_ASSETS = {
 class MosaicDesignerApp:
     """Product-facing preset flow backed by the physical geometry engine."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        export_root: str | Path | None = None,
+        export_folder_opener=None,
+    ) -> None:
         self._state_lock = RLock()
         self.tile_shape: str | None = None
         self.tile_id: str | None = None
@@ -481,6 +494,12 @@ class MosaicDesignerApp:
         self.artwork_edit_mode = True
         self.document_title = "Untitled"
         self.document_dirty = False
+        self.export_service = DesignerFabricationExportService(
+            export_root, folder_opener=export_folder_opener,
+        )
+        self._export_jobs: dict[str, dict] = {}
+        self._next_export_job = 1
+        self._active_export_job_id: str | None = None
 
     def __call__(self, environ, start_response):
         path = environ.get("PATH_INFO", "/")
@@ -920,6 +939,33 @@ class MosaicDesignerApp:
                     start_response, "200 OK",
                     self._design_state_payload(previous_project),
                 )
+            if method == "POST" and path == "/api/designer/export/preview":
+                body = self._request_json(environ)
+                summary = self._export_preview(
+                    self._export_snapshot(), body.get("mode", "fast"),
+                )
+                return self._json(start_response, "200 OK", summary)
+            if method == "POST" and path == "/api/designer/export/start":
+                body = self._request_json(environ)
+                job = self._start_export_job(body.get("mode", "fast"))
+                return self._json(start_response, "202 Accepted", job)
+            if method == "GET" and path == "/api/designer/export/status":
+                query = parse_qs(environ.get("QUERY_STRING", ""))
+                job_id = (query.get("id") or [None])[0]
+                return self._json(
+                    start_response, "200 OK", self._export_job(job_id),
+                )
+            if method == "POST" and path == "/api/designer/export/open":
+                body = self._request_json(environ)
+                job_id = body.get("id", body.get("job_id"))
+                job = self._export_job(job_id)
+                if job["status"] != "complete":
+                    raise ValueError("Complete the export before opening its folder.")
+                self.export_service.open_folder(job["result"]["output_directory"])
+                return self._json(
+                    start_response, "200 OK",
+                    {"opened": True, "output_directory": job["result"]["output_directory"]},
+                )
             if method == "POST" and path == "/api/designer/back":
                 if self.project is not None:
                     self.project = None
@@ -1025,6 +1071,136 @@ class MosaicDesignerApp:
         if self.artwork is None:
             raise ValueError("No SVG artwork is loaded.")
         return self.artwork
+
+    def _export_snapshot(self) -> DesignerExportSnapshot:
+        return DesignerExportSnapshot(
+            project=self._require_project(),
+            generated_artwork=self.generated_artwork,
+            paint_overrides=dict(self.paint_overrides),
+            document_title=self.document_title,
+        )
+
+    def _start_export_job(self, mode: str) -> dict:
+        if (
+            self._active_export_job_id is not None
+            and self._export_jobs[self._active_export_job_id]["status"] == "running"
+        ):
+            raise ValueError("A fabrication export is already in progress.")
+        snapshot = self._export_snapshot()
+        # Validate the selected mode before reserving an output directory.
+        preview = self._export_preview(snapshot, mode)
+        try:
+            output = self.export_service.allocate_output_directory(
+                snapshot.document_title,
+            )
+        except PermissionError as exc:
+            raise RuntimeError(
+                "Mosaica cannot write to the export location. Check folder permissions."
+            ) from exc
+        except OSError as exc:
+            raise RuntimeError(
+                "Mosaica could not create a new export folder in Downloads."
+            ) from exc
+        job_id = f"export-{self._next_export_job:04d}"
+        self._next_export_job += 1
+        job = {
+            "job_id": job_id,
+            "status": "running",
+            "mode": preview["mode"],
+            "panel_count": preview["panel_count"],
+            "message": "Preparing fabrication files...",
+            "output_directory": str(output),
+            "result": None,
+            "error": None,
+        }
+        self._export_jobs[job_id] = job
+        self._active_export_job_id = job_id
+        Thread(
+            target=self._run_export_job,
+            args=(job_id, snapshot, mode, output),
+            daemon=True,
+            name=f"mosaica-{job_id}",
+        ).start()
+        return dict(job)
+
+    def _export_preview(
+        self, snapshot: DesignerExportSnapshot, mode: str,
+    ) -> dict:
+        from .fabricate.panelize import PanelizationError
+
+        try:
+            return self.export_service.preview(snapshot, mode)
+        except PanelizationError as exc:
+            _EXPORT_LOG.exception("Designer panelization preview failed: %s", exc)
+            raise RuntimeError(
+                "Mosaica could not divide this design into printable panels. "
+                "Review the project dimensions and try again."
+            ) from exc
+
+    def _run_export_job(
+        self,
+        job_id: str,
+        snapshot: DesignerExportSnapshot,
+        mode: str,
+        output: Path,
+    ) -> None:
+        from .fabricate.panelize import PanelizationError
+
+        try:
+            result = self.export_service.generate(snapshot, mode, output)
+        except PanelizationError as exc:
+            message = (
+                "Mosaica could not divide this design into printable panels. "
+                "Review the project dimensions and try again."
+            )
+            _EXPORT_LOG.exception("Designer panelization failed: %s", exc)
+        except PermissionError as exc:
+            message = (
+                "Mosaica lost permission to write the export. "
+                "Check the Downloads folder and try again."
+            )
+            _EXPORT_LOG.exception("Designer export permission failure: %s", exc)
+        except OSError as exc:
+            message = (
+                "Mosaica could not finish writing the export package. "
+                "Check available disk space and folder permissions."
+            )
+            _EXPORT_LOG.exception("Designer export filesystem failure: %s", exc)
+        except (TypeError, ValueError, RuntimeError) as exc:
+            message = f"Mosaica could not prepare this design for fabrication: {exc}"
+            _EXPORT_LOG.exception("Designer fabrication resolution failed: %s", exc)
+        except Exception as exc:
+            message = (
+                "Mosaica could not generate the fabrication package. "
+                "No existing export was replaced."
+            )
+            _EXPORT_LOG.exception("Unexpected Designer export failure: %s", exc)
+        else:
+            with self._state_lock:
+                job = self._export_jobs[job_id]
+                job.update({
+                    "status": "complete",
+                    "message": "Your mosaic is ready to print.",
+                    "result": result.to_dict(),
+                })
+                self._active_export_job_id = None
+            return
+
+        shutil.rmtree(output, ignore_errors=True)
+        with self._state_lock:
+            job = self._export_jobs[job_id]
+            job.update({
+                "status": "error",
+                "message": "Export failed.",
+                "error": message,
+                "output_directory": None,
+            })
+            self._active_export_job_id = None
+
+    def _export_job(self, job_id: str | None) -> dict:
+        if not job_id or job_id not in self._export_jobs:
+            raise ValueError("Unknown fabrication export job.")
+        return dict(self._export_jobs[job_id])
 
     def _artwork_state_payload(self) -> dict:
         """Authoritative compact state for mutations that cannot alter tiles."""
