@@ -11,6 +11,8 @@
   let paintStroke = null;
   let activePartialPreviewId = null;
   let hoveredTileId = null;
+  let keyboardTileActive = false;
+  let activeGeometrySignature = null;
   let paletteSelectionHandler = null;
   let paletteInvoker = null;
   let selectedShapeOrientation = "point_top";
@@ -290,6 +292,14 @@
     if (!state.project) return;
     const project = state.project;
     const geometry = project.geometry;
+    const geometrySignature = [
+      geometry.orientation, geometry.width_in, geometry.height_in,
+      geometry.tiles.length, geometry.keyboard_center_tile_id,
+    ].join(":");
+    if (activeGeometrySignature !== null && activeGeometrySignature !== geometrySignature) {
+      setTileHighlight(null, false);
+    }
+    activeGeometrySignature = geometrySignature;
     const svg = byId("mosaic-canvas");
     svg.replaceChildren();
     svg.setAttribute("viewBox", `0 0 ${geometry.width_in} ${geometry.height_in}`);
@@ -377,6 +387,7 @@
     }
 
     renderWorkspaceStatus(project);
+    restoreTileHighlight();
     requestAnimationFrame(fitToWorkspace);
   }
 
@@ -699,14 +710,16 @@
       "point-top", state.project.tile_orientation !== "flat_top",
     );
     palette.replaceChildren();
-    for (const color of paint.curated_palette) {
+    for (const [index, color] of paint.curated_palette.entries()) {
       const swatch = document.createElement("button");
       swatch.type = "button";
       swatch.className = "paint-swatch tile-color-swatch";
       swatch.style.backgroundColor = color.display_color;
       swatch.dataset.colorId = color.color_id;
-      swatch.setAttribute("aria-label", color.name);
-      swatch.title = color.name;
+      const shortcut = index < 4 ? ` · ${index + 1}` : "";
+      swatch.setAttribute("aria-label", `${color.name}${shortcut}`);
+      swatch.title = `${color.name}${shortcut}`;
+      if (index < 4) swatch.setAttribute("aria-keyshortcuts", String(index + 1));
       swatch.setAttribute("aria-pressed", String(color.color_id === activeTileColorId));
       swatch.addEventListener("click", () => {
         activeTileColorId = color.color_id;
@@ -1174,7 +1187,11 @@
     );
     const target = blocked ? null : resolvePartialTarget(event);
     const tileId = target?.dataset.tileId || target?.id || null;
-    if (tileId === hoveredTileId) return;
+    setTileHighlight(tileId, false);
+  }
+
+  function setTileHighlight(tileId, fromKeyboard) {
+    if (tileId === hoveredTileId && keyboardTileActive === fromKeyboard) return;
     if (hoveredTileId) {
       byId(hoveredTileId)?.classList.remove("hovered");
       document.querySelector(
@@ -1182,6 +1199,7 @@
       )?.classList.remove("hover-visible");
     }
     hoveredTileId = tileId;
+    keyboardTileActive = Boolean(tileId && fromKeyboard);
     if (hoveredTileId) {
       byId(hoveredTileId)?.classList.add("hovered");
       document.querySelector(
@@ -1190,7 +1208,22 @@
     }
   }
 
+  function restoreTileHighlight() {
+    if (!hoveredTileId || !state?.project?.geometry?.tiles.some(
+      (tile) => tile.id === hoveredTileId && tile.editable,
+    )) {
+      hoveredTileId = null;
+      keyboardTileActive = false;
+      return;
+    }
+    byId(hoveredTileId)?.classList.add("hovered");
+    document.querySelector(
+      `.partial-parent-ghost[data-tile-id="${hoveredTileId}"]`,
+    )?.classList.add("hover-visible");
+  }
+
   function clearTileHover() {
+    if (keyboardTileActive) return;
     if (hoveredTileId) {
       byId(hoveredTileId)?.classList.remove("hovered");
       document.querySelector(
@@ -1198,6 +1231,7 @@
       )?.classList.remove("hover-visible");
     }
     hoveredTileId = null;
+    keyboardTileActive = false;
   }
 
   function showPartialPreview(tileId) {
@@ -1226,6 +1260,11 @@
     paintStroke.ids.add(tileId);
     const stateTile = state.project.geometry.tiles.find((value) => value.id === tileId);
     paintStroke.originalFills.set(tileId, stateTile.display_color);
+    setTileHighlight(tileId, false);
+    if (paintStroke.mode === "erase") {
+      tile.style.fill = stateTile.lower_display_color;
+      return;
+    }
     const color = state.project.paint.curated_palette.find(
       (value) => value.color_id === paintStroke.colorId,
     );
@@ -1244,8 +1283,8 @@
       pointerId: event.pointerId,
       ids: new Set(),
       originalFills: new Map(),
-      mode: paintTool,
-      colorId: activeTileColorId,
+      mode: event.shiftKey ? "erase" : paintTool,
+      colorId: event.shiftKey ? null : activeTileColorId,
     };
     byId("canvas-viewport").setPointerCapture(event.pointerId);
     paintTileFromEvent(event);
@@ -1263,14 +1302,15 @@
     const stroke = paintStroke;
     paintStroke = null;
     if (!stroke.ids.size) return;
+    const erasing = stroke.mode === "erase";
     const response = await performDesignerMutation(
-      "/api/designer/paint",
-      {
+      erasing ? "/api/designer/paint/erase" : "/api/designer/paint",
+      erasing ? { placement_ids: [...stroke.ids] } : {
         mode: stroke.mode,
         color_id: stroke.colorId,
         placement_ids: [...stroke.ids],
       },
-      { name: "Assign tile colors" },
+      { name: erasing ? "Reset tile colors" : "Assign tile colors" },
     );
     if (!response) {
       for (const [id, fill] of stroke.originalFills) byId(id).style.fill = fill;
@@ -1338,6 +1378,10 @@
 
   function render() {
     showScreen(state.stage);
+    if (state.stage !== "workspace") {
+      setTileHighlight(null, false);
+      activeGeometrySignature = null;
+    }
     renderCanvasPresets();
     renderTilePresets();
     renderWorkspace();
@@ -1714,6 +1758,62 @@
     hideDesignPalette();
     invoker?.focus();
   });
+  function designerShortcutAvailable(event) {
+    if (state?.stage !== "workspace" || !state.project) return false;
+    if (event.metaKey || event.ctrlKey || event.altKey) return false;
+    if (event.target.closest?.(
+      "input, textarea, select, [contenteditable=true], [contenteditable=plaintext-only]",
+    )) return false;
+    return !document.querySelector(
+      "dialog[open], [role=dialog]:not([hidden])",
+    );
+  }
+
+  async function editHighlightedTile(erase = false) {
+    if (!hoveredTileId || (!erase && !activeTileColorId)) return false;
+    await performDesignerMutation(
+      erase ? "/api/designer/paint/erase" : "/api/designer/paint",
+      erase ? { placement_ids: [hoveredTileId] } : {
+        mode: "paint",
+        color_id: activeTileColorId,
+        placement_ids: [hoveredTileId],
+      },
+      { name: erase ? "Reset tile color" : "Assign tile color" },
+    );
+    keyboardTileActive = true;
+    restoreTileHighlight();
+    return true;
+  }
+
+  document.addEventListener("keydown", (event) => {
+    if (!designerShortcutAvailable(event)) return;
+    if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) {
+      const current = hoveredTileId || state.project.geometry.keyboard_center_tile_id;
+      const destination = hoveredTileId
+        ? state.project.geometry.keyboard_navigation?.[current]?.[event.key]
+        : current;
+      if (destination) setTileHighlight(destination, true);
+      event.preventDefault();
+      return;
+    }
+    if (/^[1-4]$/.test(event.key)) {
+      const color = state.project.paint.curated_palette[Number(event.key) - 1];
+      if (!color) return;
+      activeTileColorId = color.color_id;
+      paintTool = "paint";
+      renderPaintInspector();
+      event.preventDefault();
+      return;
+    }
+    if (event.key === "Enter" && !event.repeat) {
+      const consumed = event.shiftKey
+        ? Boolean(hoveredTileId)
+        : Boolean(hoveredTileId && activeTileColorId);
+      if (!consumed) return;
+      event.preventDefault();
+      editHighlightedTile(event.shiftKey);
+    }
+  });
   const canvasViewport = byId("canvas-viewport");
   byId("mosaic-canvas").addEventListener("pointerdown", beginArtworkInteraction);
   byId("mosaic-canvas").addEventListener("pointermove", moveArtworkInteraction);
@@ -1727,7 +1827,7 @@
   canvasViewport.addEventListener("pointerleave", clearTileHover);
   canvasViewport.addEventListener("pointerup", finishPaintStroke);
   canvasViewport.addEventListener("pointercancel", finishPaintStroke);
-  // TODO(keyboard): add Artwork rotation controls with the planned keyboard support.
+  // Artwork rotation remains deferred until the project has authoritative rotation state.
   window.addEventListener("resize", fitToWorkspace);
 
   request("/api/designer", undefined, "Initial Designer load").then((payload) => {

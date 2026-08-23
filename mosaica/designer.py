@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from functools import lru_cache
 from importlib.resources import files
 import json
 import logging
@@ -57,6 +58,77 @@ from .project_file import (
     normalize_project_path,
     save_project_file,
 )
+
+
+_KEYBOARD_DIRECTIONS = {
+    "ArrowLeft": (-1.0, 0.0),
+    "ArrowRight": (1.0, 0.0),
+    "ArrowUp": (0.0, -1.0),
+    "ArrowDown": (0.0, 1.0),
+}
+
+
+def tile_keyboard_navigation(
+    tiles: list[dict],
+) -> tuple[dict[str, dict[str, str]], str | None]:
+    """Return cached cardinal navigation derived from physical centers."""
+
+    points = tuple(
+        (tile["id"], float(tile["center_in"][0]), float(tile["center_in"][1]))
+        for tile in tiles if tile.get("editable")
+    )
+    navigation, center_id = _cached_tile_keyboard_navigation(points)
+    return {
+        tile_id: dict(directions) for tile_id, directions in navigation
+    }, center_id
+
+
+@lru_cache(maxsize=32)
+def _cached_tile_keyboard_navigation(
+    points: tuple[tuple[str, float, float], ...],
+) -> tuple[tuple[tuple[str, tuple[tuple[str, str], ...]], ...], str | None]:
+    if not points:
+        return (), None
+    center_x = sum(point[1] for point in points) / len(points)
+    center_y = sum(point[2] for point in points) / len(points)
+    center_id = min(
+        points,
+        key=lambda point: (
+            (point[1] - center_x) ** 2 + (point[2] - center_y) ** 2,
+            point[0],
+        ),
+    )[0]
+    navigation: dict[str, dict[str, str]] = {}
+    for tile_id, x, y in points:
+        offsets = []
+        for candidate_id, candidate_x, candidate_y in points:
+            if candidate_id == tile_id:
+                continue
+            dx = candidate_x - x
+            dy = candidate_y - y
+            distance = sqrt(dx * dx + dy * dy)
+            if distance > 1e-9:
+                offsets.append((candidate_id, dx, dy, distance))
+        if not offsets:
+            navigation[tile_id] = {}
+            continue
+        nearest = min(value[3] for value in offsets)
+        nearby = [value for value in offsets if value[3] <= nearest * 1.35]
+        neighbors = {}
+        for key, (direction_x, direction_y) in _KEYBOARD_DIRECTIONS.items():
+            candidates = []
+            for candidate_id, dx, dy, distance in nearby:
+                alignment = (dx * direction_x + dy * direction_y) / distance
+                if alignment <= 0.25:
+                    continue
+                candidates.append((-alignment, distance, candidate_id))
+            if candidates:
+                neighbors[key] = min(candidates)[2]
+        navigation[tile_id] = neighbors
+    return tuple(
+        (tile_id, tuple(sorted(directions.items())))
+        for tile_id, directions in navigation.items()
+    ), center_id
 
 
 MM_PER_INCH = 25.4
@@ -329,6 +401,15 @@ class DesignerProjectShell:
             )
             for index, placement in enumerate(self.geometry.placements)
         )
+        navigation, center_tile_id = tile_keyboard_navigation([
+            {
+                "id": f"placement-{index:06d}",
+                "center_in": [placement.center_x_in, placement.center_y_in],
+                "editable": True,
+            }
+            for index, placement in enumerate(self.geometry.placements)
+            if placement.piece_type != "outside"
+        ])
         return {
             "canvas_preset": self.canvas.to_dict(),
             "canvas_mode": self.canvas_mode,
@@ -414,6 +495,8 @@ class DesignerProjectShell:
                     value.piece_type == "outside"
                     for value in self.geometry.placements
                 ),
+                "keyboard_navigation": navigation,
+                "keyboard_center_tile_id": center_tile_id,
                 "tiles": [
                     {
                         "id": f"placement-{index:06d}",
@@ -825,6 +908,40 @@ class MosaicDesignerApp:
                 )
                 changed = bool(self.paint_overrides)
                 self.paint_overrides = {}
+                self.document_dirty = self.document_dirty or changed
+                return self._json(
+                    start_response, "200 OK",
+                    self._design_state_payload(previous_project),
+                )
+            if method == "POST" and path == "/api/designer/paint/erase":
+                project = self._require_project()
+                previous_project = project.to_dict(
+                    self.generated_artwork, self.paint_overrides,
+                )
+                placement_ids = self._request_json(environ).get("placement_ids")
+                if not isinstance(placement_ids, list) or not all(
+                    isinstance(value, str) for value in placement_ids
+                ):
+                    raise ValueError("Tiles requires a list of placement IDs.")
+                unique_ids = tuple(dict.fromkeys(placement_ids))
+                visible = {
+                    f"placement-{index:06d}"
+                    for index, placement in enumerate(project.geometry.placements)
+                    if placement.piece_type != "outside"
+                }
+                invalid = [value for value in unique_ids if value not in visible]
+                if invalid:
+                    raise ValueError(
+                        "Tile edits must target visible physical placements: "
+                        + ", ".join(invalid)
+                    )
+                updated = {
+                    tile_id: color_id
+                    for tile_id, color_id in self.paint_overrides.items()
+                    if tile_id not in unique_ids
+                }
+                changed = updated != self.paint_overrides
+                self.paint_overrides = updated
                 self.document_dirty = self.document_dirty or changed
                 return self._json(
                     start_response, "200 OK",

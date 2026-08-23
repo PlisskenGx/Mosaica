@@ -261,6 +261,7 @@ h1, h2, h3, p { margin-top: 0; }
 .paint-control-heading { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
 .paint-control-heading strong { padding: 0 .8rem; font-size: .9rem; }
 .paint-colors { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); justify-items: center; gap: .35rem; width: 100%; margin: .8rem 0; }
+.paint-shortcut-hint { margin: -.25rem .8rem .45rem; color: #77777d; font-size: .68rem; line-height: 1.35; }
 .paint-swatch { width: 2rem; height: 2rem; flex: none; border: 2px solid transparent; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .25); }
 .tile-color-swatch { width: 2rem; max-width: 100%; height: 2rem; padding: 0; border: 2px solid transparent; border-radius: 50%; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .24); }
 .tile-color-swatch[aria-pressed="true"] { border-color: #fff; box-shadow: 0 0 0 2px #4c4c51, inset 0 0 0 1px rgba(0, 0, 0, .24); }
