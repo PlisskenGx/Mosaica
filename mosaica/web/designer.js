@@ -21,6 +21,8 @@
   let artworkPreviewUrl = null;
   let artworkPreviewSource = null;
   let exportMode = "studio";
+  let exportKind = "print_package";
+  let flatExportPath = null;
   let exportJobId = null;
   let exportInFlight = false;
   let exportPollTimer = null;
@@ -243,11 +245,13 @@
       ++setupTransitionToken;
       settleSetupPanels(null);
     }
+    byId("welcome-screen").hidden = stage !== "welcome";
+    byId("welcome-screen").inert = stage !== "welcome";
     byId("workspace").hidden = stage !== "workspace";
     byId("back").hidden = stage !== "workspace";
-    byId("save-action").hidden = stage !== "workspace";
-    byId("save-as-action").hidden = stage !== "workspace";
-    byId("export-action").hidden = stage !== "workspace";
+    byId("document-menu-button").hidden = stage !== "workspace";
+    byId("document-title").hidden = stage === "welcome";
+    if (stage !== "workspace") closeDocumentMenu(false);
     document.body.classList.toggle("workspace-active", stage === "workspace");
     byId("document-name").textContent = state.document.title;
     byId("document-edited").hidden = !state.document.dirty;
@@ -826,7 +830,7 @@
     if (
       !payload
       || typeof payload !== "object"
-      || !["shape", "canvas", "tile", "workspace"].includes(payload.stage)
+      || !["welcome", "shape", "canvas", "tile", "workspace"].includes(payload.stage)
       || !payload.document
       || !Array.isArray(payload.canvas_presets)
       || !Array.isArray(payload.tile_presets)
@@ -1486,9 +1490,11 @@
   }
 
   function showExportStep(step) {
+    byId("export-chooser").hidden = step !== "chooser";
     byId("export-configure").hidden = step !== "configure";
     byId("export-progress").hidden = step !== "progress";
     byId("export-success").hidden = step !== "success";
+    byId("export-file-success").hidden = step !== "file-success";
     byId("export-close").disabled = step === "progress";
   }
 
@@ -1499,26 +1505,59 @@
     byId("export-dialog").close();
   }
 
-  async function openExportDialog() {
+  function openExportDialog() {
     setExportMode("studio");
+    exportKind = "print_package";
+    byId("export-title").textContent = "Export your mosaic";
     exportJobId = null;
-    showExportStep("configure");
+    flatExportPath = null;
+    showExportStep("chooser");
     byId("export-dialog").showModal();
+    byId("export-chooser").querySelector("button")?.focus();
+  }
+
+  async function openFabricationExport(kind) {
+    exportKind = kind;
+    byId("export-title").textContent = kind === "stl"
+      ? "Export STL package" : "Export your mosaic";
+    showExportStep("configure");
     await loadExportPreview();
+  }
+
+  async function exportFlatDesign(format) {
+    try {
+      const result = await request(
+        "/api/designer/export/file", { format }, `Export ${format.toUpperCase()}`,
+      );
+      if (result.cancelled) return;
+      flatExportPath = result.path;
+      byId("export-file-success-title").textContent = `${format.toUpperCase()} exported`;
+      byId("export-file-success-summary").textContent = result.filename;
+      showExportStep("file-success");
+    } catch (error) {
+      byId("status").textContent = error.message;
+    }
   }
 
   function showExportSuccess(result) {
     showExportStep("success");
+    const stl = result.kind === "stl";
+    byId("export-success").querySelector("h2").textContent = stl
+      ? "Your STL package is ready" : "Your mosaic is ready to print";
     byId("export-success-summary").textContent = (
       `${result.panel_count} ${result.panel_count === 1 ? "panel" : "panels"} prepared in ${result.mode_display_name} mode.`
     );
     const files = byId("export-success-files");
     files.replaceChildren();
-    for (const text of [
+    const descriptions = stl ? [
+      `${result.stl_count} named STL ${result.stl_count === 1 ? "file" : "files"}`,
+      `Manifest: ${result.manifest}`,
+    ] : [
       `${result.three_mf_count} multipart 3MF ${result.three_mf_count === 1 ? "file" : "files"}`,
       `Print Guide: ${result.print_guide}`,
       `Manifest: ${result.manifest}`,
-    ]) {
+    ];
+    for (const text of descriptions) {
       const item = document.createElement("li");
       item.textContent = text;
       files.appendChild(item);
@@ -1567,7 +1606,8 @@
     showExportStep("progress");
     try {
       const job = await request(
-        "/api/designer/export/start", { mode: exportMode }, "Start fabrication export",
+        "/api/designer/export/start", { mode: exportMode, kind: exportKind },
+        `Start ${exportKind === "stl" ? "STL" : "Print Package"} export`,
       );
       exportJobId = job.job_id;
       pollExportJob();
@@ -1613,6 +1653,34 @@
     await performDesignerMutation("/api/designer/border", { preset_id: presetId }, { name: "Change Border" });
   }
 
+  function closeDocumentMenu(returnFocus = true) {
+    const menu = byId("document-menu");
+    if (menu.hidden) return;
+    menu.hidden = true;
+    byId("document-menu-button").setAttribute("aria-expanded", "false");
+    if (returnFocus) byId("document-menu-button").focus();
+  }
+
+  function openDocumentMenu() {
+    const menu = byId("document-menu");
+    menu.hidden = false;
+    byId("document-menu-button").setAttribute("aria-expanded", "true");
+    menu.querySelector("button:not(:disabled)")?.focus();
+  }
+
+  async function openMosaic() {
+    closeDocumentMenu(false);
+    const discard = !state?.document?.dirty || window.confirm(
+      "You have unsaved changes. Opening another project will discard them.",
+    );
+    if (!discard) return;
+    await performDesignerMutation(
+      "/api/designer/project/open",
+      { discard_unsaved: Boolean(state?.document?.dirty) },
+      { name: "Open Mosaic" },
+    );
+  }
+
   byId("back").addEventListener("click", async () => {
     if (state.stage === "workspace") {
       const discard = !state.document.dirty || window.confirm(
@@ -1626,27 +1694,57 @@
       );
     }
   });
-  byId("export-action").addEventListener("click", openExportDialog);
-  byId("save-action").addEventListener("click", () => performDesignerMutation(
-    "/api/designer/project/save", {}, { name: "Save project" },
+  byId("welcome-new").addEventListener("click", () => performDesignerMutation(
+    "/api/designer/new", {}, { name: "New Mosaic" },
   ));
-  byId("save-as-action").addEventListener("click", () => performDesignerMutation(
-    "/api/designer/project/save-as", {}, { name: "Save project as" },
-  ));
-  byId("open-action").addEventListener("click", async () => {
-    const discard = !state?.document?.dirty || window.confirm(
-      "You have unsaved changes. Opening another project will discard them.",
-    );
-    if (!discard) return;
-    await performDesignerMutation(
-      "/api/designer/project/open",
-      { discard_unsaved: Boolean(state?.document?.dirty) },
-      { name: "Open project" },
+  byId("welcome-open").addEventListener("click", openMosaic);
+  byId("document-menu-button").addEventListener("click", () => {
+    if (byId("document-menu").hidden) openDocumentMenu();
+    else closeDocumentMenu();
+  });
+  byId("document-menu").addEventListener("keydown", (event) => {
+    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+    const items = [...byId("document-menu").querySelectorAll("button:not(:disabled)")];
+    const current = items.indexOf(document.activeElement);
+    const next = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1
+      : (current + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+    items[next]?.focus();
+    event.preventDefault();
+  });
+  byId("export-action").addEventListener("click", () => {
+    closeDocumentMenu(false);
+    openExportDialog();
+  });
+  byId("save-action").addEventListener("click", () => {
+    closeDocumentMenu(false);
+    performDesignerMutation(
+      "/api/designer/project/save", {}, { name: "Save project" },
     );
   });
+  byId("save-as-action").addEventListener("click", () => {
+    closeDocumentMenu(false);
+    performDesignerMutation(
+      "/api/designer/project/save-as", {}, { name: "Save project as" },
+    );
+  });
+  byId("open-action").addEventListener("click", openMosaic);
   byId("export-close").addEventListener("click", closeExportDialog);
   byId("export-done").addEventListener("click", closeExportDialog);
+  byId("export-file-done").addEventListener("click", closeExportDialog);
+  byId("export-file-open-folder").addEventListener("click", async () => {
+    if (!flatExportPath) return;
+    await request(
+      "/api/designer/export/file/open", { path: flatExportPath }, "Open export folder",
+    );
+  });
   byId("export-generate").addEventListener("click", generateDesignerExport);
+  for (const card of document.querySelectorAll("[data-export-format]")) {
+    card.addEventListener("click", () => {
+      const format = card.dataset.exportFormat;
+      if (["svg", "png", "jpg"].includes(format)) exportFlatDesign(format);
+      else openFabricationExport(format);
+    });
+  }
   for (const card of document.querySelectorAll("[data-export-mode]")) {
     card.addEventListener("click", () => {
       if (exportInFlight) return;
@@ -1746,6 +1844,11 @@
     });
   });
   document.addEventListener("pointerdown", (event) => {
+    if (!byId("document-menu").hidden
+        && !byId("document-menu").contains(event.target)
+        && !byId("document-menu-button").contains(event.target)) {
+      closeDocumentMenu(false);
+    }
     const chooser = byId("design-palette");
     if (chooser.hidden || chooser.contains(event.target) || paletteInvoker?.contains(event.target)) return;
     const invoker = paletteInvoker;
@@ -1753,6 +1856,11 @@
     invoker?.focus();
   });
   document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !byId("document-menu").hidden) {
+      event.preventDefault();
+      closeDocumentMenu();
+      return;
+    }
     if (event.key !== "Escape" || byId("design-palette").hidden) return;
     const invoker = paletteInvoker;
     hideDesignPalette();
@@ -1765,7 +1873,7 @@
       "input, textarea, select, [contenteditable=true], [contenteditable=plaintext-only]",
     )) return false;
     return !document.querySelector(
-      "dialog[open], [role=dialog]:not([hidden])",
+      "dialog[open], [role=dialog]:not([hidden]), [role=menu]:not([hidden])",
     );
   }
 

@@ -133,6 +133,8 @@ def test_preset_selection_api_state_flow():
     app = MosaicDesignerApp()
     status, payload = _request(app, "GET", "/api/designer")
     assert status == "200 OK"
+    assert payload["stage"] == "welcome"
+    _, payload = _request(app, "POST", "/api/designer/new", {})
     assert payload["stage"] == "shape"
     assert len(payload["canvas_presets"]) == 3
     assert len(payload["tile_presets"]) == 3
@@ -197,7 +199,7 @@ def test_designer_assets_use_backend_polygons_and_responsive_regions():
     status, html = _request(app, "GET", "/")
     assert status == "200 OK"
     assert "Mosaica" in html
-    assert "by Veradura Design" not in html
+    assert "by Veradura Design" in html
     assert "Mosaic Designer" not in html
     assert "<title>Mosaica</title>" in html
     assert "New mosaic" not in html
@@ -416,7 +418,7 @@ def test_json_response_framing_matches_body_exactly():
     )
     assert int(captured["headers"]["Content-Length"]) == len(body)
     assert "Transfer-Encoding" not in captured["headers"]
-    assert json.loads(body)["stage"] == "shape"
+    assert json.loads(body)["stage"] == "welcome"
 
 
 def test_threaded_http_server_writes_complete_framed_response(caplog):
@@ -445,7 +447,7 @@ def test_threaded_http_server_writes_complete_framed_response(caplog):
     )
     assert content_length == len(body)
     assert b"Connection: close" in headers
-    assert json.loads(body)["stage"] == "shape"
+    assert json.loads(body)["stage"] == "welcome"
     assert "write_completed=True" in caplog.text
     assert "transfer_encoding=None" in caplog.text
     assert ThreadingWSGIServer.daemon_threads is True

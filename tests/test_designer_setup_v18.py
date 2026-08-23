@@ -40,6 +40,8 @@ def _configured_app(orientation="point_top"):
 def test_canonical_setup_flow_and_back_navigation():
     app = MosaicDesignerApp()
     _, initial = _request(app, "GET", "/api/designer")
+    assert initial["stage"] == "welcome"
+    _, initial = _request(app, "POST", "/api/designer/new", {})
     assert initial["stage"] == "shape"
     _, tile = _request(app, "POST", "/api/designer/shape", {"shape": "hexagon"})
     assert tile["stage"] == "tile"
@@ -64,7 +66,7 @@ def test_canonical_setup_flow_and_back_navigation():
 def test_setup_back_is_local_and_accepts_the_shape_setup_payload():
     app = MosaicDesignerApp()
     _, script = _request(app, "GET", "/designer.js")
-    assert '["shape", "canvas", "tile", "workspace"]' in script
+    assert '["welcome", "shape", "canvas", "tile", "workspace"]' in script
 
     back_handler = script[
         script.index('byId("back").addEventListener'):

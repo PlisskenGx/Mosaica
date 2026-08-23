@@ -47,9 +47,10 @@ from .designer_generation import (
     mark_generated_stale,
 )
 from .designer_export import (
-    DesignerExportSnapshot,
+    DesignerExportSnapshot, choose_flat_export_path, sanitize_export_name,
     DesignerFabricationExportService,
 )
+from .designer_flat_export import export_flat_design
 from .project_file import (
     DesignerProjectFileState,
     choose_open_project_path,
@@ -573,6 +574,7 @@ class MosaicDesignerApp:
         export_folder_opener=None,
         project_open_dialog=None,
         project_save_dialog=None,
+        export_file_dialog=None,
     ) -> None:
         self._state_lock = RLock()
         self.tile_shape: str | None = None
@@ -588,8 +590,11 @@ class MosaicDesignerApp:
         self.document_title = "Untitled"
         self.document_dirty = False
         self.document_path: Path | None = None
+        self.welcome_active = True
         self._project_open_dialog = project_open_dialog or choose_open_project_path
         self._project_save_dialog = project_save_dialog or choose_save_project_path
+        self._export_file_dialog = export_file_dialog or choose_flat_export_path
+        self._flat_export_paths: set[Path] = set()
         self.export_service = DesignerFabricationExportService(
             export_root, folder_opener=export_folder_opener,
         )
@@ -611,6 +616,9 @@ class MosaicDesignerApp:
             if method == "GET" and path in DESIGNER_ASSETS:
                 return self._asset(path, start_response)
             if method == "GET" and path == "/api/designer":
+                return self._json(start_response, "200 OK", self.payload())
+            if method == "POST" and path == "/api/designer/new":
+                self.welcome_active = False
                 return self._json(start_response, "200 OK", self.payload())
             if method == "POST" and path in {
                 "/api/designer/project/save",
@@ -634,6 +642,7 @@ class MosaicDesignerApp:
                 opened = self._open_project_document(body)
                 return self._json(start_response, "200 OK", opened)
             if method == "POST" and path == "/api/designer/shape":
+                self.welcome_active = False
                 body = self._request_json(environ)
                 shape = body.get("shape")
                 if shape != "hexagon":
@@ -1098,8 +1107,41 @@ class MosaicDesignerApp:
                 return self._json(start_response, "200 OK", summary)
             if method == "POST" and path == "/api/designer/export/start":
                 body = self._request_json(environ)
-                job = self._start_export_job(body.get("mode", "studio"))
+                job = self._start_export_job(
+                    body.get("mode", "studio"), body.get("kind", "print_package"),
+                )
                 return self._json(start_response, "202 Accepted", job)
+            if method == "POST" and path == "/api/designer/export/file":
+                body = self._request_json(environ)
+                format_name = str(body.get("format", "")).lower()
+                if format_name not in {"svg", "png", "jpg", "jpeg"}:
+                    raise ValueError("Choose SVG, PNG, or JPG export.")
+                default_name = (
+                    f"{sanitize_export_name(self.document_title or 'Untitled Mosaic')}"
+                    f".{format_name}"
+                )
+                requested = body.get("path")
+                destination = (
+                    Path(requested) if isinstance(requested, str) and requested
+                    else self._export_file_dialog(format_name, default_name)
+                )
+                if destination is None:
+                    return self._json(start_response, "200 OK", {
+                        "cancelled": True, "format": format_name,
+                    })
+                result = export_flat_design(
+                    self._export_snapshot(), destination, format_name,
+                )
+                resolved = result.path.resolve()
+                self._flat_export_paths.add(resolved)
+                return self._json(start_response, "200 OK", result.to_dict())
+            if method == "POST" and path == "/api/designer/export/file/open":
+                requested = self._request_json(environ).get("path")
+                target = Path(requested).resolve() if isinstance(requested, str) else None
+                if target not in self._flat_export_paths or not target.is_file():
+                    raise ValueError("Choose a file exported during this Mosaica session.")
+                self.export_service._folder_opener(target.parent)
+                return self._json(start_response, "200 OK", {"opened": True})
             if method == "GET" and path == "/api/designer/export/status":
                 query = parse_qs(environ.get("QUERY_STRING", ""))
                 job_id = (query.get("id") or [None])[0]
@@ -1131,6 +1173,7 @@ class MosaicDesignerApp:
                         "requires_confirmation": True,
                     })
                 if self.project is not None:
+                    self.welcome_active = False
                     self.project = None
                     self.artwork = None
                     self.generated_artwork = None
@@ -1186,6 +1229,7 @@ class MosaicDesignerApp:
             "app_version": __version__,
             "stage": (
                 "workspace" if self.project is not None
+                else "welcome" if self.welcome_active
                 else "canvas" if self.tile_id is not None
                 else "tile" if self.tile_shape is not None
                 else "shape"
@@ -1300,6 +1344,7 @@ class MosaicDesignerApp:
         self.document_path = Path(source).expanduser().resolve()
         self.document_title = self.document_path.stem
         self.document_dirty = False
+        self.welcome_active = False
         return self.payload()
 
     def _export_snapshot(self) -> DesignerExportSnapshot:
@@ -1310,7 +1355,9 @@ class MosaicDesignerApp:
             document_title=self.document_title,
         )
 
-    def _start_export_job(self, mode: str) -> dict:
+    def _start_export_job(self, mode: str, export_kind: str = "print_package") -> dict:
+        if export_kind not in {"print_package", "stl"}:
+            raise ValueError("Unknown fabrication export type.")
         if (
             self._active_export_job_id is not None
             and self._export_jobs[self._active_export_job_id]["status"] == "running"
@@ -1320,8 +1367,18 @@ class MosaicDesignerApp:
         # Validate the selected mode before reserving an output directory.
         preview = self._export_preview(snapshot, mode)
         try:
-            output = self.export_service.allocate_output_directory(
-                snapshot.document_title,
+            suffix = (
+                f"STL {preview['mode']['display_name']}"
+                if export_kind == "stl" else None
+            )
+            output = (
+                self.export_service.allocate_named_output_directory(
+                    snapshot.document_title, suffix,
+                )
+                if export_kind == "stl"
+                else self.export_service.allocate_output_directory(
+                    snapshot.document_title,
+                )
             )
         except PermissionError as exc:
             raise RuntimeError(
@@ -1336,6 +1393,7 @@ class MosaicDesignerApp:
         job = {
             "job_id": job_id,
             "status": "running",
+            "kind": export_kind,
             "mode": preview["mode"],
             "panel_count": preview["panel_count"],
             "message": "Preparing your fabrication package…",
@@ -1356,7 +1414,7 @@ class MosaicDesignerApp:
         self._active_export_job_id = job_id
         Thread(
             target=self._run_export_job,
-            args=(job_id, snapshot, mode, output),
+            args=(job_id, snapshot, mode, output, export_kind),
             daemon=True,
             name=f"mosaica-{job_id}",
         ).start()
@@ -1382,11 +1440,16 @@ class MosaicDesignerApp:
         snapshot: DesignerExportSnapshot,
         mode: str,
         output: Path,
+        export_kind: str = "print_package",
     ) -> None:
         from .fabricate.panelize import PanelizationError
 
         try:
-            result = self.export_service.generate(
+            generator = (
+                self.export_service.generate_stl
+                if export_kind == "stl" else self.export_service.generate
+            )
+            result = generator(
                 snapshot, mode, output,
                 progress=lambda event: self._update_export_progress(job_id, event),
             )

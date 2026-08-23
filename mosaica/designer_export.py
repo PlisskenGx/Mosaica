@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import logging
+import json
 import os
 from pathlib import Path
 import platform
@@ -50,6 +51,31 @@ class DesignerExportResult:
         }
 
 
+@dataclass(frozen=True)
+class DesignerStlExportResult:
+    output_directory: Path
+    mode: FabricationMode
+    panel_count: int
+    stl_paths: tuple[Path, ...]
+    manifest_path: Path
+    geometry_signature: str
+
+    def to_dict(self) -> dict:
+        return {
+            "output_directory": str(self.output_directory),
+            "kind": "stl",
+            "mode": self.mode.value,
+            "mode_display_name": resolve_fabrication_mode(self.mode).display_name,
+            "panel_count": self.panel_count,
+            "stl_count": len(self.stl_paths),
+            "stl_files": [
+                str(path.relative_to(self.output_directory)) for path in self.stl_paths
+            ],
+            "manifest": self.manifest_path.name,
+            "geometry_signature": self.geometry_signature,
+        }
+
+
 def sanitize_export_name(document_title: str) -> str:
     title = document_title.strip()
     if not title or title.lower() == "untitled":
@@ -57,6 +83,39 @@ def sanitize_export_name(document_title: str) -> str:
     title = re.sub(r"[^A-Za-z0-9._ -]+", "", title)
     title = re.sub(r"[ ._-]+", "_", title).strip("_")
     return title or "Project"
+
+
+def _stl_part_token(name: str) -> str:
+    value = name.replace(" - ", " ")
+    value = re.sub(r"[^A-Za-z0-9 -]+", "", value)
+    return re.sub(r" +", "_", value.strip()) or "Part"
+
+
+def choose_flat_export_path(format_name: str, default_name: str) -> Path | None:
+    extension = ".jpg" if format_name.lower() == "jpeg" else f".{format_name.lower()}"
+    filename = Path(default_name).with_suffix(extension).name
+    if platform.system() == "Darwin":
+        script = (
+            'POSIX path of (choose file name with prompt "Export Mosaica Design" '
+            f'default name {__import__("json").dumps(filename)})'
+        )
+        result = subprocess.run(
+            ["osascript", "-e", script], capture_output=True, text=True,
+        )
+        return Path(result.stdout.strip()) if result.returncode == 0 else None
+    import tkinter as tk
+    from tkinter import filedialog
+    root = tk.Tk()
+    root.withdraw()
+    try:
+        selected = filedialog.asksaveasfilename(
+            title="Export Mosaica Design", defaultextension=extension,
+            filetypes=((format_name.upper(), f"*{extension}"),),
+            initialfile=filename,
+        )
+    finally:
+        root.destroy()
+    return Path(selected) if selected else None
 
 
 def panelization_summary(plan: PanelizationPlan) -> dict:
@@ -152,8 +211,15 @@ class DesignerFabricationExportService:
         return panelization_summary(plan)
 
     def allocate_output_directory(self, document_title: str) -> Path:
+        return self.allocate_named_output_directory(document_title)
+
+    def allocate_named_output_directory(
+        self, document_title: str, suffix: str | None = None,
+    ) -> Path:
         self.output_root.mkdir(parents=True, exist_ok=True)
         stem = f"Mosaica_{sanitize_export_name(document_title)}"
+        if suffix:
+            stem += f"_{sanitize_export_name(suffix)}"
         for suffix in range(1, 10_000):
             name = stem if suffix == 1 else f"{stem}_{suffix}"
             candidate = self.output_root / name
@@ -203,6 +269,68 @@ class DesignerFabricationExportService:
             print_guide_path=package.print_guide_path,
             manifest_path=package.manifest_path,
             three_mf_paths=package.three_mf_paths,
+        )
+
+    def generate_stl(
+        self,
+        snapshot: DesignerExportSnapshot,
+        mode: FabricationMode | str,
+        output_directory: str | Path,
+        progress: Callable[[dict[str, object]], None] | None = None,
+    ) -> DesignerStlExportResult:
+        from .fabricate.panelize import generate_panelization_package, panelize_model
+        from .fabricate.three_mf import _part_identity
+
+        definition = resolve_fabrication_mode(mode)
+        if progress is not None:
+            progress({
+                "phase": "resolving", "current_panel": None,
+                "completed_panels": 0, "total_panels": 0, "panel_index": None,
+                "message": "Resolving your design…",
+            })
+        model = self._model(snapshot)
+        plan = panelize_model(model, mode=definition.mode)
+        if progress is not None:
+            progress({
+                "phase": "building_panels", "current_panel": None,
+                "completed_panels": 0, "total_panels": len(plan.panels),
+                "panel_index": None, "message": "Building STL panel bodies…",
+            })
+        package = generate_panelization_package(
+            model, output_directory, mode=definition.mode,
+        )
+        manifest = json.loads(package.manifest_path.read_text(encoding="utf-8"))
+        records = {
+            record["filename"]: record
+            for record in manifest["body_channel_ownership"]
+        }
+        named_paths = []
+        for path in package.stl_paths:
+            relative = str(path.relative_to(package.output_directory))
+            record = records[relative]
+            identity = _part_identity(model.channel(record["channel"]))
+            filename = (
+                f"Panel_{record['panel_id']}_"
+                f"{_stl_part_token(str(identity['user_facing_name']))}.stl"
+            )
+            named_path = path.with_name(filename)
+            path.rename(named_path)
+            record["filename"] = str(named_path.relative_to(package.output_directory))
+            record["user_facing_name"] = identity["user_facing_name"]
+            record["project_palette_index"] = identity["project_palette_index"]
+            record["project_color_name"] = identity["project_color_name"]
+            record["project_color_value"] = identity["project_color_value"]
+            named_paths.append(named_path)
+        package.manifest_path.write_text(
+            json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8",
+        )
+        return DesignerStlExportResult(
+            output_directory=package.output_directory,
+            mode=definition.mode,
+            panel_count=len(plan.panels),
+            stl_paths=tuple(named_paths),
+            manifest_path=package.manifest_path,
+            geometry_signature=package.geometry_signature,
         )
 
     def open_folder(self, output_directory: str | Path) -> None:
