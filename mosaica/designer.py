@@ -49,6 +49,14 @@ from .designer_export import (
     DesignerExportSnapshot,
     DesignerFabricationExportService,
 )
+from .project_file import (
+    DesignerProjectFileState,
+    choose_open_project_path,
+    choose_save_project_path,
+    load_project_file,
+    normalize_project_path,
+    save_project_file,
+)
 
 
 MM_PER_INCH = 25.4
@@ -480,6 +488,8 @@ class MosaicDesignerApp:
         *,
         export_root: str | Path | None = None,
         export_folder_opener=None,
+        project_open_dialog=None,
+        project_save_dialog=None,
     ) -> None:
         self._state_lock = RLock()
         self.tile_shape: str | None = None
@@ -494,6 +504,9 @@ class MosaicDesignerApp:
         self.artwork_edit_mode = True
         self.document_title = "Untitled"
         self.document_dirty = False
+        self.document_path: Path | None = None
+        self._project_open_dialog = project_open_dialog or choose_open_project_path
+        self._project_save_dialog = project_save_dialog or choose_save_project_path
         self.export_service = DesignerFabricationExportService(
             export_root, folder_opener=export_folder_opener,
         )
@@ -516,6 +529,27 @@ class MosaicDesignerApp:
                 return self._asset(path, start_response)
             if method == "GET" and path == "/api/designer":
                 return self._json(start_response, "200 OK", self.payload())
+            if method == "POST" and path in {
+                "/api/designer/project/save",
+                "/api/designer/project/save-as",
+            }:
+                body = self._request_json(environ)
+                saved = self._save_project_document(
+                    body, save_as=path.endswith("save-as"),
+                )
+                return self._json(start_response, "200 OK", saved)
+            if method == "POST" and path == "/api/designer/project/open":
+                body = self._request_json(environ)
+                if self.document_dirty and not body.get("discard_unsaved", False):
+                    return self._json(start_response, "409 Conflict", {
+                        "error": (
+                            "You have unsaved changes. Opening another project "
+                            "will discard them."
+                        ),
+                        "requires_confirmation": True,
+                    })
+                opened = self._open_project_document(body)
+                return self._json(start_response, "200 OK", opened)
             if method == "POST" and path == "/api/designer/shape":
                 body = self._request_json(environ)
                 shape = body.get("shape")
@@ -967,6 +1001,18 @@ class MosaicDesignerApp:
                     {"opened": True, "output_directory": job["result"]["output_directory"]},
                 )
             if method == "POST" and path == "/api/designer/back":
+                body = self._request_json(environ)
+                if (
+                    self.project is not None and self.document_dirty
+                    and not body.get("discard_unsaved", False)
+                ):
+                    return self._json(start_response, "409 Conflict", {
+                        "error": (
+                            "You have unsaved changes. Returning to setup will "
+                            "discard them."
+                        ),
+                        "requires_confirmation": True,
+                    })
                 if self.project is not None:
                     self.project = None
                     self.artwork = None
@@ -974,6 +1020,8 @@ class MosaicDesignerApp:
                     self.paint_overrides = {}
                     self.artwork_edit_mode = True
                     self.document_dirty = False
+                    self.document_path = None
+                    self.document_title = "Untitled"
                     self._canvas_confirmed = False
                 elif self.tile_id is not None:
                     self.tile_id = None
@@ -1037,6 +1085,7 @@ class MosaicDesignerApp:
             "document": {
                 "title": self.document_title,
                 "dirty": self.document_dirty,
+                "has_file": self.document_path is not None,
             },
             "project": project_payload,
         }
@@ -1071,6 +1120,70 @@ class MosaicDesignerApp:
         if self.artwork is None:
             raise ValueError("No SVG artwork is loaded.")
         return self.artwork
+
+    def _project_file_state(self, title: str | None = None) -> DesignerProjectFileState:
+        return DesignerProjectFileState(
+            project=self._require_project(), artwork=self.artwork,
+            generated_artwork=self.generated_artwork,
+            paint_overrides=dict(self.paint_overrides),
+            artwork_edit_mode=self.artwork_edit_mode,
+            title=title or self.document_title,
+        )
+
+    def _document_state_payload(self, *, saved: bool = False) -> dict:
+        return {
+            "payload_kind": "document_state",
+            "stage": "workspace" if self.project is not None else self.payload()["stage"],
+            "document": {
+                "title": self.document_title,
+                "dirty": self.document_dirty,
+                "has_file": self.document_path is not None,
+            },
+            "saved": saved,
+        }
+
+    def _save_project_document(self, body: dict, *, save_as: bool) -> dict:
+        self._require_project()
+        requested = body.get("path")
+        destination = Path(requested) if isinstance(requested, str) and requested else None
+        if destination is None and not save_as and self.document_path is not None:
+            destination = self.document_path
+        if destination is None:
+            destination = self._project_save_dialog(self.document_path)
+        if destination is None:
+            return {**self._document_state_payload(), "cancelled": True}
+        destination = normalize_project_path(destination)
+        title = destination.stem.strip() or "Untitled"
+        saved_path = save_project_file(
+            destination, self._project_file_state(title),
+        )
+        self.document_path = saved_path.resolve()
+        self.document_title = title
+        self.document_dirty = False
+        return self._document_state_payload(saved=True)
+
+    def _open_project_document(self, body: dict) -> dict:
+        requested = body.get("path")
+        source = Path(requested) if isinstance(requested, str) and requested else None
+        if source is None:
+            source = self._project_open_dialog()
+        if source is None:
+            return {**self._document_state_payload(), "cancelled": True}
+        loaded = load_project_file(source)
+        self.project = loaded.project
+        self.artwork = loaded.artwork
+        self.generated_artwork = loaded.generated_artwork
+        self.paint_overrides = dict(loaded.paint_overrides)
+        self.artwork_edit_mode = loaded.artwork_edit_mode
+        self.tile_shape = "hexagon"
+        self.tile_id = self.project.tile.id
+        self.tile_orientation = self.project.tile_orientation
+        self.canvas_id = self.project.canvas.id
+        self._canvas_confirmed = False
+        self.document_path = Path(source).expanduser().resolve()
+        self.document_title = self.document_path.stem
+        self.document_dirty = False
+        return self.payload()
 
     def _export_snapshot(self) -> DesignerExportSnapshot:
         return DesignerExportSnapshot(
@@ -1258,6 +1371,7 @@ class MosaicDesignerApp:
             "document": {
                 "title": self.document_title,
                 "dirty": self.document_dirty,
+                "has_file": self.document_path is not None,
             },
             "artwork": (
                 {**self.artwork.to_dict(), "edit_mode": self.artwork_edit_mode}
@@ -1311,6 +1425,7 @@ class MosaicDesignerApp:
             "document": {
                 "title": self.document_title,
                 "dirty": self.document_dirty,
+                "has_file": self.document_path is not None,
             },
             "artwork": (
                 {**self.artwork.to_dict(), "edit_mode": self.artwork_edit_mode}

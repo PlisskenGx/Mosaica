@@ -24,6 +24,7 @@
   let exportPollTimer = null;
   let exportPreviewToken = 0;
   let exportPreviewReadyMode = null;
+  let saveConfirmationTimer = null;
   const byId = (id) => document.getElementById(id);
   const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
   const orientationLabel = (orientation) => (
@@ -242,6 +243,8 @@
     }
     byId("workspace").hidden = stage !== "workspace";
     byId("back").hidden = stage !== "workspace";
+    byId("save-action").hidden = stage !== "workspace";
+    byId("save-as-action").hidden = stage !== "workspace";
     byId("export-action").hidden = stage !== "workspace";
     document.body.classList.toggle("workspace-active", stage === "workspace");
     byId("document-name").textContent = state.document.title;
@@ -772,6 +775,12 @@
   }
 
   function validateDesignerState(payload, requireGenerated = false) {
+    if (payload?.payload_kind === "document_state") {
+      if (!payload.document || !hasOwn(payload.document, "dirty")) {
+        throw new Error("Mosaica returned incomplete document state.");
+      }
+      return;
+    }
     if (payload?.payload_kind === "artwork_state") {
       if (
         payload.stage !== "workspace"
@@ -829,7 +838,19 @@
 
   function applyDesignerState(payload, requireGenerated = false) {
     validateDesignerState(payload, requireGenerated);
-    if (payload.payload_kind === "artwork_state") {
+    if (payload.payload_kind === "document_state") {
+      state = { ...state, document: payload.document };
+      byId("document-name").textContent = state.document.title;
+      byId("document-edited").hidden = !state.document.dirty;
+      if (payload.saved) {
+        window.clearTimeout(saveConfirmationTimer);
+        byId("save-confirmation").textContent = "Saved";
+        saveConfirmationTimer = window.setTimeout(() => {
+          byId("save-confirmation").textContent = "";
+        }, 1800);
+      }
+      return;
+    } else if (payload.payload_kind === "artwork_state") {
       if (!state?.project) {
         throw new Error("Mosaica cannot apply artwork state without an open project.");
       }
@@ -1550,10 +1571,35 @@
 
   byId("back").addEventListener("click", async () => {
     if (state.stage === "workspace") {
-      await performDesignerMutation("/api/designer/back", {}, { name: "Back" });
+      const discard = !state.document.dirty || window.confirm(
+        "You have unsaved changes. Returning to setup will discard them.",
+      );
+      if (!discard) return;
+      await performDesignerMutation(
+        "/api/designer/back",
+        { discard_unsaved: Boolean(state.document.dirty) },
+        { name: "Back" },
+      );
     }
   });
   byId("export-action").addEventListener("click", openExportDialog);
+  byId("save-action").addEventListener("click", () => performDesignerMutation(
+    "/api/designer/project/save", {}, { name: "Save project" },
+  ));
+  byId("save-as-action").addEventListener("click", () => performDesignerMutation(
+    "/api/designer/project/save-as", {}, { name: "Save project as" },
+  ));
+  byId("open-action").addEventListener("click", async () => {
+    const discard = !state?.document?.dirty || window.confirm(
+      "You have unsaved changes. Opening another project will discard them.",
+    );
+    if (!discard) return;
+    await performDesignerMutation(
+      "/api/designer/project/open",
+      { discard_unsaved: Boolean(state?.document?.dirty) },
+      { name: "Open project" },
+    );
+  });
   byId("export-close").addEventListener("click", closeExportDialog);
   byId("export-done").addEventListener("click", closeExportDialog);
   byId("export-generate").addEventListener("click", generateDesignerExport);

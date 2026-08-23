@@ -137,14 +137,18 @@ def test_preset_selection_api_state_flow():
     assert len(payload["canvas_presets"]) == 3
     assert len(payload["tile_presets"]) == 3
     assert payload["fixed_grout_mm"] == 1.8
-    assert payload["document"] == {"title": "Untitled", "dirty": False}
+    assert payload["document"] == {
+        "title": "Untitled", "dirty": False, "has_file": False,
+    }
 
     status, payload = _request(app, "POST", "/api/designer/shape", {"shape": "hexagon"})
     assert status == "200 OK"
     assert payload["stage"] == "tile"
     assert payload["selected_tile_shape"] == "hexagon"
     assert payload["project"] is None
-    assert payload["document"] == {"title": "Untitled", "dirty": False}
+    assert payload["document"] == {
+        "title": "Untitled", "dirty": False, "has_file": False,
+    }
 
     status, payload = _request(
         app, "POST", "/api/designer/tile", {"tile_id": "m", "orientation": "point_top"},
@@ -160,7 +164,9 @@ def test_preset_selection_api_state_flow():
     assert abs(payload["project"]["geometry"]["height_in"] - 24) < 1
     assert payload["project"]["tile_orientation"] == "point_top"
     assert payload["project"]["tile_preset"]["flat_to_flat_mm"] == 24
-    assert payload["document"] == {"title": "Untitled", "dirty": False}
+    assert payload["document"] == {
+        "title": "Untitled", "dirty": False, "has_file": False,
+    }
 
     status, payload = _request(app, "POST", "/api/designer/back", {})
     assert status == "200 OK"
@@ -291,7 +297,8 @@ def test_workspace_and_sidebar_polish_is_structurally_scoped():
     assert 'byId("setup-previous").addEventListener' in script
     assert 'byId("setup-next")' not in script
     assert 'if (state.stage === "workspace")' in script
-    assert 'performDesignerMutation("/api/designer/back", {}, { name: "Back" })' in script
+    assert '"/api/designer/back"' in script
+    assert 'discard_unsaved: Boolean(state.document.dirty)' in script
 
     _, stylesheet = _request(app, "GET", "/designer.css")
     assert "grid-template-columns: minmax(0, 1fr)" in stylesheet

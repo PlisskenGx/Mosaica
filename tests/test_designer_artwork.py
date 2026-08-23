@@ -240,7 +240,9 @@ def test_border_change_preserves_transform_and_reset_uses_current_field():
 def test_geometry_setup_navigation_clears_session_artwork():
     app = _workspace()
     _upload(app)
-    _, payload = _request(app, "POST", "/api/designer/back", {})
+    _, payload = _request(app, "POST", "/api/designer/back", {
+        "discard_unsaved": True,
+    })
     assert payload["stage"] == "canvas"
     assert app.artwork is None
     _, payload = _request(app, "POST", "/api/designer/tile", {"tile_id": "l"})

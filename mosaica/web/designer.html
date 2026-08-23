@@ -18,10 +18,15 @@
       </div>
     </div>
     <div class="app-bar-center">
-      <button id="export-action" class="export-action" type="button" hidden>Export</button>
+      <div class="project-actions" aria-label="Project actions">
+        <button id="open-action" class="project-action" type="button">Open…</button>
+        <button id="save-action" class="project-action" type="button" hidden>Save</button>
+        <button id="save-as-action" class="project-action" type="button" hidden>Save As…</button>
+        <button id="export-action" class="export-action" type="button" hidden>Export</button>
+      </div>
     </div>
     <div id="document-title" class="document-title" aria-label="Document title">
-      <span id="document-name">Untitled</span><span id="document-edited" hidden>Edited</span>
+      <span id="document-name">Untitled</span><span id="document-edited" hidden>Edited</span><span id="save-confirmation" role="status" aria-live="polite"></span>
     </div>
   </header>
 

@@ -28,6 +28,18 @@ button { font: inherit; }
 
 .app-bar-left { grid-column: 1; display: flex; align-items: center; gap: clamp(1rem, 2vw, 1.6rem); min-width: 0; }
 .app-bar-center { grid-column: 2; justify-self: center; }
+.project-actions { display: flex; align-items: center; gap: .3rem; white-space: nowrap; }
+.project-action {
+  min-height: 2.35rem;
+  padding: .45rem .65rem;
+  border: 0;
+  border-radius: .55rem;
+  color: #55555a;
+  background: transparent;
+  cursor: pointer;
+}
+.project-action:hover { color: #1d1d1f; background: rgba(0, 0, 0, .04); }
+.project-action:focus-visible { outline: 3px solid #8bb7ff; outline-offset: 2px; }
 .export-action {
   min-width: 5.5rem;
   min-height: 2.35rem;
@@ -53,6 +65,7 @@ button { font: inherit; }
 .brand-copy strong { font-size: 1.2rem; }
 .document-title { grid-column: 3; display: flex; align-items: center; justify-self: end; gap: .45rem; color: #55555a; font-size: .85rem; }
 #document-edited { padding: .16rem .4rem; border-radius: 999px; color: #6d581a; background: #f4ebca; font-size: .65rem; }
+#save-confirmation { min-width: 2.8rem; color: #3d8359; font-size: .72rem; }
 .back-navigation {
   min-width: 2.75rem;
   min-height: 2.75rem;
@@ -425,6 +438,7 @@ h1, h2, h3, p { margin-top: 0; }
 @media (max-width: 680px) {
   .app-bar { grid-template-columns: 1fr auto; }
   .app-bar-center { grid-column: 2; }
+  .project-action { padding-inline: .45rem; }
   .export-action { min-width: 4.6rem; padding-inline: .75rem; }
   .document-title { display: none; }
   .app-bar-left { gap: .6rem; }
