@@ -1,0 +1,1 @@
+"""Mosaica test package."""

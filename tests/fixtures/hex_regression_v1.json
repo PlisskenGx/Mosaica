@@ -1,0 +1,1530 @@
+{
+  "artwork": {
+    "assignments": 11,
+    "sha256": "bb2eb8906efd5bce9fb15b214de6afed0c9fe9bede53d00e0e70612e87c277f4"
+  },
+  "backside_id": {
+    "cell_count": 28,
+    "cell_mm": 1.0,
+    "deboss_depth_mm": 0.35,
+    "front_view_panel_order": "excluded-known-bug",
+    "glyph_sha256": "46b2ce4d17607d3e84949c24cc7777afa3676d164dd75493bc883d1d3490d30e"
+  },
+  "borders": {
+    "flat_top_alternating": {
+      "available": 11,
+      "owned": 34,
+      "rings": [
+        34
+      ],
+      "sha256": "c06aa7540b3b8bd632bcee05e022846f7d62b22de2b3021643dd4145bfaea9f0"
+    },
+    "flat_top_double": {
+      "available": 1,
+      "owned": 44,
+      "rings": [
+        34,
+        10
+      ],
+      "sha256": "1bc93c802a4549800698b075e251ba5aafa875114734a9e35b0767f9d1052483"
+    },
+    "flat_top_none": {
+      "available": 27,
+      "owned": 18,
+      "rings": [
+        18
+      ],
+      "sha256": "8bee4a21e4bda185f0d728ac4b44fa5a297efefb45b4f9f4e95a81cce893ab6e"
+    },
+    "flat_top_solid": {
+      "available": 11,
+      "owned": 34,
+      "rings": [
+        34
+      ],
+      "sha256": "aa7ecbc9e70cc9b21e449d75f8d1ddcc6c730c11286eac00814181165153eba5"
+    },
+    "point_top_alternating": {
+      "available": 11,
+      "owned": 34,
+      "rings": [
+        34
+      ],
+      "sha256": "f506dd74d3a8945426e6a91035b64047c02b6c18f57798385ba903f4712d396c"
+    },
+    "point_top_double": {
+      "available": 1,
+      "owned": 44,
+      "rings": [
+        34,
+        10
+      ],
+      "sha256": "e1899aa8be4caae38c12cce8a85c99e0c95fac1ca4d87b30a3646032af72feae"
+    },
+    "point_top_none": {
+      "available": 27,
+      "owned": 18,
+      "rings": [
+        18
+      ],
+      "sha256": "55ce632a5681c81858f65c4810ec4f649e8549b1764b90a51dbfd7d97714cae8"
+    },
+    "point_top_solid": {
+      "available": 11,
+      "owned": 34,
+      "rings": [
+        34
+      ],
+      "sha256": "e8aae805af75e47ed82233abdb79b3a62e2ed3ec220c493cb9211c517d9d2330"
+    }
+  },
+  "clipped": {
+    "flat_top": {
+      "semantic": {
+        "full": {
+          "center": [
+            1.713866547,
+            0.586614173
+          ],
+          "column": 3,
+          "fraction": 1.0,
+          "full": [
+            [
+              2.350315663,
+              0.586614173
+            ],
+            [
+              2.032091105,
+              1.137795276
+            ],
+            [
+              1.395641989,
+              1.137795276
+            ],
+            [
+              1.077417431,
+              0.586614173
+            ],
+            [
+              1.395641989,
+              0.035433071
+            ],
+            [
+              2.032091105,
+              0.035433071
+            ]
+          ],
+          "id": "placement-000012",
+          "piece_type": "full",
+          "row": 1,
+          "visible": [
+            [
+              2.350315663,
+              0.586614173
+            ],
+            [
+              2.032091105,
+              1.137795276
+            ],
+            [
+              1.395641989,
+              1.137795276
+            ],
+            [
+              1.077417431,
+              0.586614173
+            ],
+            [
+              1.395641989,
+              0.035433071
+            ],
+            [
+              2.032091105,
+              0.035433071
+            ]
+          ]
+        },
+        "nearest_half": {
+          "center": [
+            0.697820995,
+            0.0
+          ],
+          "column": 2,
+          "fraction": 0.5,
+          "full": [
+            [
+              1.33427011,
+              0.0
+            ],
+            [
+              1.016045552,
+              0.551181102
+            ],
+            [
+              0.379596437,
+              0.551181102
+            ],
+            [
+              0.061371879,
+              0.0
+            ],
+            [
+              0.379596437,
+              -0.551181102
+            ],
+            [
+              1.016045552,
+              -0.551181102
+            ]
+          ],
+          "id": "placement-000011",
+          "piece_type": "half",
+          "row": 1,
+          "visible": [
+            [
+              1.33427011,
+              0.0
+            ],
+            [
+              1.33427011,
+              0.0
+            ],
+            [
+              1.016045552,
+              0.551181102
+            ],
+            [
+              0.379596437,
+              0.551181102
+            ],
+            [
+              0.061371879,
+              0.0
+            ],
+            [
+              0.061371879,
+              0.0
+            ]
+          ]
+        },
+        "smallest": {
+          "center": [
+            5.778048757,
+            5.279527559
+          ],
+          "column": 7,
+          "fraction": 0.166666667,
+          "full": [
+            [
+              6.414497873,
+              5.279527559
+            ],
+            [
+              6.096273315,
+              5.830708661
+            ],
+            [
+              5.459824199,
+              5.830708661
+            ],
+            [
+              5.141599641,
+              5.279527559
+            ],
+            [
+              5.459824199,
+              4.728346457
+            ],
+            [
+              6.096273315,
+              4.728346457
+            ]
+          ],
+          "id": "placement-000052",
+          "piece_type": "edge_cut",
+          "row": 5,
+          "visible": [
+            [
+              5.459824199,
+              5.830708661
+            ],
+            [
+              5.459824199,
+              5.830708661
+            ],
+            [
+              5.141599641,
+              5.279527559
+            ],
+            [
+              5.459824199,
+              4.728346457
+            ],
+            [
+              5.459824199,
+              4.728346457
+            ]
+          ]
+        }
+      },
+      "sha256": "f35d718e6e6a51633843ca32c35a280df07041321282a6b389fc1a33ad23d22a"
+    },
+    "point_top": {
+      "semantic": {
+        "full": {
+          "center": [
+            0.551181102,
+            0.906291635
+          ],
+          "column": 2,
+          "fraction": 1.0,
+          "full": [
+            [
+              1.102362205,
+              1.224516193
+            ],
+            [
+              0.551181102,
+              1.542740751
+            ],
+            [
+              0.0,
+              1.224516193
+            ],
+            [
+              0.0,
+              0.588067078
+            ],
+            [
+              0.551181102,
+              0.26984252
+            ],
+            [
+              1.102362205,
+              0.588067078
+            ]
+          ],
+          "id": "placement-000020",
+          "piece_type": "full",
+          "row": 2,
+          "visible": [
+            [
+              1.102362205,
+              1.224516193
+            ],
+            [
+              0.551181102,
+              1.542740751
+            ],
+            [
+              0.0,
+              1.224516193
+            ],
+            [
+              0.0,
+              0.588067078
+            ],
+            [
+              0.551181102,
+              0.26984252
+            ],
+            [
+              1.102362205,
+              0.588067078
+            ]
+          ]
+        },
+        "nearest_half": {
+          "center": [
+            6.417322835,
+            0.906291635
+          ],
+          "column": 7,
+          "fraction": 0.457831633,
+          "full": [
+            [
+              6.968503937,
+              1.224516193
+            ],
+            [
+              6.417322835,
+              1.542740751
+            ],
+            [
+              5.866141732,
+              1.224516193
+            ],
+            [
+              5.866141732,
+              0.588067078
+            ],
+            [
+              6.417322835,
+              0.26984252
+            ],
+            [
+              6.968503937,
+              0.588067078
+            ]
+          ],
+          "id": "placement-000025",
+          "piece_type": "edge_cut",
+          "row": 2,
+          "visible": [
+            [
+              6.381889764,
+              1.522283458
+            ],
+            [
+              5.866141732,
+              1.224516193
+            ],
+            [
+              5.866141732,
+              0.588067078
+            ],
+            [
+              6.381889764,
+              0.290299813
+            ]
+          ]
+        },
+        "smallest": {
+          "center": [
+            -0.035433071,
+            -0.109753917
+          ],
+          "column": 1,
+          "fraction": 0.175128689,
+          "full": [
+            [
+              0.515748031,
+              0.208470641
+            ],
+            [
+              -0.035433071,
+              0.526695198
+            ],
+            [
+              -0.586614173,
+              0.208470641
+            ],
+            [
+              -0.586614173,
+              -0.427978475
+            ],
+            [
+              -0.035433071,
+              -0.746203033
+            ],
+            [
+              0.515748031,
+              -0.427978475
+            ]
+          ],
+          "id": "placement-000010",
+          "piece_type": "edge_cut",
+          "row": 1,
+          "visible": [
+            [
+              0.515748031,
+              0.0
+            ],
+            [
+              0.515748031,
+              0.208470641
+            ],
+            [
+              0.0,
+              0.506237905
+            ],
+            [
+              0.0,
+              0.0
+            ]
+          ]
+        }
+      },
+      "sha256": "84f4b1d54bce903848b43cfbb4998c22dae29aa40f8006be75d4a4a68f85c2e4"
+    }
+  },
+  "crown": {
+    "clipped": {
+      "final_mesh_sha256": "20661e93f1e1f342a43062748f815a6ff0702071f573770e8c5da7cb018f0471",
+      "final_triangle_count": 68,
+      "finished_z_mm": 5.4,
+      "grout_top_z_mm": 3.0,
+      "mesh_sha256": "ae2ea55bd7899053323bfca232038adca99ce814331ce980cc777a58a1d6e855",
+      "parent_polygon": [
+        [
+          20.9,
+          0.0
+        ],
+        [
+          10.9,
+          5.773502692
+        ],
+        [
+          0.9,
+          0.0
+        ],
+        [
+          0.9,
+          -11.547005384
+        ],
+        [
+          10.9,
+          -17.320508076
+        ],
+        [
+          20.9,
+          -11.547005384
+        ]
+      ],
+      "piece_type": "edge_cut",
+      "ring_count": 8,
+      "rings_sha256": "f448137b5b3417e84a2ac93da6b532367525b8f846ca9c0c309200544ac924e3",
+      "tile": "placement-000010",
+      "triangle_count": 92,
+      "vertices_per_ring": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "visible_polygon": [
+        [
+          20.9,
+          0.0
+        ],
+        [
+          20.9,
+          0.0
+        ],
+        [
+          10.9,
+          5.773502692
+        ],
+        [
+          0.9,
+          0.0
+        ],
+        [
+          0.9,
+          0.0
+        ]
+      ]
+    },
+    "full": {
+      "final_mesh_sha256": "2ed725b26bfc5769217326d47c6d4546701e1e06e1f693aab6097d01ddc9654e",
+      "final_triangle_count": 92,
+      "finished_z_mm": 5.4,
+      "grout_top_z_mm": 3.0,
+      "mesh_sha256": "2ed725b26bfc5769217326d47c6d4546701e1e06e1f693aab6097d01ddc9654e",
+      "parent_polygon": [
+        [
+          31.8,
+          18.879353803
+        ],
+        [
+          21.8,
+          24.652856494
+        ],
+        [
+          11.8,
+          18.879353803
+        ],
+        [
+          11.8,
+          7.332348419
+        ],
+        [
+          21.8,
+          1.558845727
+        ],
+        [
+          31.8,
+          7.332348419
+        ]
+      ],
+      "piece_type": "full",
+      "ring_count": 8,
+      "rings_sha256": "e8282ab046634b4e9dc9687ae41a789682ed511d2aa3b949136e549e765504fb",
+      "tile": "placement-000020",
+      "triangle_count": 92,
+      "vertices_per_ring": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "visible_polygon": [
+        [
+          31.8,
+          18.879353803
+        ],
+        [
+          21.8,
+          24.652856494
+        ],
+        [
+          11.8,
+          18.879353803
+        ],
+        [
+          11.8,
+          7.332348419
+        ],
+        [
+          21.8,
+          1.558845727
+        ],
+        [
+          31.8,
+          7.332348419
+        ]
+      ]
+    },
+    "profile": {
+      "base_thickness_mm": 2.0,
+      "crown_segments": 6,
+      "frame_land_mm": 9.525,
+      "grout_depression_mm": 0.0,
+      "grout_mesh_step_mm": 0.9,
+      "grout_surface": "flat",
+      "grout_thickness_mm": 1.0,
+      "profile_id": "phase1.1-physical-review-fixture",
+      "rounded_crown_mm": 0.8,
+      "straight_tile_relief_mm": 1.6,
+      "version": 1
+    }
+  },
+  "effective_colors": {
+    "count": 2,
+    "sha256": "d9dab0eb59d5b7b0b840c05a3a07065cf1f5927c5947bf3be7867108f3701fd5"
+  },
+  "fixture": {
+    "float_digits": 9,
+    "id": "mosaica-hex-regression-v1",
+    "known_exclusions": [
+      "front-view-panel-order",
+      "archimedean-chords"
+    ]
+  },
+  "geometry": {
+    "custom_flat_top_4x4": {
+      "sha256": "2fec0fc75bea9553ed6052d8566e3aaf503f2cbbbd7537f16a378aaa0a93fba7",
+      "summary": {
+        "bounds_in": [
+          4.860719928,
+          5.208661417
+        ],
+        "clipped": 14,
+        "full": 16,
+        "grid": [
+          8,
+          8
+        ],
+        "placements": 64,
+        "visible": 30
+      }
+    },
+    "custom_flat_top_4x5": {
+      "sha256": "12a13c6e31729059471ad4b12534bb737834febeafaaf6d8394a80e0836589ce",
+      "summary": {
+        "bounds_in": [
+          4.860719928,
+          6.381889764
+        ],
+        "clipped": 16,
+        "full": 20,
+        "grid": [
+          8,
+          9
+        ],
+        "placements": 72,
+        "visible": 36
+      }
+    },
+    "custom_flat_top_5x4": {
+      "sha256": "7c8b8f188c09bcbfdea2f993d27afc6b86eb5d8cbeed0da2acdf93cd27150419",
+      "summary": {
+        "bounds_in": [
+          5.459824199,
+          5.866141732
+        ],
+        "clipped": 16,
+        "full": 22,
+        "grid": [
+          9,
+          8
+        ],
+        "placements": 72,
+        "visible": 38
+      }
+    },
+    "custom_flat_top_5x5": {
+      "sha256": "7687a1b536f7dcd2870faa6b25fab2b7c3377306ba692d9fc028489ae09f9012",
+      "summary": {
+        "bounds_in": [
+          5.459824199,
+          7.039370079
+        ],
+        "clipped": 18,
+        "full": 27,
+        "grid": [
+          9,
+          9
+        ],
+        "placements": 81,
+        "visible": 45
+      }
+    },
+    "custom_point_top_4x4": {
+      "sha256": "199f291d1419f0d40c87788d2d979cbb11514a0d558bc41f67172e280ea931c1",
+      "summary": {
+        "bounds_in": [
+          5.208661417,
+          4.860719928
+        ],
+        "clipped": 14,
+        "full": 16,
+        "grid": [
+          8,
+          8
+        ],
+        "placements": 64,
+        "visible": 30
+      }
+    },
+    "custom_point_top_4x5": {
+      "sha256": "d08308ae6c11c664a7e9934f649ee66ebc500b444b75312a067f57b39f0fd59d",
+      "summary": {
+        "bounds_in": [
+          5.866141732,
+          5.459824199
+        ],
+        "clipped": 16,
+        "full": 22,
+        "grid": [
+          8,
+          9
+        ],
+        "placements": 72,
+        "visible": 38
+      }
+    },
+    "custom_point_top_5x4": {
+      "sha256": "174435d4fefebd49cfb0079175d02e27ab5b216eb41796e94086b9d1fdb25380",
+      "summary": {
+        "bounds_in": [
+          6.381889764,
+          4.860719928
+        ],
+        "clipped": 16,
+        "full": 20,
+        "grid": [
+          9,
+          8
+        ],
+        "placements": 72,
+        "visible": 36
+      }
+    },
+    "custom_point_top_5x5": {
+      "sha256": "e3fd17fa761bd1dd4cc9203f0c60d738db3e3b76e65ef058654814b2096331e9",
+      "summary": {
+        "bounds_in": [
+          7.039370079,
+          5.459824199
+        ],
+        "clipped": 18,
+        "full": 27,
+        "grid": [
+          9,
+          9
+        ],
+        "placements": 81,
+        "visible": 45
+      }
+    },
+    "preset_flat": {
+      "sha256": "ed8884e33c210ab753574d70ffd60a5be43ca4ab40c1759f27083d69b2151d54",
+      "summary": {
+        "bounds_in": [
+          36.40034335,
+          24.377952756
+        ],
+        "clipped": 90,
+        "full": 963,
+        "grid": [
+          43,
+          25
+        ],
+        "placements": 1075,
+        "visible": 1053
+      }
+    },
+    "preset_point": {
+      "sha256": "f42a3a233262bc990d9b21f9f44c2d8bda8c055926a54607a1013e5383f4d9fb",
+      "summary": {
+        "bounds_in": [
+          24.377952756,
+          24.085052962
+        ],
+        "clipped": 76,
+        "full": 634,
+        "grid": [
+          25,
+          29
+        ],
+        "placements": 725,
+        "visible": 710
+      }
+    }
+  },
+  "grout": {
+    "concave": {
+      "mesh_validation": {
+        "degenerate_faces": 0,
+        "face_count": 3720,
+        "nonmanifold_edges": 0,
+        "normals_consistent": true,
+        "triangle_count": 3720,
+        "vertex_count": 1862,
+        "watertight": true,
+        "winding_errors": 0
+      },
+      "sha256": "0735076ffe431d62fc0f0c733f4a8ea536800c291e00522451668c384f422db0",
+      "spatial": {
+        "boundary_edge_count_by_orientation": {
+          "+60": 84,
+          "-60": 68,
+          "horizontal": 40
+        },
+        "boundary_z_range_by_orientation": {
+          "+60": [
+            2.5,
+            2.5
+          ],
+          "-60": [
+            2.5,
+            2.5
+          ],
+          "horizontal": [
+            2.5,
+            2.5
+          ]
+        },
+        "depressed_vertices_inside_tiles": 0,
+        "maximum_boundary_deviation_mm": 0.0,
+        "maximum_depression_mm": 0.3,
+        "maximum_triple_junction_z_spread_mm": 0.0,
+        "transverse_segments_per_half_gap": 3,
+        "triple_junction_count": 66
+      },
+      "triangles": 3720
+    },
+    "flat": {
+      "mesh_validation": {
+        "degenerate_faces": 0,
+        "face_count": 40,
+        "nonmanifold_edges": 0,
+        "normals_consistent": true,
+        "triangle_count": 40,
+        "vertex_count": 22,
+        "watertight": true,
+        "winding_errors": 0
+      },
+      "sha256": "d484326982d3a04c75cf447ba543086cfe5d8ece8ba12bfedea2e022061dc8fc",
+      "triangles": 40,
+      "z": [
+        2.0,
+        2.006880734,
+        2.006928407,
+        2.5,
+        2.993071593,
+        2.993119266,
+        3.0
+      ]
+    }
+  },
+  "keyboard": {
+    "flat_top": {
+      "samples": {
+        "center": {
+          "ArrowDown": "placement-000049",
+          "ArrowLeft": "placement-000030",
+          "ArrowRight": "placement-000032",
+          "ArrowUp": "placement-000031"
+        },
+        "center_id": "placement-000040",
+        "clipped": {
+          "ArrowDown": "placement-000019",
+          "ArrowRight": "placement-000011",
+          "ArrowUp": "placement-000011"
+        },
+        "clipped_id": "placement-000010",
+        "edge": {
+          "ArrowDown": "placement-000019",
+          "ArrowRight": "placement-000011",
+          "ArrowUp": "placement-000011"
+        },
+        "edge_id": "placement-000010"
+      },
+      "sha256": "f0a5197328d767021406b75dc43568acba133f795cd8b6c23efaeb1ee83a996e"
+    },
+    "point_top": {
+      "samples": {
+        "center": {
+          "ArrowDown": "placement-000048",
+          "ArrowLeft": "placement-000039",
+          "ArrowRight": "placement-000041",
+          "ArrowUp": "placement-000030"
+        },
+        "center_id": "placement-000040",
+        "clipped": {
+          "ArrowDown": "placement-000019",
+          "ArrowLeft": "placement-000019",
+          "ArrowRight": "placement-000011"
+        },
+        "clipped_id": "placement-000010",
+        "edge": {
+          "ArrowDown": "placement-000028",
+          "ArrowRight": "placement-000020",
+          "ArrowUp": "placement-000010"
+        },
+        "edge_id": "placement-000019"
+      },
+      "sha256": "ef8e64e5f38cc69a1a845006bd5fdb0d2a10e2e2d65020792283c5bf415a15b2"
+    }
+  },
+  "panelization": {
+    "museum": {
+      "count": 12,
+      "final": [
+        4,
+        3
+      ],
+      "plan_sha256": "923ac3407acb0b378d4a02687706c32eb16ec0fd59b2b0bfaaab9aa22b283057",
+      "safe": [
+        210.0,
+        210.0
+      ],
+      "seams_sha256": "bd7916f8625adcb7ee51264a71647c4b322f74ef291b20aff54feb27ec73f3e0",
+      "theoretical": [
+        3,
+        3
+      ],
+      "tile_counts": [
+        49,
+        45,
+        49,
+        42,
+        39,
+        42,
+        42,
+        39,
+        42,
+        42,
+        39,
+        42
+      ],
+      "zero_tile_cuts": true
+    },
+    "studio": {
+      "count": 9,
+      "final": [
+        3,
+        3
+      ],
+      "plan_sha256": "29e043a32d9632dc5132302f1aa7c55176e78caf515db69f269ffad955663bdf",
+      "safe": [
+        228.0,
+        228.0
+      ],
+      "seams_sha256": "b1bc921a9c4f775292aa037c48a3b4c61fa41700d9a307e850077d09ded4cca0",
+      "theoretical": [
+        3,
+        3
+      ],
+      "tile_counts": [
+        63,
+        58,
+        63,
+        56,
+        52,
+        56,
+        56,
+        52,
+        56
+      ],
+      "zero_tile_cuts": true
+    }
+  },
+  "perimeters": {
+    "flat_top": {
+      "designer": [
+        0.0,
+        0.0,
+        120.204326045,
+        154.8
+      ],
+      "fabrication": [
+        0.0,
+        0.9,
+        120.204326045,
+        153.9
+      ],
+      "half_grout_correction": 0.9,
+      "size": [
+        120.204326045,
+        153.0
+      ]
+    },
+    "point_top": {
+      "designer": [
+        0.0,
+        0.0,
+        154.8,
+        120.204326045
+      ],
+      "fabrication": [
+        0.9,
+        0.0,
+        153.9,
+        120.204326045
+      ],
+      "half_grout_correction": 0.9,
+      "size": [
+        153.0,
+        120.204326045
+      ]
+    }
+  },
+  "print_guide": {
+    "museum": {
+      "semantic": {
+        "grid": [
+          1,
+          1
+        ],
+        "grout": 1.8,
+        "instructions": [
+          [
+            "Prime Tower",
+            "Others",
+            "Enable",
+            "Enable"
+          ],
+          [
+            "Brim",
+            "Others",
+            "Brim type",
+            "Use Bambu default"
+          ],
+          [
+            "Adaptive Variable Layer Height",
+            "Quality",
+            "Enable",
+            "Enable"
+          ],
+          [
+            "Ironing",
+            "Quality",
+            "Ironing type",
+            "Apply premium ironing settings"
+          ]
+        ],
+        "mode": [
+          "museum",
+          "Museum"
+        ],
+        "palette": [
+          [
+            "tile-color-1",
+            "Ivory",
+            "#FAF9F6"
+          ],
+          [
+            "tile-color-2",
+            "Black",
+            "#000000"
+          ],
+          [
+            "tile-color-3",
+            "Clay",
+            "#B56F52"
+          ]
+        ],
+        "panels": [
+          "A1"
+        ],
+        "parts": [
+          [
+            "Base",
+            "Base",
+            "#808080"
+          ],
+          [
+            "Grout-Thinset",
+            "Grout",
+            "#FAF9F6"
+          ],
+          [
+            "Tile 1 - Ivory",
+            "Ivory",
+            "#FAF9F6"
+          ],
+          [
+            "Tile 2 - Black",
+            "Black",
+            "#000000"
+          ],
+          [
+            "Tile 3 - Clay",
+            "Clay",
+            "#B56F52"
+          ]
+        ],
+        "placement": {
+          "automatic_position_guaranteed": false,
+          "proprietary_bambu_placement_metadata_emitted": false,
+          "responsibility": "user_positions_imported_panel_in_bambu_studio"
+        },
+        "tile": [
+          "s",
+          20.0,
+          "point_top"
+        ],
+        "warning": "The 3mf is not from Bambu Lab, load geometry data and color data only."
+      },
+      "sha256": "2f740159a8c8855030ed9510d94ecba8b673864b27166cd017d5d393280a1647"
+    },
+    "studio": {
+      "semantic": {
+        "grid": [
+          1,
+          1
+        ],
+        "grout": 1.8,
+        "instructions": [
+          [
+            "Prime Tower",
+            "Others",
+            "Enable",
+            "Uncheck"
+          ],
+          [
+            "Brim",
+            "Others",
+            "Brim type",
+            "Set to No Brim"
+          ],
+          [
+            "Adaptive Variable Layer Height",
+            "Quality",
+            "Enable",
+            "Enable"
+          ]
+        ],
+        "mode": [
+          "studio",
+          "Studio"
+        ],
+        "palette": [
+          [
+            "tile-color-1",
+            "Ivory",
+            "#FAF9F6"
+          ],
+          [
+            "tile-color-2",
+            "Black",
+            "#000000"
+          ],
+          [
+            "tile-color-3",
+            "Clay",
+            "#B56F52"
+          ]
+        ],
+        "panels": [
+          "A1"
+        ],
+        "parts": [
+          [
+            "Base",
+            "Base",
+            "#808080"
+          ],
+          [
+            "Grout-Thinset",
+            "Grout",
+            "#FAF9F6"
+          ],
+          [
+            "Tile 1 - Ivory",
+            "Ivory",
+            "#FAF9F6"
+          ],
+          [
+            "Tile 2 - Black",
+            "Black",
+            "#000000"
+          ],
+          [
+            "Tile 3 - Clay",
+            "Clay",
+            "#B56F52"
+          ]
+        ],
+        "placement": {
+          "automatic_position_guaranteed": false,
+          "proprietary_bambu_placement_metadata_emitted": false,
+          "responsibility": "user_positions_imported_panel_in_bambu_studio"
+        },
+        "tile": [
+          "s",
+          20.0,
+          "point_top"
+        ],
+        "warning": "The 3mf is not from Bambu Lab, load geometry data and color data only."
+      },
+      "sha256": "4f61ebd1142795ee244afcc05699711ae998236dcbe109ec5808303895d5dd62"
+    }
+  },
+  "project_schema_v1": {
+    "application": "2.0.0",
+    "resolved_sha256": "b5525d360577b80d7ac4013cb17993d0af7d77173917a77d28f1b57a611c018b",
+    "round_trip_equal": true,
+    "schema": 1,
+    "semantic_sha256": "dd518da59b2a0a7309a86789210d5a1d0bf74838d1e3554758dc66bead509ee4"
+  },
+  "raster": {
+    "jpg": {
+      "mode": "RGB",
+      "samples": [
+        [
+          250,
+          249,
+          245
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          250,
+          249,
+          245
+        ]
+      ],
+      "size": [
+        2400,
+        1864
+      ]
+    },
+    "png": {
+      "mode": "RGB",
+      "samples": [
+        [
+          250,
+          249,
+          246
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          250,
+          249,
+          246
+        ]
+      ],
+      "size": [
+        2400,
+        1864
+      ]
+    }
+  },
+  "resolved_models": {
+    "flat_top": {
+      "channels": 4,
+      "sha256": "a8ffd1a05f82f9ca0c16ebb788fd0a37344f8d22e2f724469b267fb6b5dc3d8c",
+      "tiles": 45
+    },
+    "point_top": {
+      "channels": 3,
+      "sha256": "0af056641e27d584d594c486f9c86f785aed20b0f74c5fa2eabe8f50ad9df931",
+      "tiles": 45
+    }
+  },
+  "stl": {
+    "base": {
+      "bounds": [
+        0.9,
+        0.0,
+        0.0,
+        129.9,
+        101.729117431,
+        1.5
+      ],
+      "bytes_sha256": "c7ac46ed550d134c5b7a1481f25ce895f1fa81e35984794fb9e1bda8c3000d77",
+      "mesh_sha256": "a04d7582957f50e43fb1beb12fb3d551c02cdebafcf5a782bbfef257ea087c78",
+      "name": "Panel A1 Base",
+      "parsed_sha256": "a04d7582957f50e43fb1beb12fb3d551c02cdebafcf5a782bbfef257ea087c78",
+      "parsed_validation": {
+        "degenerate_faces": 0,
+        "face_count": 2468,
+        "nonmanifold_edges": 0,
+        "normals_consistent": true,
+        "triangle_count": 2468,
+        "vertex_count": 1236,
+        "watertight": true,
+        "winding_errors": 0
+      },
+      "triangles": 2468,
+      "validation": {
+        "degenerate_faces": 0,
+        "face_count": 2468,
+        "nonmanifold_edges": 0,
+        "normals_consistent": true,
+        "triangle_count": 2468,
+        "vertex_count": 1236,
+        "watertight": true,
+        "winding_errors": 0
+      }
+    },
+    "grout-thinset": {
+      "bounds": [
+        0.9,
+        0.0,
+        1.5,
+        129.9,
+        101.729117431,
+        2.5
+      ],
+      "bytes_sha256": "ed31f7643b7b7baf90fcc915185a3ba903bda35cb0bf9e623c06c2ebe8a31eba",
+      "mesh_sha256": "bd4b7b264b34c6c320a548311c47c95a606689deafc1959f32879d7247d8ab6f",
+      "name": "Panel A1 Grout/Thinset",
+      "parsed_sha256": "bd4b7b264b34c6c320a548311c47c95a606689deafc1959f32879d7247d8ab6f",
+      "parsed_validation": {
+        "degenerate_faces": 0,
+        "face_count": 3720,
+        "nonmanifold_edges": 0,
+        "normals_consistent": true,
+        "triangle_count": 3720,
+        "vertex_count": 1862,
+        "watertight": true,
+        "winding_errors": 0
+      },
+      "triangles": 3720,
+      "validation": {
+        "degenerate_faces": 0,
+        "face_count": 3720,
+        "nonmanifold_edges": 0,
+        "normals_consistent": true,
+        "triangle_count": 3720,
+        "vertex_count": 1862,
+        "watertight": true,
+        "winding_errors": 0
+      }
+    },
+    "tile-color-1": {
+      "bounds": [
+        0.9,
+        0.0,
+        2.5,
+        129.9,
+        101.729117431,
+        4.6
+      ],
+      "bytes_sha256": "cbb418e66b06a4170cfeed53e90bf39d3532ccb1fe7a5ca67c51d7ccc319b1fc",
+      "mesh_sha256": "ceadef499388c27d19cb867b045a9729cea27afd4d3791eca292d0f1eb0a5989",
+      "name": "Panel A1 Tile Color 1",
+      "parsed_sha256": "ceadef499388c27d19cb867b045a9729cea27afd4d3791eca292d0f1eb0a5989",
+      "parsed_validation": {
+        "degenerate_faces": 0,
+        "face_count": 3004,
+        "nonmanifold_edges": 0,
+        "normals_consistent": true,
+        "triangle_count": 3004,
+        "vertex_count": 1572,
+        "watertight": true,
+        "winding_errors": 0
+      },
+      "triangles": 3004,
+      "validation": {
+        "degenerate_faces": 0,
+        "face_count": 3004,
+        "nonmanifold_edges": 0,
+        "normals_consistent": true,
+        "triangle_count": 3004,
+        "vertex_count": 1572,
+        "watertight": true,
+        "winding_errors": 0
+      }
+    },
+    "tile-color-2": {
+      "bounds": [
+        11.8,
+        1.558845727,
+        2.5,
+        129.9,
+        100.170271704,
+        4.6
+      ],
+      "bytes_sha256": "55a875b773bb1634850387a64216c926561875b4afe96b6f7e308e53690d8e2d",
+      "mesh_sha256": "4d6b16d6f3e56d300ac665663b1d27d5dc4213608a78403f76137f4dd1ac002a",
+      "name": "Panel A1 Tile Color 2",
+      "parsed_sha256": "4d6b16d6f3e56d300ac665663b1d27d5dc4213608a78403f76137f4dd1ac002a",
+      "parsed_validation": {
+        "degenerate_faces": 0,
+        "face_count": 828,
+        "nonmanifold_edges": 0,
+        "normals_consistent": true,
+        "triangle_count": 828,
+        "vertex_count": 432,
+        "watertight": true,
+        "winding_errors": 0
+      },
+      "triangles": 828,
+      "validation": {
+        "degenerate_faces": 0,
+        "face_count": 828,
+        "nonmanifold_edges": 0,
+        "normals_consistent": true,
+        "triangle_count": 828,
+        "vertex_count": 432,
+        "watertight": true,
+        "winding_errors": 0
+      }
+    },
+    "tile-color-3": {
+      "bounds": [
+        55.4,
+        39.317553332,
+        2.5,
+        75.4,
+        62.411564099,
+        4.6
+      ],
+      "bytes_sha256": "81ea42727805b4a6d995307e2ff994c0b22b8e495d0ba394cbe1867a816b84f2",
+      "mesh_sha256": "0faa7fe849ea1abeb1b44e7c5866d6b26188801e3760f5f6b4a0d64614ef0ca2",
+      "name": "Panel A1 Tile Color 3",
+      "parsed_sha256": "0faa7fe849ea1abeb1b44e7c5866d6b26188801e3760f5f6b4a0d64614ef0ca2",
+      "parsed_validation": {
+        "degenerate_faces": 0,
+        "face_count": 92,
+        "nonmanifold_edges": 0,
+        "normals_consistent": true,
+        "triangle_count": 92,
+        "vertex_count": 48,
+        "watertight": true,
+        "winding_errors": 0
+      },
+      "triangles": 92,
+      "validation": {
+        "degenerate_faces": 0,
+        "face_count": 92,
+        "nonmanifold_edges": 0,
+        "normals_consistent": true,
+        "triangle_count": 92,
+        "vertex_count": 48,
+        "watertight": true,
+        "winding_errors": 0
+      }
+    }
+  },
+  "svg": {
+    "bytes_sha256": "b7d1d0f7f9045413c8ec6e33d67e7603f6e48be4e1a23d3ccf442678847deaa5",
+    "group_ids": [
+      "grout",
+      "border",
+      "tile-color-2",
+      "tile-color-4",
+      "tile-color-5"
+    ],
+    "height": "120.204326mm",
+    "polygons": 45,
+    "viewBox": "0 0 154.8 120.204326",
+    "width": "154.8mm"
+  },
+  "three_mf": {
+    "inspected_sha256": "bb956c05a8826d028684c19148684b4abffc1864bcd269a5159bd5389bbf41d3",
+    "manifest_schema": {
+      "name": "mosaica-fabricate-3mf",
+      "version": 3
+    },
+    "manifest_sha256": "30913c702db53a1f9c49251aa6035bc5b5f172719c7fdf638c2cde2e3f7b1098",
+    "member_hashes": {
+      "3D/3dmodel.model": "86785a247992a091b5dc189b98f0c52511b5042a9a30b565590289bfd1d9b851",
+      "Metadata/model_settings.config": "9fdd5c383901c616d1643adc869824b489b43b57d97cb462da062b90a6de1e4c",
+      "[Content_Types].xml": "9cfbbf192341074cc42e7628b73c6a8134ec6c543fed1b38170aef0b1f38da4e",
+      "_rels/.rels": "32cbd72fc8ad612cea9714f94f4305f982ce9625f905db5224f72bf4017b9bc2"
+    },
+    "members": [
+      "[Content_Types].xml",
+      "_rels/.rels",
+      "3D/3dmodel.model",
+      "Metadata/model_settings.config"
+    ],
+    "no_ns0": false,
+    "package_sha256": "3b387cac2198c6a55bd4eea6f7bf94fcf31379000bdc887f9b74ad0c86331549",
+    "part_mapping": [
+      {
+        "logical_channel_id": "base",
+        "part_role": "base",
+        "project_color_name": null,
+        "project_color_value": null,
+        "project_palette_index": null,
+        "user_facing_name": "Base"
+      },
+      {
+        "logical_channel_id": "grout-thinset",
+        "part_role": "grout_thinset",
+        "project_color_name": null,
+        "project_color_value": "#FAF9F6",
+        "project_palette_index": null,
+        "user_facing_name": "Grout-Thinset"
+      },
+      {
+        "logical_channel_id": "tile-color-1",
+        "part_role": "tile_color",
+        "project_color_name": "Ivory",
+        "project_color_value": "#FAF9F6",
+        "project_palette_index": 0,
+        "user_facing_name": "Tile 1 - Ivory"
+      },
+      {
+        "logical_channel_id": "tile-color-2",
+        "part_role": "tile_color",
+        "project_color_name": "Black",
+        "project_color_value": "#000000",
+        "project_palette_index": 1,
+        "user_facing_name": "Tile 2 - Black"
+      },
+      {
+        "logical_channel_id": "tile-color-3",
+        "part_role": "tile_color",
+        "project_color_name": "Clay",
+        "project_color_value": "#B56F52",
+        "project_palette_index": 3,
+        "user_facing_name": "Tile 3 - Clay"
+      }
+    ],
+    "settings_sha256": "9fdd5c383901c616d1643adc869824b489b43b57d97cb462da062b90a6de1e4c"
+  }
+}
