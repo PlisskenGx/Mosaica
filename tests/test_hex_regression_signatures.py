@@ -48,6 +48,8 @@ from mosaica.project_file import DesignerProjectFileState, load_project_file, sa
 from tests.helpers.hex_regression import canonicalize, geometry_record, mesh_record, plan_record, signature
 
 GOLDEN = Path(__file__).parent / "fixtures" / "hex_regression_v1.json"
+V1_PROJECT_JSON = Path(__file__).parent / "fixtures" / "hex_lock_project_v1.json"
+V1_PROJECT_SVG = Path(__file__).parent / "fixtures" / "hex_lock_project_v1.svg"
 SVG = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">'
        '<rect width="50" height="100" fill="#000000"/>'
        '<rect x="50" width="50" height="100" fill="#B56F52"/></svg>')
@@ -162,7 +164,13 @@ def build_records(root: Path):
             "sha256": signature(value),
         }
     state = DesignerProjectFileState(shell, artwork, generated, overrides, True, "Hex Lock")
-    project_path = save_project_file(root / "hex-lock.mosaica", state)
+    project_path = root / "hex-lock-v1.mosaica"
+    v1_json = V1_PROJECT_JSON.read_bytes()
+    v1_payload = json.loads(v1_json)
+    v1_asset = v1_payload["project"]["artwork"]["embedded_path"]
+    with ZipFile(project_path, "w") as archive:
+        archive.writestr("project.json", v1_json)
+        archive.writestr(v1_asset, V1_PROJECT_SVG.read_bytes().rstrip(b"\n"))
     with ZipFile(project_path) as archive:
         project_json = json.loads(archive.read("project.json"))
         asset = project_json["project"]["artwork"]["embedded_path"]
@@ -180,6 +188,27 @@ def build_records(root: Path):
         "semantic_sha256": signature(archive_record),
         "round_trip_equal": before == after,
         "resolved_sha256": signature(after.to_dict()),
+    }
+    v2_path = save_project_file(root / "hex-lock-v2.mosaica", state)
+    with ZipFile(v2_path) as archive:
+        v2_json = json.loads(archive.read("project.json"))
+        v2_asset = v2_json["project"]["artwork"]["embedded_path"]
+        v2_record = {
+            "members": archive.namelist(), "project": v2_json,
+            "asset_sha256": sha256(archive.read(v2_asset)).hexdigest(),
+        }
+    v2_loaded = load_project_file(v2_path)
+    v2_after = resolve_designer_project(
+        v2_loaded.project, PRODUCTION_PROFILE,
+        generated_artwork=v2_loaded.generated_artwork,
+        paint_overrides=v2_loaded.paint_overrides,
+    )
+    records["project_schema_v2"] = {
+        "schema": v2_json["schema_version"],
+        "family": v2_json["project"]["setup"]["tile_family"],
+        "semantic_sha256": signature(v2_record),
+        "round_trip_equal": before == v2_after,
+        "resolved_sha256": signature(v2_after.to_dict()),
     }
     models = {
         orientation: resolve_designer_project(
@@ -343,7 +372,7 @@ def hex_regression_golden():
 
 @pytest.mark.parametrize("section", (
     "fixture", "geometry", "clipped", "borders", "artwork",
-    "effective_colors", "keyboard", "project_schema_v1",
+    "effective_colors", "keyboard", "project_schema_v1", "project_schema_v2",
     "resolved_models", "perimeters", "crown", "grout",
     "panelization", "backside_id", "stl", "three_mf", "svg",
     "raster", "print_guide",

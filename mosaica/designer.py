@@ -56,7 +56,10 @@ from .project_file import (
     normalize_project_path,
     save_project_file,
 )
-from .tiles import HEXAGON_PRESETS, TileSizePreset, get_tile_family
+from .tiles import (
+    DEFAULT_TILE_FAMILY_ID, HEXAGON_PRESETS, TileSizePreset,
+    TileSystemSelection, get_tile_family, resolve_tile_system,
+)
 
 
 _KEYBOARD_DIRECTIONS = {
@@ -219,6 +222,7 @@ class DesignerProjectShell:
     tile: TilePreset
     grout_mm: float
     geometry: GridGeometry
+    tile_system: TileSystemSelection
     color_system: DesignerColorResolution = DEFAULT_DESIGNER_COLORS
     grout_color_id: str = "project-color-1"
     border_channels: tuple[tuple[str, str], ...] = (
@@ -230,37 +234,54 @@ class DesignerProjectShell:
     tiles_across: int | None = None
     tiles_down: int | None = None
 
+    def __post_init__(self) -> None:
+        _, selection = resolve_tile_system(self.tile_system)
+        if selection.preset_id != self.tile.id:
+            raise ValueError("Tile-system preset does not match the project tile.")
+        if selection.orientation_id != self.geometry.orientation:
+            raise ValueError("Tile-system orientation does not match project geometry.")
+
+    @property
+    def tile_family(self) -> str:
+        return self.tile_system.family_id
+
+    @property
+    def tile_preset_id(self) -> str:
+        return self.tile_system.preset_id
+
     @property
     def tile_orientation(self) -> str:
-        return self.geometry.orientation or "point_top"
+        return self.tile_system.orientation_id
 
     @classmethod
     def create(
         cls, canvas_id: str, tile_id: str, orientation: str = "point_top",
+        *, family_id: str = DEFAULT_TILE_FAMILY_ID,
     ) -> DesignerProjectShell:
         try:
             canvas = {**_CANVASES, **_LEGACY_CANVASES}[canvas_id]
         except KeyError as exc:
             raise ValueError(f"Unknown canvas preset: {canvas_id}") from exc
-        family = get_tile_family()
+        family = get_tile_family(family_id)
         selection = family.selection(orientation, tile_id)
         tile = family.preset(selection.preset_id)
         geometry = family.build_preset_panel(
             selection.preset_id, selection.orientation_id, DESIGNER_GROUT_MM,
             canvas.width_in, canvas.height_in,
         )
-        return cls(canvas, tile, DESIGNER_GROUT_MM, geometry)
+        return cls(canvas, tile, DESIGNER_GROUT_MM, geometry, selection)
 
     @classmethod
     def create_custom(
         cls, tile_id: str, orientation: str, tiles_across: int, tiles_down: int,
+        *, family_id: str = DEFAULT_TILE_FAMILY_ID,
     ) -> DesignerProjectShell:
         for name, value in (("Tiles Across", tiles_across), ("Tiles Down", tiles_down)):
             if isinstance(value, bool) or not isinstance(value, int):
                 raise ValueError(f"{name} must be a whole number.")
             if not 1 <= value <= CUSTOM_GRID_MAX:
                 raise ValueError(f"{name} must be between 1 and {CUSTOM_GRID_MAX}.")
-        family = get_tile_family()
+        family = get_tile_family(family_id)
         selection = family.selection(orientation, tile_id)
         tile = family.preset(selection.preset_id)
         geometry = family.build_custom_grid(
@@ -271,7 +292,7 @@ class DesignerProjectShell:
             "custom", "Custom", geometry.width_in, geometry.height_in,
         )
         return cls(
-            canvas, tile, DESIGNER_GROUT_MM, geometry,
+            canvas, tile, DESIGNER_GROUT_MM, geometry, selection,
             canvas_mode="custom_grid", tiles_across=tiles_across,
             tiles_down=tiles_down,
         )
@@ -378,6 +399,7 @@ class DesignerProjectShell:
                 if self.canvas_mode == "custom_grid" else None
             ),
             "tile_preset": self.tile.to_dict(),
+            "tile_family": self.tile_family,
             "tile_shape": "hexagon",
             "tile_orientation": self.tile_orientation,
             "grout_mm": self.grout_mm,
@@ -1295,7 +1317,7 @@ class MosaicDesignerApp:
         self.generated_artwork = loaded.generated_artwork
         self.paint_overrides = dict(loaded.paint_overrides)
         self.artwork_edit_mode = loaded.artwork_edit_mode
-        self.tile_shape = "hexagon"
+        self.tile_shape = self.project.tile_family
         self.tile_id = self.project.tile.id
         self.tile_orientation = self.project.tile_orientation
         self.canvas_id = self.project.canvas.id

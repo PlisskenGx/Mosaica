@@ -1209,6 +1209,13 @@
     "schema": 1,
     "semantic_sha256": "dd518da59b2a0a7309a86789210d5a1d0bf74838d1e3554758dc66bead509ee4"
   },
+  "project_schema_v2": {
+    "family": "hexagon",
+    "resolved_sha256": "b5525d360577b80d7ac4013cb17993d0af7d77173917a77d28f1b57a611c018b",
+    "round_trip_equal": true,
+    "schema": 2,
+    "semantic_sha256": "ebf43f5024c1d5a35d144b321762801d1746364bc625d071ff716ff58ddcf45f"
+  },
   "raster": {
     "jpg": {
       "mode": "RGB",

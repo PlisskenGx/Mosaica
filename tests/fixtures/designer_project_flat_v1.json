@@ -1,0 +1,558 @@
+{
+  "application_version": "2.0.0",
+  "project": {
+    "artwork": {
+      "asset_id": "artwork-cab4b88bdb7a43a5",
+      "embedded_path": "artwork/artwork-cab4b88bdb7a43a5.svg",
+      "initial_transform": {
+        "height_in": 1.3219957344908915,
+        "width_in": 2.643991468981783,
+        "x_in": 1.4079163651025757,
+        "y_in": 2.2720729988962862
+      },
+      "media_type": "image/svg+xml",
+      "original_filename": "source-logo.svg",
+      "selected": true,
+      "sha256": "cab4b88bdb7a43a583b069ddc891f9276a41323f22fa2703f0f5a279913ffb31",
+      "source_aspect_ratio": 2.0,
+      "source_view_box": [
+        0.0,
+        0.0,
+        100.0,
+        50.0
+      ],
+      "transform": {
+        "height_in": 1.75,
+        "width_in": 3.5,
+        "x_in": 1.25,
+        "y_in": 1.5
+      }
+    },
+    "artwork_edit_mode": true,
+    "border": {
+      "channels": [
+        [
+          "border_primary",
+          "project-color-3"
+        ],
+        [
+          "border_secondary",
+          "project-color-4"
+        ]
+      ],
+      "preset_id": "solid"
+    },
+    "colors": {
+      "items": [
+        {
+          "color_id": "project-color-1",
+          "display_color": "#FAF9F6",
+          "name": "Ivory",
+          "order": 0,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-2",
+          "display_color": "#000000",
+          "name": "Black",
+          "order": 1,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-3",
+          "display_color": "#808080",
+          "name": "Gray",
+          "order": 2,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-4",
+          "display_color": "#B56F52",
+          "name": "Clay",
+          "order": 3,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-5",
+          "display_color": "#466984",
+          "name": "Denim",
+          "order": 4,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-6",
+          "display_color": "#EEE9DF",
+          "name": "Warm White",
+          "order": 5,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-7",
+          "display_color": "#D8C9B5",
+          "name": "Sand",
+          "order": 6,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-8",
+          "display_color": "#303033",
+          "name": "Charcoal",
+          "order": 7,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-9",
+          "display_color": "#555A60",
+          "name": "Slate",
+          "order": 8,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-10",
+          "display_color": "#B8B9B5",
+          "name": "Mist",
+          "order": 9,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-11",
+          "display_color": "#49362D",
+          "name": "Espresso",
+          "order": 10,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-12",
+          "display_color": "#765543",
+          "name": "Walnut",
+          "order": 11,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-13",
+          "display_color": "#A8825E",
+          "name": "Camel",
+          "order": 12,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-14",
+          "display_color": "#9B493D",
+          "name": "Brick",
+          "order": 13,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-15",
+          "display_color": "#762F3A",
+          "name": "Garnet",
+          "order": 14,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-16",
+          "display_color": "#C86A5A",
+          "name": "Coral",
+          "order": 15,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-17",
+          "display_color": "#C4774D",
+          "name": "Terracotta",
+          "order": 16,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-18",
+          "display_color": "#B88935",
+          "name": "Ochre",
+          "order": 17,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-19",
+          "display_color": "#D1A84A",
+          "name": "Gold",
+          "order": 18,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-20",
+          "display_color": "#829276",
+          "name": "Sage",
+          "order": 19,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-21",
+          "display_color": "#687044",
+          "name": "Olive",
+          "order": 20,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-22",
+          "display_color": "#315B46",
+          "name": "Forest",
+          "order": 21,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-23",
+          "display_color": "#55745B",
+          "name": "Moss",
+          "order": 22,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-24",
+          "display_color": "#263E59",
+          "name": "Navy",
+          "order": 23,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-25",
+          "display_color": "#7EA3B5",
+          "name": "Sky",
+          "order": 24,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-26",
+          "display_color": "#347577",
+          "name": "Teal",
+          "order": 25,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-27",
+          "display_color": "#6E9B91",
+          "name": "Sea Glass",
+          "order": 26,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-28",
+          "display_color": "#66445F",
+          "name": "Plum",
+          "order": 27,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-29",
+          "display_color": "#8B7694",
+          "name": "Lavender",
+          "order": 28,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-30",
+          "display_color": "#A85E70",
+          "name": "Rose",
+          "order": 29,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-31",
+          "display_color": "#D09A9C",
+          "name": "Blush",
+          "order": 30,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-32",
+          "display_color": "#B77B82",
+          "name": "Dusty Pink",
+          "order": 31,
+          "origin": "canonical"
+        }
+      ],
+      "role_to_color_id": {
+        "background": "project-color-1",
+        "border_primary": "project-color-2",
+        "border_secondary": "project-color-3",
+        "edge": "project-color-1"
+      }
+    },
+    "generated_artwork": {
+      "assignments": [
+        {
+          "color_id": "project-color-3",
+          "column": 0,
+          "coverage": 0.72,
+          "row": 0,
+          "source_rgb": [
+            181,
+            111,
+            82
+          ],
+          "tile_id": "placement-000010"
+        }
+      ],
+      "border_preset_id": "solid",
+      "color_remaps": [
+        [
+          "project-color-3",
+          "project-color-2"
+        ]
+      ],
+      "coverage_threshold": 0.45,
+      "design_colors": [
+        {
+          "color_id": "project-color-1",
+          "display_color": "#FAF9F6",
+          "name": "Ivory",
+          "order": 0,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-2",
+          "display_color": "#000000",
+          "name": "Black",
+          "order": 1,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-3",
+          "display_color": "#808080",
+          "name": "Gray",
+          "order": 2,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-4",
+          "display_color": "#B56F52",
+          "name": "Clay",
+          "order": 3,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-5",
+          "display_color": "#466984",
+          "name": "Denim",
+          "order": 4,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-6",
+          "display_color": "#EEE9DF",
+          "name": "Warm White",
+          "order": 5,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-7",
+          "display_color": "#D8C9B5",
+          "name": "Sand",
+          "order": 6,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-8",
+          "display_color": "#303033",
+          "name": "Charcoal",
+          "order": 7,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-9",
+          "display_color": "#555A60",
+          "name": "Slate",
+          "order": 8,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-10",
+          "display_color": "#B8B9B5",
+          "name": "Mist",
+          "order": 9,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-11",
+          "display_color": "#49362D",
+          "name": "Espresso",
+          "order": 10,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-12",
+          "display_color": "#765543",
+          "name": "Walnut",
+          "order": 11,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-13",
+          "display_color": "#A8825E",
+          "name": "Camel",
+          "order": 12,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-14",
+          "display_color": "#9B493D",
+          "name": "Brick",
+          "order": 13,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-15",
+          "display_color": "#762F3A",
+          "name": "Garnet",
+          "order": 14,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-16",
+          "display_color": "#C86A5A",
+          "name": "Coral",
+          "order": 15,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-17",
+          "display_color": "#C4774D",
+          "name": "Terracotta",
+          "order": 16,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-18",
+          "display_color": "#B88935",
+          "name": "Ochre",
+          "order": 17,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-19",
+          "display_color": "#D1A84A",
+          "name": "Gold",
+          "order": 18,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-20",
+          "display_color": "#829276",
+          "name": "Sage",
+          "order": 19,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-21",
+          "display_color": "#687044",
+          "name": "Olive",
+          "order": 20,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-22",
+          "display_color": "#315B46",
+          "name": "Forest",
+          "order": 21,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-23",
+          "display_color": "#55745B",
+          "name": "Moss",
+          "order": 22,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-24",
+          "display_color": "#263E59",
+          "name": "Navy",
+          "order": 23,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-25",
+          "display_color": "#7EA3B5",
+          "name": "Sky",
+          "order": 24,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-26",
+          "display_color": "#347577",
+          "name": "Teal",
+          "order": 25,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-27",
+          "display_color": "#6E9B91",
+          "name": "Sea Glass",
+          "order": 26,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-28",
+          "display_color": "#66445F",
+          "name": "Plum",
+          "order": 27,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-29",
+          "display_color": "#8B7694",
+          "name": "Lavender",
+          "order": 28,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-30",
+          "display_color": "#A85E70",
+          "name": "Rose",
+          "order": 29,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-31",
+          "display_color": "#D09A9C",
+          "name": "Blush",
+          "order": 30,
+          "origin": "canonical"
+        },
+        {
+          "color_id": "project-color-32",
+          "display_color": "#B77B82",
+          "name": "Dusty Pink",
+          "order": 31,
+          "origin": "canonical"
+        }
+      ],
+      "revision": 3,
+      "samples_per_axis": 24,
+      "source_colors": [
+        [
+          181,
+          111,
+          82
+        ]
+      ],
+      "source_signature": "source-signature",
+      "stale": true,
+      "stale_reason": "Placement changed"
+    },
+    "grout_color_id": "project-color-2",
+    "paint_overrides": {
+      "placement-000010": "project-color-5"
+    },
+    "setup": {
+      "canvas_height_in": 5.866141732283465,
+      "canvas_id": "custom",
+      "canvas_mode": "custom_grid",
+      "canvas_width_in": 5.459824199186933,
+      "tile_id": "l",
+      "tile_orientation": "flat_top",
+      "tiles_across": 5,
+      "tiles_down": 4
+    },
+    "title": "Kitchen Mark"
+  },
+  "schema_version": 1
+}

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from copy import deepcopy
 from hashlib import sha256
 import json
 import os
@@ -17,9 +18,13 @@ from .designer_generation import (
     DesignerGeneratedArtwork,
     GeneratedArtworkAssignment,
 )
+from .tiles import get_tile_family
 
 
-PROJECT_SCHEMA_VERSION = 1
+CURRENT_PROJECT_SCHEMA_VERSION = 2
+SUPPORTED_PROJECT_SCHEMA_VERSIONS = (1, CURRENT_PROJECT_SCHEMA_VERSION)
+# Compatibility export for callers that used the former constant name.
+PROJECT_SCHEMA_VERSION = CURRENT_PROJECT_SCHEMA_VERSION
 PROJECT_JSON = "project.json"
 MAX_ARCHIVE_MEMBERS = 64
 MAX_MEMBER_BYTES = 5_000_000
@@ -39,6 +44,7 @@ class DesignerProjectFileState:
     paint_overrides: dict[str, str]
     artwork_edit_mode: bool
     title: str
+    source_schema_version: int = CURRENT_PROJECT_SCHEMA_VERSION
 
 
 def normalize_project_path(path: str | Path) -> Path:
@@ -102,7 +108,8 @@ def _project_payload(state: DesignerProjectFileState) -> tuple[dict, dict[str, b
                 "canvas_mode": project.canvas_mode,
                 "canvas_width_in": project.canvas.width_in,
                 "canvas_height_in": project.canvas.height_in,
-                "tile_id": project.tile.id,
+                "tile_family": project.tile_system.family_id,
+                "tile_preset": project.tile_system.preset_id,
                 "tile_orientation": project.tile_orientation,
                 "tiles_across": project.tiles_across,
                 "tiles_down": project.tiles_down,
@@ -269,31 +276,66 @@ def _load_generated(value) -> DesignerGeneratedArtwork | None:
         raise ProjectFileError("Malformed generated artwork state.") from exc
 
 
-def _load_state(payload: dict, members: dict[str, bytes]) -> DesignerProjectFileState:
+def _migrate_v1_to_v2(payload: dict) -> dict:
+    migrated = deepcopy(payload)
+    setup = _object(
+        _object(migrated.get("project"), "project").get("setup"), "setup",
+    )
+    setup["tile_family"] = "hexagon"
+    if "tile_id" in setup:
+        setup["tile_preset"] = setup.pop("tile_id")
+    migrated["schema_version"] = CURRENT_PROJECT_SCHEMA_VERSION
+    return migrated
+
+
+def _migrate_to_current(payload: dict) -> tuple[dict, int]:
     if "schema_version" not in payload:
         raise ProjectFileError("This project is missing its schema version.")
     version = payload["schema_version"]
-    if version != PROJECT_SCHEMA_VERSION:
-        if isinstance(version, int) and version > PROJECT_SCHEMA_VERSION:
-            raise ProjectFileError(
-                "This project was created by a newer version of Mosaica and cannot be opened by this version."
-            )
+    if isinstance(version, bool) or not isinstance(version, int):
         raise ProjectFileError(f"Unsupported Mosaica project schema version: {version}.")
+    if version > CURRENT_PROJECT_SCHEMA_VERSION:
+        raise ProjectFileError(
+            "This project was created by a newer version of Mosaica and cannot be opened by this version."
+        )
+    if version not in SUPPORTED_PROJECT_SCHEMA_VERSIONS:
+        raise ProjectFileError(f"Unsupported Mosaica project schema version: {version}.")
+    if version == 1:
+        return _migrate_v1_to_v2(payload), version
+    return payload, version
+
+
+def _load_state(payload: dict, members: dict[str, bytes]) -> DesignerProjectFileState:
+    payload, source_schema_version = _migrate_to_current(payload)
     if not isinstance(payload.get("application_version"), str):
         raise ProjectFileError("This project is missing its application version.")
     data = _object(payload.get("project"), "project")
     setup = _object(data.get("setup"), "setup")
     try:
+        tile_family = str(setup["tile_family"])
+        tile_preset = str(setup["tile_preset"])
+        tile_orientation = str(setup["tile_orientation"])
+    except KeyError as exc:
+        raise ProjectFileError(
+            f"Malformed project state: setup is missing {exc.args[0]}."
+        ) from exc
+    try:
+        family = get_tile_family(tile_family)
+        selection = family.selection(tile_orientation, tile_preset)
+    except ValueError as exc:
+        raise ProjectFileError(f"Invalid project tile system: {exc}") from exc
+    try:
         from .designer import DesignerProjectShell
         if setup["canvas_mode"] == "custom_grid":
             project = DesignerProjectShell.create_custom(
-                str(setup["tile_id"]), str(setup["tile_orientation"]),
+                selection.preset_id, selection.orientation_id,
                 int(setup["tiles_across"]), int(setup["tiles_down"]),
+                family_id=selection.family_id,
             )
         else:
             project = DesignerProjectShell.create(
-                str(setup["canvas_id"]), str(setup["tile_id"]),
-                str(setup["tile_orientation"]),
+                str(setup["canvas_id"]), selection.preset_id,
+                selection.orientation_id, family_id=selection.family_id,
             )
         if (
             abs(project.canvas.width_in - float(setup["canvas_width_in"])) > 1e-8
@@ -366,6 +408,7 @@ def _load_state(payload: dict, members: dict[str, bytes]) -> DesignerProjectFile
     return DesignerProjectFileState(
         project, artwork, generated, overrides,
         bool(data.get("artwork_edit_mode", artwork is not None)), title,
+        source_schema_version,
     )
 
 

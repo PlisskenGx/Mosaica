@@ -18,6 +18,7 @@ from mosaica.designer_generation import (
 from mosaica.fabricate.phase2b import PRODUCTION_PROFILE
 from mosaica.fabricate.resolve import resolve_designer_project
 from mosaica.project_file import (
+    CURRENT_PROJECT_SCHEMA_VERSION,
     DesignerProjectFileState,
     ProjectFileError,
     load_project_file,
@@ -27,6 +28,31 @@ from mosaica.project_file import (
 
 
 SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 50"><rect width="100" height="50" fill="#B56F52"/></svg>'
+FIXTURES = Path(__file__).parent / "fixtures"
+
+
+def _v1_archive(tmp_path, stem, json_name, svg_name):
+    raw = (FIXTURES / json_name).read_bytes()
+    payload = json.loads(raw)
+    embedded = payload["project"]["artwork"]["embedded_path"]
+    path = tmp_path / f"{stem}.mosaica"
+    with ZipFile(path, "w") as archive:
+        archive.writestr("project.json", raw)
+        archive.writestr(embedded, (FIXTURES / svg_name).read_bytes().rstrip(b"\n"))
+    return path
+
+
+def _replace_project_json(path, mutate):
+    with ZipFile(path) as source:
+        members = {name: source.read(name) for name in source.namelist()}
+    payload = json.loads(members["project.json"])
+    mutate(payload)
+    with ZipFile(path, "w") as archive:
+        for name, content in members.items():
+            archive.writestr(
+                name,
+                json.dumps(payload).encode() if name == "project.json" else content,
+            )
 
 
 def _request(app, method, path, body=None):
@@ -96,8 +122,13 @@ def test_mosaica_container_is_versioned_deterministic_and_self_contained(tmp_pat
     with ZipFile(first) as archive:
         assert archive.namelist()[0] == "project.json"
         project = json.loads(archive.read("project.json"))
-        assert project["schema_version"] == 1
+        assert project["schema_version"] == CURRENT_PROJECT_SCHEMA_VERSION == 2
         assert project["application_version"] == __version__ == "2.0.0"
+        setup = project["project"]["setup"]
+        assert setup["tile_family"] == "hexagon"
+        assert setup["tile_preset"] == "l"
+        assert setup["tile_orientation"] == "flat_top"
+        assert "tile_id" not in setup
         artwork = project["project"]["artwork"]
         assert artwork["embedded_path"].startswith("artwork/artwork-")
         assert not Path(artwork["embedded_path"]).is_absolute()
@@ -195,7 +226,7 @@ def test_invalid_archives_and_schema_fail_cleanly(tmp_path):
         load_project_file(unversioned)
     newer = tmp_path / "newer.mosaica"
     with ZipFile(newer, "w") as archive:
-        archive.writestr("project.json", json.dumps({"schema_version": 2}))
+        archive.writestr("project.json", json.dumps({"schema_version": 3}))
     with pytest.raises(ProjectFileError, match="newer version"):
         load_project_file(newer)
     duplicate = tmp_path / "duplicate.mosaica"
@@ -204,6 +235,118 @@ def test_invalid_archives_and_schema_fail_cleanly(tmp_path):
         archive.writestr("project.json", "{}")
     with pytest.raises(ProjectFileError, match="duplicate archive members"):
         load_project_file(duplicate)
+
+
+@pytest.mark.parametrize("fixture,svg,orientation", (
+    ("hex_lock_project_v1.json", "hex_lock_project_v1.svg", "point_top"),
+    ("designer_project_flat_v1.json", "designer_project_flat_v1.svg", "flat_top"),
+))
+def test_frozen_v1_projects_migrate_to_explicit_hex_without_rewriting(
+    tmp_path, fixture, svg, orientation,
+):
+    path = _v1_archive(tmp_path, orientation, fixture, svg)
+    before = path.read_bytes()
+    loaded = load_project_file(path)
+    assert path.read_bytes() == before
+    assert loaded.source_schema_version == 1
+    assert loaded.project.tile_system.family_id == "hexagon"
+    assert loaded.project.tile_system.orientation_id == orientation
+    assert loaded.project.tile_orientation == orientation
+
+
+def test_rich_v1_artwork_border_paint_palette_and_fabrication_upgrade_to_v2(tmp_path):
+    source = _v1_archive(
+        tmp_path, "rich-flat", "designer_project_flat_v1.json",
+        "designer_project_flat_v1.svg",
+    )
+    loaded_v1 = load_project_file(source)
+    assert loaded_v1.artwork is not None
+    assert loaded_v1.artwork.source_filename == "source-logo.svg"
+    assert loaded_v1.generated_artwork is not None
+    assert loaded_v1.project.border_preset_id == "solid"
+    assert loaded_v1.paint_overrides
+    before = resolve_designer_project(
+        loaded_v1.project, PRODUCTION_PROFILE,
+        generated_artwork=loaded_v1.generated_artwork,
+        paint_overrides=loaded_v1.paint_overrides,
+    )
+    upgraded = save_project_file(tmp_path / "upgraded", loaded_v1)
+    with ZipFile(upgraded) as archive:
+        payload = json.loads(archive.read("project.json"))
+    assert payload["schema_version"] == 2
+    assert payload["project"]["setup"]["tile_family"] == "hexagon"
+    loaded_v2 = load_project_file(upgraded)
+    assert loaded_v2.source_schema_version == 2
+    assert loaded_v2.artwork == loaded_v1.artwork
+    assert loaded_v2.generated_artwork == loaded_v1.generated_artwork
+    assert loaded_v2.paint_overrides == loaded_v1.paint_overrides
+    assert loaded_v2.project.color_system == loaded_v1.project.color_system
+    assert resolve_designer_project(
+        loaded_v2.project, PRODUCTION_PROFILE,
+        generated_artwork=loaded_v2.generated_artwork,
+        paint_overrides=loaded_v2.paint_overrides,
+    ) == before
+    assert [value.tile_id for value in before.tiles] == [
+        value.tile_id for value in resolve_designer_project(
+            loaded_v2.project, PRODUCTION_PROFILE,
+            generated_artwork=loaded_v2.generated_artwork,
+            paint_overrides=loaded_v2.paint_overrides,
+        ).tiles
+    ]
+
+
+def test_opening_v1_in_designer_is_clean_and_next_save_upgrades(tmp_path):
+    source = _v1_archive(
+        tmp_path, "legacy", "hex_lock_project_v1.json", "hex_lock_project_v1.svg",
+    )
+    destination = tmp_path / "Legacy Saved.mosaica"
+    app = MosaicDesignerApp(project_save_dialog=lambda _current: destination)
+    status, opened = _request(app, "POST", "/api/designer/project/open", {
+        "path": str(source), "discard_unsaved": True,
+    })
+    assert status == "200 OK"
+    assert opened["document"]["dirty"] is False
+    assert app.document_dirty is False
+    status, saved = _request(app, "POST", "/api/designer/project/save-as", {})
+    assert status == "200 OK" and saved["saved"] is True
+    with ZipFile(destination) as archive:
+        assert json.loads(archive.read("project.json"))["schema_version"] == 2
+
+
+@pytest.mark.parametrize("orientation", ("point_top", "flat_top"))
+def test_v2_point_and_flat_projects_open_with_explicit_selection(tmp_path, orientation):
+    state = _rich_state(tmp_path)
+    state = replace(state, project=DesignerProjectShell.create_custom(
+        "m", orientation, 5, 4,
+    ))
+    path = save_project_file(tmp_path / orientation, state)
+    loaded = load_project_file(path)
+    assert loaded.project.tile_system.family_id == "hexagon"
+    assert loaded.project.tile_system.orientation_id == orientation
+    assert loaded.project.tile_system.preset_id == "m"
+
+
+@pytest.mark.parametrize("field,value,message", (
+    ("tile_family", None, "missing tile_family"),
+    ("tile_family", "square", "Unknown production tile family: square"),
+    ("tile_orientation", "straight", "Unsupported Hexagon orientation: straight"),
+    ("tile_preset", "xl", "Unknown Hexagon tile preset: xl"),
+))
+def test_v2_rejects_missing_or_invalid_family_selection(
+    tmp_path, field, value, message,
+):
+    path = save_project_file(tmp_path / field, _rich_state(tmp_path))
+
+    def mutate(payload):
+        setup = payload["project"]["setup"]
+        if value is None:
+            setup.pop(field)
+        else:
+            setup[field] = value
+
+    _replace_project_json(path, mutate)
+    with pytest.raises(ProjectFileError, match=message):
+        load_project_file(path)
 
 
 def test_missing_and_damaged_embedded_artwork_are_rejected(tmp_path):
