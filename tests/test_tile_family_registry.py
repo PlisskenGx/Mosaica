@@ -19,12 +19,13 @@ def _config(preset_id="m", orientation="point_top"):
     )
 
 
-def test_registry_contains_only_hexagon_and_rejects_unknown_family():
+def test_registry_contains_designer_hexagon_and_square_and_rejects_unknown_family():
     families = production_tile_families()
-    assert [(value.id, value.display_name) for value in families] == [("hexagon", "Hexagon")]
+    assert [(value.id, value.display_name) for value in families] == [
+        ("hexagon", "Hexagon"), ("square", "Square"),
+    ]
     assert get_tile_family() is get_tile_family("hexagon")
-    with pytest.raises(ValueError, match="Unknown production tile family: square"):
-        get_tile_family("square")
+    assert get_tile_family("square").display_name == "Square"
 
 
 def test_hexagon_metadata_owns_current_orientations_and_presets():

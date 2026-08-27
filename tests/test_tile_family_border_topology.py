@@ -86,8 +86,8 @@ def test_generic_boundary_detection_uses_supplied_topology_degree():
 def test_hex_family_supports_exact_current_border_catalog_only():
     family = get_tile_family("hexagon")
     assert family.supported_border_presets() == tuple(value.id for value in BORDER_PRESETS)
-    with pytest.raises(ValueError, match="Unsupported production geometry shape: square"):
-        get_tile_family_for_geometry_shape("square")
+    square = get_tile_family_for_geometry_shape("square")
+    assert square.supported_border_presets() == ("none", "solid")
 
 
 @pytest.mark.parametrize("preset", ("none", "solid", "double", "alternating"))

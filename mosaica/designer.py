@@ -58,7 +58,8 @@ from .project_file import (
 )
 from .tiles import (
     DEFAULT_TILE_FAMILY_ID, HEXAGON_PRESETS, TileSizePreset,
-    TileSystemSelection, get_tile_family, resolve_tile_system,
+    TileSystemSelection, get_tile_family, production_tile_families,
+    resolve_tile_system,
 )
 
 
@@ -297,8 +298,34 @@ class DesignerProjectShell:
             tiles_down=tiles_down,
         )
 
+    @classmethod
+    def create_physical(
+        cls, tile_id: str, orientation: str, width_in: float, height_in: float,
+        *, family_id: str = DEFAULT_TILE_FAMILY_ID,
+    ) -> DesignerProjectShell:
+        for name, value in (("Canvas width", width_in), ("Canvas height", height_in)):
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
+                raise ValueError(f"{name} must be positive.")
+        family = get_tile_family(family_id)
+        selection = family.selection(orientation, tile_id)
+        tile = family.preset(selection.preset_id)
+        geometry = family.build_preset_panel(
+            selection.preset_id, selection.orientation_id, DESIGNER_GROUT_MM,
+            float(width_in), float(height_in),
+        )
+        canvas = CanvasPreset("custom", "Custom", float(width_in), float(height_in))
+        return cls(
+            canvas, tile, DESIGNER_GROUT_MM, geometry, selection,
+            canvas_mode="custom_physical",
+        )
+
     def with_border(self, preset_id: str) -> DesignerProjectShell:
         border_preset(preset_id)
+        family = get_tile_family(self.tile_family)
+        if preset_id not in family.supported_border_presets():
+            raise ValueError(
+                f"Border preset {preset_id!r} is unsupported for {family.display_name}."
+            )
         return replace(self, border_preset_id=preset_id)
 
     def with_color_system(
@@ -400,7 +427,7 @@ class DesignerProjectShell:
             ),
             "tile_preset": self.tile.to_dict(),
             "tile_family": self.tile_family,
-            "tile_shape": "hexagon",
+            "tile_shape": self.tile_family,
             "tile_orientation": self.tile_orientation,
             "grout_mm": self.grout_mm,
             "color_system": effective_resolution.to_dict(),
@@ -563,6 +590,10 @@ class MosaicDesignerApp:
         self.tile_orientation: str | None = None
         self.canvas_id: str | None = None
         self._canvas_confirmed = False
+        self._canvas_first_setup = False
+        self._setup_stage: str | None = None
+        self._custom_width_in = 24.0
+        self._custom_height_in = 18.0
         self.project: DesignerProjectShell | None = None
         self.artwork: DesignerArtwork | None = None
         self.generated_artwork: DesignerGeneratedArtwork | None = None
@@ -583,6 +614,27 @@ class MosaicDesignerApp:
         self._next_export_job = 1
         self._active_export_job_id: str | None = None
 
+    def _reset_for_new_mosaic(self, *, canvas_first: bool) -> None:
+        """Clear document-scoped state at the authoritative New Mosaic boundary."""
+        self.tile_shape = None
+        self.tile_id = None
+        self.tile_orientation = None
+        self.canvas_id = None
+        self._canvas_confirmed = False
+        self._canvas_first_setup = canvas_first
+        self._setup_stage = "canvas" if canvas_first else "shape"
+        self._custom_width_in = 24.0
+        self._custom_height_in = 18.0
+        self.project = None
+        self.artwork = None
+        self.generated_artwork = None
+        self.paint_overrides = {}
+        self.artwork_edit_mode = True
+        self.document_title = "Untitled"
+        self.document_dirty = False
+        self.document_path = None
+        self.welcome_active = False
+
     def __call__(self, environ, start_response):
         path = environ.get("PATH_INFO", "/")
         if path.startswith("/api/designer"):
@@ -599,7 +651,21 @@ class MosaicDesignerApp:
             if method == "GET" and path == "/api/designer":
                 return self._json(start_response, "200 OK", self.payload())
             if method == "POST" and path == "/api/designer/new":
-                self.welcome_active = False
+                body = self._request_json(environ)
+                if (
+                    self.project is not None and self.document_dirty
+                    and not body.get("discard_unsaved", False)
+                ):
+                    return self._json(start_response, "409 Conflict", {
+                        "error": (
+                            "You have unsaved changes. Starting a new mosaic "
+                            "will discard them."
+                        ),
+                        "requires_confirmation": True,
+                    })
+                self._reset_for_new_mosaic(
+                    canvas_first=bool(body.get("canvas_first", False)),
+                )
                 return self._json(start_response, "200 OK", self.payload())
             if method == "POST" and path in {
                 "/api/designer/project/save",
@@ -626,16 +692,14 @@ class MosaicDesignerApp:
                 self.welcome_active = False
                 body = self._request_json(environ)
                 shape = body.get("shape")
-                if shape != "hexagon":
-                    raise ValueError(f"Unknown tile shape: {shape}")
-                self.tile_shape = shape
+                family = get_tile_family(shape)
+                self.tile_shape = family.id
                 self.tile_id = None
-                orientation = body.get("orientation", "point_top")
-                if orientation not in {"flat_top", "point_top"}:
-                    raise ValueError(f"Unsupported canonical hex orientation: {orientation}")
-                self.tile_orientation = orientation
-                self.canvas_id = None
-                self._canvas_confirmed = False
+                default_orientation = family.orientations()[0].id
+                self.tile_orientation = family.normalize_orientation(
+                    body.get("orientation", default_orientation)
+                )
+                self._setup_stage = "tile"
                 self.project = None
                 self.artwork = None
                 self.generated_artwork = None
@@ -647,22 +711,33 @@ class MosaicDesignerApp:
                     raise ValueError("Select a tile shape before configuring tiles.")
                 body = self._request_json(environ)
                 tile_id = body.get("tile_id")
-                if tile_id not in _TILES:
-                    raise ValueError(f"Unknown tile preset: {tile_id}")
-                orientation = body.get("orientation", self.tile_orientation or "point_top")
-                if orientation not in {"flat_top", "point_top"}:
-                    raise ValueError(f"Unsupported canonical hex orientation: {orientation}")
-                self.tile_id = tile_id
-                self.tile_orientation = orientation
+                family = get_tile_family(self.tile_shape)
+                default_orientation = family.orientations()[0].id
+                selection = family.selection(
+                    body.get("orientation", self.tile_orientation or default_orientation),
+                    tile_id,
+                )
+                self.tile_id = selection.preset_id
+                self.tile_orientation = selection.orientation_id
                 # A remembered canvas is setup continuity, not confirmation.
                 # The product flow resumes at Canvas; the guarded branch only
                 # preserves the legacy API's explicit Canvas-then-Tile order.
                 self.project = (
-                    DesignerProjectShell.create(self.canvas_id, tile_id, orientation)
+                    DesignerProjectShell.create_physical(
+                        selection.preset_id, selection.orientation_id,
+                        self._custom_width_in, self._custom_height_in,
+                        family_id=selection.family_id,
+                    )
+                    if self._canvas_confirmed and self.canvas_id == "custom"
+                    else DesignerProjectShell.create(
+                        self.canvas_id, selection.preset_id,
+                        selection.orientation_id, family_id=selection.family_id,
+                    )
                     if self._canvas_confirmed
                     and self.canvas_id in {**_CANVASES, **_LEGACY_CANVASES}
                     else None
                 )
+                self._setup_stage = None if self.project is not None else "canvas"
                 self._canvas_confirmed = False
                 self.artwork = None
                 self.generated_artwork = None
@@ -679,11 +754,23 @@ class MosaicDesignerApp:
                 if self.tile_id is None or self.tile_orientation is None:
                     body = self._request_json(environ)
                     canvas_id = body.get("canvas_id")
-                    if canvas_id not in {**_CANVASES, **_LEGACY_CANVASES}:
-                        raise ValueError("Configure the tile system before selecting a canvas.")
-                    self.tile_shape = "hexagon"
+                    if canvas_id == "custom":
+                        if body.get("width_in") is None:
+                            raise ValueError(
+                                "Configure the tile system before selecting a custom canvas."
+                            )
+                        self._custom_width_in = float(body.get("width_in"))
+                        self._custom_height_in = float(body.get("height_in"))
+                        if self._custom_width_in <= 0 or self._custom_height_in <= 0:
+                            raise ValueError("Custom canvas dimensions must be positive.")
+                    elif canvas_id not in {**_CANVASES, **_LEGACY_CANVASES}:
+                        raise ValueError(f"Unknown canvas preset: {canvas_id}")
                     self.canvas_id = canvas_id
                     self._canvas_confirmed = True
+                    self._setup_stage = "shape"
+                    if self.tile_shape is None and not self._canvas_first_setup:
+                        self.tile_shape = "hexagon"
+                        self.tile_orientation = "point_top"
                     self.project = None
                     self.artwork = None
                     self.generated_artwork = None
@@ -693,17 +780,27 @@ class MosaicDesignerApp:
                 body = self._request_json(environ)
                 canvas_id = body.get("canvas_id")
                 if canvas_id == "custom":
-                    self.project = DesignerProjectShell.create_custom(
-                        self.tile_id, self.tile_orientation,
-                        body.get("tiles_across"), body.get("tiles_down"),
-                    )
+                    if body.get("width_in") is not None:
+                        self.project = DesignerProjectShell.create_physical(
+                            self.tile_id, self.tile_orientation,
+                            float(body.get("width_in")), float(body.get("height_in")),
+                            family_id=self.tile_shape,
+                        )
+                    else:
+                        self.project = DesignerProjectShell.create_custom(
+                            self.tile_id, self.tile_orientation,
+                            body.get("tiles_across"), body.get("tiles_down"),
+                            family_id=self.tile_shape,
+                        )
                 elif canvas_id in {**_CANVASES, **_LEGACY_CANVASES}:
                     self.project = DesignerProjectShell.create(
                         canvas_id, self.tile_id, self.tile_orientation,
+                        family_id=self.tile_shape,
                     )
                 else:
                     raise ValueError(f"Unknown canvas preset: {canvas_id}")
                 self.canvas_id = canvas_id
+                self._setup_stage = None
                 self._canvas_confirmed = False
                 self.artwork = None
                 self.generated_artwork = None
@@ -1164,15 +1261,11 @@ class MosaicDesignerApp:
                     self.document_path = None
                     self.document_title = "Untitled"
                     self._canvas_confirmed = False
-                elif self.tile_id is not None:
-                    self.tile_id = None
-                    self.tile_orientation = None
-                    self.canvas_id = None
-                    self._canvas_confirmed = False
-                elif self.tile_shape is not None:
-                    self.tile_shape = None
-                else:
-                    self.canvas_id = None
+                    self._setup_stage = "canvas"
+                elif self._setup_stage == "canvas":
+                    self._setup_stage = "tile"
+                elif self._setup_stage == "tile":
+                    self._setup_stage = "shape"
                 return self._json(start_response, "200 OK", self.payload())
             return self._json(start_response, "404 Not Found", {"error": "Not found."})
         except (KeyError, TypeError, ValueError, RuntimeError) as exc:
@@ -1192,8 +1285,11 @@ class MosaicDesignerApp:
                 if self.artwork is not None else None
             )
         canvas_presets = [value.to_dict() for value in CANVAS_PRESETS]
-        if self.tile_id is not None and self.tile_orientation is not None:
-            tile = _TILES[self.tile_id]
+        if (
+            self.tile_shape == "hexagon"
+            and self.tile_id is not None and self.tile_orientation is not None
+        ):
+            tile = get_tile_family("hexagon").preset(self.tile_id)
             config = MosaicConfig(
                 tile_shape="hex", tile_width_in=tile.flat_to_flat_in,
                 grout_width_in=DESIGNER_GROUT_MM / MM_PER_INCH,
@@ -1211,13 +1307,39 @@ class MosaicDesignerApp:
             "stage": (
                 "workspace" if self.project is not None
                 else "welcome" if self.welcome_active
+                else self._setup_stage if self._setup_stage is not None
+                else "canvas" if self._canvas_first_setup and self.canvas_id is None
                 else "canvas" if self.tile_id is not None
                 else "tile" if self.tile_shape is not None
                 else "shape"
             ),
             "canvas_presets": canvas_presets,
-            "tile_presets": [value.to_dict() for value in TILE_PRESETS],
-            "border_presets": [value.to_dict() for value in BORDER_PRESETS],
+            "tile_families": [
+                {
+                    "id": family.id, "display_name": family.display_name,
+                    "orientations": [
+                        {"id": value.id, "display_name": value.display_name}
+                        for value in family.orientations()
+                    ],
+                }
+                for family in production_tile_families()
+            ],
+            "tile_presets": [
+                value.to_dict()
+                for value in (
+                    get_tile_family(self.tile_shape).presets()
+                    if self.tile_shape else TILE_PRESETS
+                )
+            ],
+            "border_presets": [
+                value.to_dict() for value in BORDER_PRESETS
+                if (
+                    self.project is None
+                    or value.id in get_tile_family(
+                        self.project.tile_family
+                    ).supported_border_presets()
+                )
+            ],
             "fixed_grout_mm": DESIGNER_GROUT_MM,
             "selected_canvas_id": self.canvas_id,
             "selected_tile_shape": self.tile_shape,
@@ -1237,12 +1359,22 @@ class MosaicDesignerApp:
             raise ValueError("Configure the tile system before previewing a canvas.")
         canvas_id = body.get("canvas_id")
         shell = (
-            DesignerProjectShell.create_custom(
+            DesignerProjectShell.create_physical(
+                self.tile_id, self.tile_orientation,
+                float(body.get("width_in")), float(body.get("height_in")),
+                family_id=self.tile_shape,
+            )
+            if canvas_id == "custom" and body.get("width_in") is not None
+            else DesignerProjectShell.create_custom(
                 self.tile_id, self.tile_orientation,
                 body.get("tiles_across"), body.get("tiles_down"),
+                family_id=self.tile_shape,
             )
             if canvas_id == "custom"
-            else DesignerProjectShell.create(canvas_id, self.tile_id, self.tile_orientation)
+            else DesignerProjectShell.create(
+                canvas_id, self.tile_id, self.tile_orientation,
+                family_id=self.tile_shape,
+            )
         )
         return {
             "canvas_id": canvas_id,
@@ -1322,10 +1454,14 @@ class MosaicDesignerApp:
         self.tile_orientation = self.project.tile_orientation
         self.canvas_id = self.project.canvas.id
         self._canvas_confirmed = False
+        self._custom_width_in = self.project.canvas.width_in
+        self._custom_height_in = self.project.canvas.height_in
         self.document_path = Path(source).expanduser().resolve()
         self.document_title = self.document_path.stem
         self.document_dirty = False
         self.welcome_active = False
+        self._canvas_first_setup = False
+        self._setup_stage = None
         return self.payload()
 
     def _export_snapshot(self) -> DesignerExportSnapshot:

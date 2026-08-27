@@ -13,10 +13,11 @@ geometry is regenerated from the saved tile/canvas setup; generated artwork
 assignments and manual overrides are authoritative and round-trip exactly.
 
 Schema v2 setup state explicitly records `tile_family`, `tile_preset`, and
-`tile_orientation`. The only currently supported production family is
-`hexagon`, with `point_top` and `flat_top` orientations and the existing S/M/L
-presets. The internal geometry shape ID remains `hex`; it is not serialized as
-the production family identity.
+`tile_orientation`. Designer supports `hexagon` with `point_top` / `flat_top`
+and `square` with `straight`. Each family owns its S/M/L dimensions. The
+internal Hex geometry shape ID remains `hex`; it is not serialized as the
+production family identity. Fabricate remains independently restricted to the
+validated Hexagon family.
 
 Schema-v1 projects remain readable. Because v1 implicitly meant Hexagon, the
 loader migrates them in memory to `tile_family = "hexagon"` while preserving

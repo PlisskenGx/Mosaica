@@ -206,7 +206,10 @@ def build_border_layer(
     clipped_order = perimeter_order(geometry, clipped)
 
     if preset.id == "none":
-        owned_by_layer = (clipped_order,)
+        owned_by_layer = (
+            (clipped_order,) if family.protects_clipped_without_border()
+            else ((),)
+        )
     else:
         first_full_ring = rings[0] if rings else ()
         outer = perimeter_order(geometry, set((*clipped_order, *first_full_ring)))
@@ -242,7 +245,10 @@ def build_border_layer(
         _tile_id(geometry, coordinate)
         for coordinate in visible
         if _tile_id(geometry, coordinate) not in set(owned)
-        and geometry.placement(*coordinate).piece_type == "full"
+        and (
+            geometry.placement(*coordinate).piece_type == "full"
+            or family.artwork_includes_clipped()
+        )
     ))
     return BorderLayerState(
         preset_id=preset.id,

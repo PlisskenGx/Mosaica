@@ -328,7 +328,7 @@ def test_v2_point_and_flat_projects_open_with_explicit_selection(tmp_path, orien
 
 @pytest.mark.parametrize("field,value,message", (
     ("tile_family", None, "missing tile_family"),
-    ("tile_family", "square", "Unknown production tile family: square"),
+        ("tile_family", "triangle", "Unknown production tile family: triangle"),
     ("tile_orientation", "straight", "Unsupported Hexagon orientation: straight"),
     ("tile_preset", "xl", "Unknown Hexagon tile preset: xl"),
 ))

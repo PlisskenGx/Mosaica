@@ -55,6 +55,9 @@ def mosaic_svg(snapshot: DesignerExportSnapshot) -> str:
         "viewBox": f"0 0 {_number(width_mm)} {_number(height_mm)}",
         "data-mosaica-document": snapshot.document_title,
     })
+    if project["tile_family"] != "hexagon":
+        root.set("data-tile-family", project["tile_family"])
+        root.set("data-tile-orientation", project["tile_orientation"])
     metadata = ET.SubElement(root, f"{{{SVG_NS}}}metadata")
     metadata.text = json.dumps({
         "grout": project["grout"],

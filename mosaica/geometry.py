@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from math import (
+    ceil,
     cos,
     floor,
     hypot,
@@ -316,6 +317,66 @@ def square_geometry(
                 config.artwork_inset_in,
             )
         ),
+    )
+
+
+def counted_square_geometry(
+    side_in: float, grout_in: float, columns: int, rows: int,
+) -> GridGeometry:
+    """Build an explicit whole-Square counted grid with Straight orientation."""
+    config = MosaicConfig(
+        tile_shape="square", tile_width_in=side_in, tile_height_in=side_in,
+        grout_width_in=grout_in,
+    )
+    return replace(square_geometry(config, columns, rows), orientation="straight")
+
+
+def panel_square_geometry(
+    side_in: float, grout_in: float, width_in: float, height_in: float,
+) -> GridGeometry:
+    """Center a Square lattice and clip it to an authoritative canvas rectangle.
+
+    The smallest row/column field whose tile-and-grout span covers each canvas
+    axis is centered on that axis. Any symmetric overhang becomes clipped edge
+    geometry, while a pitch-compatible canvas naturally produces whole tiles.
+    """
+    if side_in <= 0 or width_in <= 0 or height_in <= 0:
+        raise ValueError("Square tile and canvas dimensions must be positive.")
+    if grout_in < 0:
+        raise ValueError("Square grout cannot be negative.")
+    pitch = side_in + grout_in
+    columns = max(1, int(ceil((width_in + grout_in) / pitch)))
+    rows = max(1, int(ceil((height_in + grout_in) / pitch)))
+    field_width = columns * side_in + (columns - 1) * grout_in
+    field_height = rows * side_in + (rows - 1) * grout_in
+    origin_x = (width_in - field_width) / 2.0
+    origin_y = (height_in - field_height) / 2.0
+    panel = Rect(0.0, 0.0, width_in, height_in)
+    placements = []
+    for row in range(rows):
+        for column in range(columns):
+            left = origin_x + column * pitch
+            top = origin_y + row * pitch
+            full = (
+                (left, top), (left + side_in, top),
+                (left + side_in, top + side_in), (left, top + side_in),
+            )
+            clipped = tuple(clip_polygon_to_rect(full, panel))
+            piece_type, fraction = _piece_type(full, clipped)
+            if piece_type not in {"full", "outside"}:
+                piece_type = "edge_cut"
+            placements.append(TilePlacement(
+                row=row, column=column,
+                center_x_in=left + side_in / 2.0,
+                center_y_in=top + side_in / 2.0,
+                full_vertices_in=full, vertices_in=clipped,
+                piece_type=piece_type, piece_fraction=fraction,
+            ))
+    return GridGeometry(
+        shape="square", orientation="straight", columns=columns, rows=rows,
+        width_in=width_in, height_in=height_in,
+        placements=tuple(placements), panel_bounds=panel,
+        artwork_bounds=_artwork_bounds(width_in, height_in, 0.0),
     )
 
 

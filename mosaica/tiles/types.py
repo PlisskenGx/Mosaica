@@ -31,6 +31,16 @@ class TileSizePreset:
     def side_length_mm(self): return self.primary_dimension_mm / sqrt(3.0)
 
     def to_dict(self):
+        common = {
+            "id": self.id, "title": self.title,
+            "summary": self.summary, "recommended": self.recommended,
+        }
+        if self.dimension_kind == "side_length":
+            return {
+                **common, "dimension_kind": self.dimension_kind,
+                "side_length_mm": self.primary_dimension_mm,
+                "side_length_in": self.primary_dimension_mm / MM_PER_INCH,
+            }
         return {
             "id": self.id, "flat_to_flat_mm": self.flat_to_flat_mm,
             "flat_to_flat_in": self.flat_to_flat_in,
@@ -68,3 +78,5 @@ class TileFamily(Protocol):
     def build_custom_grid(self, preset_id, orientation_id, grout_mm, tiles_across, tiles_down): ...
     def neighbors(self, row, column, rows, columns, orientation_id): ...
     def supported_border_presets(self) -> tuple[str, ...]: ...
+    def artwork_includes_clipped(self) -> bool: ...
+    def protects_clipped_without_border(self) -> bool: ...

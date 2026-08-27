@@ -32,10 +32,11 @@
   const byId = (id) => document.getElementById(id);
   const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
   const orientationLabel = (orientation) => (
-    orientation === "flat_top" ? "Flat Top" : "Point Top"
+    orientation === "straight" ? "Straight"
+      : orientation === "flat_top" ? "Flat Top" : "Point Top"
   );
   const tileShapeLabel = (shape) => (
-    shape === "hexagon" ? "Hexagon" : shape
+    shape === "hexagon" ? "Hexagon" : shape === "square" ? "Square" : shape
   );
 
   class DesignerResponseReadError extends Error {
@@ -280,15 +281,35 @@
     for (const preset of state.tile_presets) {
       const card = document.createElement("article");
       card.className = "choice-card tile-card";
-      card.setAttribute("aria-label", `${preset.id.toUpperCase()}, ${preset.flat_to_flat_mm} millimeters flat to flat`);
-      const relativeSize = 3.2 * preset.flat_to_flat_mm / 24;
+      const square = state.selected_tile_shape === "square";
+      const dimension = square ? preset.side_length_mm : preset.flat_to_flat_mm;
+      const dimensionName = square ? "side" : "flat to flat";
+      card.setAttribute("aria-label", `${preset.id.toUpperCase()}, ${dimension} millimeters ${dimensionName}`);
+      const relativeSize = 3.2 * dimension / (square ? 20 : 24);
       card.innerHTML = `
         ${preset.recommended ? '<span class="recommended-badge">Recommended</span>' : ''}
-        <span class="hex-preview-wrap"><span class="hex-preview ${state.selected_tile_orientation}" style="--hex-size:${relativeSize}rem;--preview-rotation:${state.selected_tile_orientation === "flat_top" ? "30deg" : "0deg"}"></span></span>
-        <span class="tile-size"><strong>${preset.id.toUpperCase()}</strong><span>${preset.flat_to_flat_mm} mm</span></span>
+        ${square
+          ? `<span class="square-preview-wrap"><span class="square-preview" style="width:${relativeSize}rem"></span></span>`
+          : `<span class="hex-preview-wrap"><span class="hex-preview ${state.selected_tile_orientation}" style="--hex-size:${relativeSize}rem;--preview-rotation:${state.selected_tile_orientation === "flat_top" ? "30deg" : "0deg"}"></span></span>`}
+        <span class="tile-size"><strong>${preset.id.toUpperCase()}</strong><span>${dimension} mm${square ? " side" : ""}</span></span>
         <h2>${preset.title}</h2><p>${preset.summary}</p>`;
       card.addEventListener("click", () => chooseTile(preset.id));
       container.appendChild(card);
+    }
+  }
+
+  function renderFamilyOrientation() {
+    selectedShapeOrientation = state.selected_tile_shape === "hexagon"
+      ? state.selected_tile_orientation || "point_top"
+      : "point_top";
+    const preview = byId("shape-hexagon").querySelector(".hex-preview");
+    preview.style.setProperty(
+      "--preview-rotation", selectedShapeOrientation === "flat_top" ? "30deg" : "0deg",
+    );
+    for (const choice of byId("shape-hexagon").querySelectorAll("[data-shape-orientation]")) {
+      choice.setAttribute(
+        "aria-pressed", String(choice.dataset.shapeOrientation === selectedShapeOrientation),
+      );
     }
   }
 
@@ -322,6 +343,8 @@
     protectedLayer.classList.add("protected-layer");
     const partialAidLayer = document.createElementNS(SVG_NS, "g");
     partialAidLayer.classList.add("partial-aid-layer");
+    const tileHoverLayer = document.createElementNS(SVG_NS, "g");
+    tileHoverLayer.classList.add("tile-hover-outline-layer");
     const tileHitLayer = document.createElementNS(SVG_NS, "g");
     tileHitLayer.classList.add("tile-hit-layer");
     for (const tile of geometry.tiles) {
@@ -354,8 +377,10 @@
       ghost.setAttribute("points", (tile.full_vertices_in || tile.vertices_in).map(
         (point) => point.join(","),
       ).join(" "));
-      partialAidLayer.appendChild(ghost);
-      if (tile.piece_type !== "full" && tile.full_vertices_in) {
+      tileHoverLayer.appendChild(ghost);
+      if (
+        tile.piece_type !== "full" && tile.full_vertices_in
+      ) {
         const hit = document.createElementNS(SVG_NS, "polygon");
         hit.classList.add("partial-parent-hit", "editable");
         hit.dataset.tileId = tile.id;
@@ -379,6 +404,9 @@
     boundary.setAttribute("width", geometry.width_in);
     boundary.setAttribute("height", geometry.height_in);
     svg.appendChild(boundary);
+    // Full-parent hover outlines sit above the physical canvas while visible
+    // tile fill remains clipped to the authoritative finished panel.
+    svg.appendChild(tileHoverLayer);
     // Exact physical-piece hit geometry wins over the panel boundary and
     // supplemental parent aids. Artwork controls are appended afterward and
     // retain the highest interaction priority.
@@ -1167,10 +1195,14 @@
     const physical = pointer.matrixTransform(matrix.inverse());
     const matched = state.project.geometry.tiles.find((tile) => (
       tile.editable && pointInPolygon(
-        physical.x, physical.y, tile.full_vertices_in || tile.vertices_in,
+        physical.x, physical.y, tileInteractionVertices(tile),
       )
     ));
     return matched ? byId(matched.id) : null;
+  }
+
+  function tileInteractionVertices(tile) {
+    return tile.full_vertices_in || tile.vertices_in;
   }
 
   function pointInPolygon(x, y, vertices) {
@@ -1388,6 +1420,7 @@
     }
     renderCanvasPresets();
     renderTilePresets();
+    renderFamilyOrientation();
     renderWorkspace();
     renderBorderInspector();
     renderArtworkInspector();
@@ -1512,6 +1545,17 @@
     exportJobId = null;
     flatExportPath = null;
     showExportStep("chooser");
+    const square = state.project?.tile_family === "square";
+    for (const card of document.querySelectorAll(".export-format-cards.fabrication [data-export-format]")) {
+      card.classList.toggle("family-unavailable", square);
+      card.setAttribute("aria-disabled", String(square));
+      card.title = square ? "Square fabrication is not yet available." : "";
+      card.querySelector("span").textContent = square
+        ? "Square fabrication is not yet available."
+        : (card.dataset.exportFormat === "stl"
+          ? "Universal mesh fabrication files"
+          : "Recommended for multicolor 3D printing");
+    }
     byId("export-dialog").showModal();
     byId("export-chooser").querySelector("button")?.focus();
   }
@@ -1636,8 +1680,13 @@
     const across = byId("custom-across").value;
     const down = byId("custom-down").value;
     try {
+      if (!state.selected_tile_id) {
+        byId("custom-finished").textContent = `Finished size ${Number(across).toFixed(2)} × ${Number(down).toFixed(2)} in`;
+        byId("custom-create").disabled = !(Number(across) > 0 && Number(down) > 0);
+        return;
+      }
       const preview = await request("/api/designer/canvas-preview", {
-        canvas_id: "custom", tiles_across: Number(across), tiles_down: Number(down),
+        canvas_id: "custom", width_in: Number(across), height_in: Number(down),
       }, "Preview custom canvas");
       byId("custom-finished").textContent = (
         `Finished size ${preview.width_in.toFixed(2)} × ${preview.height_in.toFixed(2)} in`
@@ -1694,9 +1743,11 @@
       );
     }
   });
-  byId("welcome-new").addEventListener("click", () => performDesignerMutation(
-    "/api/designer/new", {}, { name: "New Mosaic" },
-  ));
+  byId("welcome-new").addEventListener("click", async () => {
+    await performDesignerMutation(
+      "/api/designer/new", {}, { name: "New Mosaic" },
+    );
+  });
   byId("welcome-open").addEventListener("click", openMosaic);
   byId("document-menu-button").addEventListener("click", () => {
     if (byId("document-menu").hidden) openDocumentMenu();
@@ -1740,6 +1791,7 @@
   byId("export-generate").addEventListener("click", generateDesignerExport);
   for (const card of document.querySelectorAll("[data-export-format]")) {
     card.addEventListener("click", () => {
+      if (card.getAttribute("aria-disabled") === "true") return;
       const format = card.dataset.exportFormat;
       if (["svg", "png", "jpg"].includes(format)) exportFlatDesign(format);
       else openFabricationExport(format);
@@ -1772,11 +1824,11 @@
     render();
   }
   byId("setup-previous").addEventListener("click", navigateSetupNeighbor);
-  const shapePreview = byId("shape-hexagon").querySelector(".hex-preview");
   const shapeOrientationButtons = [
     byId("shape-hexagon").querySelector("[data-shape-orientation=flat_top]"),
     byId("shape-hexagon").querySelector("[data-shape-orientation=point_top]"),
   ];
+  const shapePreview = byId("shape-hexagon").querySelector(".hex-preview");
   const previewShapeOrientation = (orientation) => shapePreview.style.setProperty(
     "--preview-rotation", orientation === "flat_top" ? "30deg" : "0deg",
   );
@@ -1797,12 +1849,18 @@
       }, { name: "Choose Hexagon" });
     });
   }
+  byId("shape-square").addEventListener("click", async () => {
+    if (setupTransitionActive) return;
+    await performDesignerMutation("/api/designer/shape", {
+      shape: "square", orientation: "straight",
+    }, { name: "Choose Square" });
+  });
 
   async function createCustomCanvas() {
     await performDesignerMutation("/api/designer/canvas", {
       canvas_id: "custom",
-      tiles_across: Number(byId("custom-across").value),
-      tiles_down: Number(byId("custom-down").value),
+      width_in: Number(byId("custom-across").value),
+      height_in: Number(byId("custom-down").value),
     }, { name: "Create custom canvas" });
   }
   byId("custom-size").addEventListener("click", () => {

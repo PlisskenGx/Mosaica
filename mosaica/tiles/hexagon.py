@@ -90,5 +90,8 @@ class HexagonTileFamily:
     def supported_border_presets(self):
         return HEXAGON_BORDER_PRESET_IDS
 
+    def artwork_includes_clipped(self): return False
+    def protects_clipped_without_border(self): return True
+
 
 HEXAGON_TILE_FAMILY = HexagonTileFamily()

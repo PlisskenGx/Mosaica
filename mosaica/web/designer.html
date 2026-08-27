@@ -55,7 +55,7 @@
     </section>
     <section id="shape-screen" class="setup-screen">
       <div class="setup-heading">
-        <h1>Choose tile shape</h1>
+        <h1>Choose tile family</h1>
         <p>Start with the physical tile system for your mosaic.</p>
       </div>
       <div class="shape-presets">
@@ -68,6 +68,11 @@
             <button type="button" data-shape-orientation="point_top" aria-pressed="true"><span class="mini-hex point-top"></span>Point Top</button>
           </span>
         </article>
+        <button id="shape-square" class="choice-card shape-card" type="button">
+          <span class="square-family-preview" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+          <strong class="choice-title">Square</strong>
+          <span class="choice-meta">Four-sided tile · Straight grid</span>
+        </button>
       </div>
     </section>
 
@@ -93,7 +98,7 @@
     <section id="custom-screen" class="setup-screen custom-screen" hidden>
       <div class="setup-heading">
         <h1>Create custom canvas</h1>
-        <p>Choose the dimensions of the full-tile grid.</p>
+        <p>Choose the exact finished canvas dimensions.</p>
       </div>
       <div class="custom-panel">
         <div id="custom-lattice" class="custom-lattice point_top" aria-hidden="true">
@@ -104,13 +109,13 @@
           </div>
           <span class="measure across">Tiles Across = 5</span><span class="measure down">Tiles Down = 3</span>
         </div>
-        <p class="custom-explanation">Counts refer to the full-tile grid. Edge pieces are added automatically.</p>
+        <p class="custom-explanation">The canvas remains exact. Edge tiles are clipped when needed.</p>
         <div class="custom-fields">
-          <label>Tiles Across<input id="custom-across" type="number" min="1" max="200" step="1" value="40"></label>
-          <label>Tiles Down<input id="custom-down" type="number" min="1" max="200" step="1" value="24"></label>
+          <label>Width (in)<input id="custom-across" type="number" min="1" max="200" step="0.01" value="24"></label>
+          <label>Height (in)<input id="custom-down" type="number" min="1" max="200" step="0.01" value="18"></label>
         </div>
         <p id="custom-finished" class="custom-finished">Finished size</p>
-        <button id="custom-create" class="inspector-action primary" type="button">Create Canvas</button>
+        <button id="custom-create" class="inspector-action primary" type="button">Continue</button>
       </div>
     </section>
 

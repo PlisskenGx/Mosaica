@@ -70,7 +70,7 @@ def test_setup_back_is_local_and_accepts_the_shape_setup_payload():
 
     back_handler = script[
         script.index('byId("back").addEventListener'):
-        script.index('const shapePreview')
+        script.index('const shapeOrientationButtons')
     ]
     assert back_handler.count('/api/designer/back') == 1
     assert 'state.stage === "workspace"' in back_handler
@@ -258,9 +258,9 @@ def test_custom_stage_copy_controls_and_paint_action_row():
     _, html = _request(app, "GET", "/")
     _, css = _request(app, "GET", "/designer.css")
     assert "Create custom canvas" in html
-    assert "Tiles Across" in html and "Tiles Down" in html
-    assert "Counts refer to the full-tile grid. Edge pieces are added automatically." in html
-    assert "Finished size" in html and "Create Canvas" in html
+    assert "Width (in)" in html and "Height (in)" in html
+    assert "The canvas remains exact. Edge tiles are clipped when needed." in html
+    assert "Finished size" in html and ">Continue<" in html
     paint_actions = html[html.index('class="paint-actions"'):html.index("</div>", html.index('class="paint-actions"'))]
     assert "paint-assign" not in paint_actions
     assert "paint-clear" in paint_actions
@@ -304,18 +304,25 @@ def test_canvas_cards_use_common_larger_illustration_region():
     assert ".custom-lattice { transform: none; }" in css
 
 
-def test_orientation_belongs_to_shape_and_tile_cards_are_size_only():
+def test_orientation_belongs_to_hex_family_and_tile_cards_are_size_only():
     app = MosaicDesignerApp()
     _, html = _request(app, "GET", "/")
     _, script = _request(app, "GET", "/designer.js")
-    assert html.index("Hexagon") < html.index('data-shape-orientation="flat_top"')
+    tile_screen = html[html.index('id="tile-screen"'):html.index('id="custom-screen"')]
+    shape_screen = html[html.index('id="shape-screen"'):html.index('id="canvas-screen"')]
+    hex_card = shape_screen[shape_screen.index('id="shape-hexagon"'):shape_screen.index('id="shape-square"')]
+    square_card = shape_screen[shape_screen.index('id="shape-square"'):]
+    assert 'data-shape-orientation="flat_top"' in hex_card
+    assert 'data-shape-orientation="point_top"' in hex_card
+    assert "orientation-choices" not in square_card
+    assert 'data-shape-orientation="flat_top"' not in tile_screen
     assert 'data-shape-orientation="point_top" aria-pressed="true"' in html
     tile_render = script[
         script.index("function renderTilePresets"):
         script.index("function renderWorkspace")
     ]
-    assert "orientation-choices" not in tile_render
-    assert "data-orientation" not in tile_render
+    assert "orientationControls" not in tile_render
+    assert "function renderFamilyOrientation()" in script
     assert "state.selected_tile_orientation" in script
 
 

@@ -204,7 +204,7 @@ def test_designer_assets_use_backend_polygons_and_responsive_regions():
     assert "<title>Mosaica</title>" in html
     assert "New mosaic" not in html
     assert "Physical tile system" not in html
-    assert "Choose tile shape" in html
+    assert "Choose tile family" in html
     assert "Choose canvas size" in html
     assert "Choose tile size" in html
     assert "canvas-presets" in html

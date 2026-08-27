@@ -332,6 +332,12 @@ def _load_state(payload: dict, members: dict[str, bytes]) -> DesignerProjectFile
                 int(setup["tiles_across"]), int(setup["tiles_down"]),
                 family_id=selection.family_id,
             )
+        elif setup["canvas_mode"] == "custom_physical":
+            project = DesignerProjectShell.create_physical(
+                selection.preset_id, selection.orientation_id,
+                float(setup["canvas_width_in"]), float(setup["canvas_height_in"]),
+                family_id=selection.family_id,
+            )
         else:
             project = DesignerProjectShell.create(
                 str(setup["canvas_id"]), selection.preset_id,

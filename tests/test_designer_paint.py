@@ -486,7 +486,7 @@ def test_custom_mid_side_piece_accepts_direct_canonical_assignment():
     assert app.paint_overrides[piece["id"]] == "project-color-4"
 
 
-def test_parent_preview_is_below_physical_tiles_and_paint_gated():
+def test_parent_hit_aid_stays_below_tiles_and_hover_outline_stays_above_boundary():
     app = MosaicDesignerApp()
     _, script = _request(app, "GET", "/designer.js")
     _, stylesheet = _request(app, "GET", "/designer.css")
@@ -494,6 +494,8 @@ def test_parent_preview_is_below_physical_tiles_and_paint_gated():
         "svg.appendChild(baseLayer)"
     ) < script.index("svg.appendChild(protectedLayer)")
     assert script.index("svg.appendChild(boundary)") < script.index(
+        "svg.appendChild(tileHoverLayer)"
+    ) < script.index(
         "svg.appendChild(tileHitLayer)"
     ) < script.index("renderArtwork(svg, project.artwork)")
     assert "overflow: visible" in stylesheet
@@ -558,7 +560,7 @@ def test_every_visible_piece_gets_an_exact_top_level_paint_hit_polygon():
     assert ".tile-hit-layer { pointer-events: all; }" in stylesheet
 
 
-def test_each_clipped_piece_gets_a_full_parent_hex_pointer_surface():
+def test_each_clipped_piece_gets_a_full_parent_pointer_surface_for_every_family():
     app = MosaicDesignerApp()
     _, script = _request(app, "GET", "/designer.js")
     _, stylesheet = _request(app, "GET", "/designer.css")
@@ -567,7 +569,7 @@ def test_each_clipped_piece_gets_a_full_parent_hex_pointer_surface():
     ]
     assert 'hit.classList.add("partial-parent-hit", "editable")' in render
     assert 'hit.setAttribute("points", ghost.getAttribute("points"))' in render
-    assert "partialAidLayer.appendChild(ghost)" in render
+    assert "tileHoverLayer.appendChild(ghost)" in render
     assert "partialAidLayer.appendChild(hit)" in render
     assert ".partial-aid-layer { pointer-events: all; }" in stylesheet
     assert ".partial-parent-hit { fill: transparent; stroke: none; pointer-events: all; }" in stylesheet
@@ -705,7 +707,7 @@ def test_tile_hover_toggles_real_polygon_without_rerendering():
     assert "renderWorkspace" not in hover
 
 
-def test_every_tile_hover_outline_uses_original_full_hex_geometry():
+def test_hover_outline_uses_full_parent_geometry_for_hex_and_square():
     app = MosaicDesignerApp()
     _, script = _request(app, "GET", "/designer.js")
     render = script[
@@ -714,7 +716,7 @@ def test_every_tile_hover_outline_uses_original_full_hex_geometry():
     ghost = render[render.index('const ghost = document.createElementNS'):]
     assert 'ghost.classList.add("partial-parent-ghost")' in ghost
     assert "tile.full_vertices_in || tile.vertices_in" in ghost
-    assert "partialAidLayer.appendChild(ghost)" in ghost
-    assert ghost.index("partialAidLayer.appendChild(ghost)") < ghost.index(
-        'if (tile.piece_type !== "full" && tile.full_vertices_in)'
+    assert "tileHoverLayer.appendChild(ghost)" in ghost
+    assert ghost.index("tileHoverLayer.appendChild(ghost)") < ghost.index(
+        'if (\n        tile.piece_type !== "full"'
     )

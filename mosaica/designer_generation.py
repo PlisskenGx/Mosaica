@@ -16,6 +16,7 @@ from .border import BorderLayerState
 from .designer_colors import DesignColor, DesignerColorResolution
 from .engine import _point_in_polygon
 from .geometry import GridGeometry
+from .tiles import get_tile_family_for_geometry_shape
 
 
 DESIGNER_COVERAGE_THRESHOLD = 0.45
@@ -361,13 +362,16 @@ def generate_designer_artwork(
             "colors or fewer and try again."
         )
     available = set(border.available_artwork_placement_ids)
+    family = get_tile_family_for_geometry_shape(geometry.shape)
     pixels = image.load()
     transform = artwork.transform
     sampled_assignments = []
 
     for index, placement in enumerate(geometry.placements):
         tile_id = f"placement-{index:06d}"
-        if tile_id not in available or placement.piece_type != "full":
+        if tile_id not in available or (
+            placement.piece_type != "full" and not family.artwork_includes_clipped()
+        ):
             continue
         polygon = placement.vertices_in
         min_x, max_x = min(x for x, _ in polygon), max(x for x, _ in polygon)

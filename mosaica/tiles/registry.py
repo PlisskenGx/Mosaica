@@ -3,11 +3,17 @@
 from types import MappingProxyType
 
 from .hexagon import HEXAGON_TILE_FAMILY
+from .square import SQUARE_TILE_FAMILY
 from .types import TileSystemSelection
 
 DEFAULT_TILE_FAMILY_ID = "hexagon"
-_PRODUCTION_TILE_FAMILIES = MappingProxyType({HEXAGON_TILE_FAMILY.id: HEXAGON_TILE_FAMILY})
-_GEOMETRY_SHAPE_FAMILIES = MappingProxyType({"hex": HEXAGON_TILE_FAMILY})
+_PRODUCTION_TILE_FAMILIES = MappingProxyType({
+    HEXAGON_TILE_FAMILY.id: HEXAGON_TILE_FAMILY,
+    SQUARE_TILE_FAMILY.id: SQUARE_TILE_FAMILY,
+})
+_GEOMETRY_SHAPE_FAMILIES = MappingProxyType({
+    "hex": HEXAGON_TILE_FAMILY, "square": SQUARE_TILE_FAMILY,
+})
 
 
 def production_tile_families(): return tuple(_PRODUCTION_TILE_FAMILIES.values())
