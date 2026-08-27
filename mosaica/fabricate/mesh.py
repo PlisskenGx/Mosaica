@@ -1124,9 +1124,10 @@ def clip_mesh_to_axis_plane(
     return tuple(clipped_triangles)
 
 
-def fabrication_perimeter_bounds(model: ResolvedFabricationModel) -> tuple[float, float, float, float]:
-    """Return the straight manufacturing perimeter without changing artwork."""
-
+def _hexagon_fabrication_perimeter_bounds(
+    model: ResolvedFabricationModel,
+) -> tuple[float, float, float, float]:
+    """Existing validated Hex manufacturing-perimeter implementation."""
     correction = model.grout_gap_mm / 2.0
     if model.tile_orientation == "point_top":
         return (
@@ -1139,6 +1140,11 @@ def fabrication_perimeter_bounds(model: ResolvedFabricationModel) -> tuple[float
             model.artwork_width_mm, round(model.artwork_height_mm - correction, 9),
         )
     raise ValueError(f"Unsupported fabrication orientation: {model.tile_orientation}")
+
+
+def fabrication_perimeter_bounds(model: ResolvedFabricationModel) -> tuple[float, float, float, float]:
+    """Delegate the manufacturing perimeter to the resolved family strategy."""
+    return model.tile_strategy.manufacturing_perimeter_bounds(model)
 
 
 def clip_mesh_to_fabrication_perimeter(

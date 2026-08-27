@@ -11,6 +11,7 @@ from .model import (
     ResolvedFabricationModel,
     ResolvedTile,
 )
+from .strategy import HEXAGON_TILE_PROFILE_ID, get_tile_fabrication_strategy
 
 if TYPE_CHECKING:
     from ..designer import DesignerProjectShell
@@ -19,16 +20,8 @@ if TYPE_CHECKING:
 
 SCHEMA_NAME = "mosaica-resolved-fabrication"
 SCHEMA_VERSION = 1
-TILE_PROFILE = "V4 Rounded"
+TILE_PROFILE = HEXAGON_TILE_PROFILE_ID
 AUTHORITATIVE_GROUT_GAP_MM = 1.8
-
-
-def _hex_orientation(value: str | None) -> str:
-    if value in {"pointy", "point_top", None}:
-        return "point_top"
-    if value in {"flat", "flat_top"}:
-        return "flat_top"
-    raise ValueError(f"Unsupported fabrication tile orientation: {value}")
 
 
 def _assert_grout(grout_mm: float) -> None:
@@ -50,6 +43,11 @@ def resolve_mosaic_project(
 
     grout_mm = round(project.config.grout_width_in * INCH_TO_MM, 9)
     _assert_grout(grout_mm)
+    strategy = get_tile_fabrication_strategy("hexagon")
+    tile_system = strategy.resolve_legacy_hex(
+        project.config.tile_width_in * INCH_TO_MM,
+        project.config.hex_orientation,
+    )
     used_palette_indices = sorted({
         project.effective_index(value.row, value.column)
         for value in project.geometry.placements
@@ -96,10 +94,7 @@ def resolve_mosaic_project(
         SCHEMA_NAME, SCHEMA_VERSION, profile,
         project.physical_width_in * INCH_TO_MM,
         project.physical_height_in * INCH_TO_MM,
-        None,
-        project.config.tile_width_in * INCH_TO_MM,
-        _hex_orientation(project.config.hex_orientation),
-        grout_mm, TILE_PROFILE, tiles, tuple(channels), "none",
+        tile_system, strategy, grout_mm, tiles, tuple(channels), "none",
     )
 
 
@@ -112,6 +107,8 @@ def resolve_designer_project(
 ) -> ResolvedFabricationModel:
     """Freeze a Designer shell without retaining any browser/UI dependency."""
 
+    strategy = get_tile_fabrication_strategy(project.tile_system.family_id)
+    tile_system = strategy.resolve_tile_system(project.tile_system)
     _assert_grout(project.grout_mm)
     state = project.to_dict(generated_artwork, paint_overrides)
     tile_state = state["geometry"]["tiles"]
@@ -166,8 +163,7 @@ def resolve_designer_project(
         SCHEMA_NAME, SCHEMA_VERSION, profile,
         project.geometry.width_in * INCH_TO_MM,
         project.geometry.height_in * INCH_TO_MM,
-        project.tile.id, project.tile.flat_to_flat_mm,
-        project.tile_orientation, project.grout_mm, TILE_PROFILE,
+        tile_system, strategy, project.grout_mm,
         tuple(tiles), tuple(channels), project.border_preset_id,
     )
 

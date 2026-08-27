@@ -29,6 +29,20 @@ The snapshot schema and fabrication profile are explicitly versioned. Given
 the same resolved project and profile, tile order, mesh construction, body
 names, and coordinates are deterministic.
 
+The resolved snapshot now owns one family-aware physical tile descriptor. For
+the only supported production family, `hexagon`, it records the Hexagon display
+name, S/M/L preset ID, family-owned Point Top or Flat Top orientation, an
+explicit `flat_to_flat` primary dimension with the unchanged 20/24/28 mm value,
+and the validated `V4 Rounded` profile identity. Historical
+`tile_flat_to_flat_mm`, `tile_orientation`, and `tile_profile` views remain
+derived compatibility properties so manifests and Print Guides are unchanged.
+
+`HexagonFabricationStrategy` validates the Designer tile-system selection and
+delegates manufacturing-perimeter calculation to the existing Hex function.
+The current crown, grout, expanded-parent-cell, panelization, and mesh functions
+remain authoritative and unmoved. Square fabrication is unsupported pending a
+separate physical-validation milestone.
+
 ## Coordinates and physical truth
 
 Units are millimetres. The origin is the top-left of the finished artwork at

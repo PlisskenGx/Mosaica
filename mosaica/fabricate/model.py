@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from typing import Any
+from typing import Any, Protocol
 
 
 Point2MM = tuple[float, float]
@@ -91,17 +91,52 @@ class ResolvedTile:
 
 
 @dataclass(frozen=True)
+class PhysicalTileDimension:
+    kind: str
+    value_mm: float
+
+    def __post_init__(self) -> None:
+        if self.kind != "flat_to_flat":
+            raise ValueError(f"Unsupported production tile dimension kind: {self.kind}")
+        if self.value_mm <= 0:
+            raise ValueError("Physical tile dimension must be positive.")
+
+
+@dataclass(frozen=True)
+class ResolvedTileSystem:
+    family_id: str
+    family_display_name: str
+    preset_id: str | None
+    orientation_id: str
+    primary_dimension: PhysicalTileDimension
+    profile_id: str
+
+    def __post_init__(self) -> None:
+        if not self.family_id or not self.family_display_name:
+            raise ValueError("Resolved tile family identity is required.")
+        if not self.orientation_id or not self.profile_id:
+            raise ValueError("Resolved tile orientation and profile are required.")
+
+
+class TileFabricationStrategy(Protocol):
+    strategy_id: str
+    family_id: str
+
+    def manufacturing_perimeter_bounds(
+        self, model: ResolvedFabricationModel,
+    ) -> tuple[float, float, float, float]: ...
+
+
+@dataclass(frozen=True)
 class ResolvedFabricationModel:
     schema_name: str
     schema_version: int
     profile: FabricationProfile
     artwork_width_mm: float
     artwork_height_mm: float
-    tile_preset_id: str | None
-    tile_flat_to_flat_mm: float
-    tile_orientation: str
+    tile_system: ResolvedTileSystem
+    tile_strategy: TileFabricationStrategy
     grout_gap_mm: float
-    tile_profile: str
     tiles: tuple[ResolvedTile, ...]
     channels: tuple[LogicalMaterialChannel, ...]
     border_preset_id: str
@@ -113,6 +148,30 @@ class ResolvedFabricationModel:
     )
     units: str = "mm"
     print_orientation: str = "backside-on-build-plate; artwork-face-up"
+
+    def __post_init__(self) -> None:
+        if self.tile_strategy.family_id != self.tile_system.family_id:
+            raise ValueError(
+                "Fabrication strategy does not match the resolved tile family."
+            )
+
+    @property
+    def tile_preset_id(self) -> str | None:
+        return self.tile_system.preset_id
+
+    @property
+    def tile_flat_to_flat_mm(self) -> float:
+        if self.tile_system.primary_dimension.kind != "flat_to_flat":
+            raise ValueError("This fabrication model is not flat-to-flat based.")
+        return self.tile_system.primary_dimension.value_mm
+
+    @property
+    def tile_orientation(self) -> str:
+        return self.tile_system.orientation_id
+
+    @property
+    def tile_profile(self) -> str:
+        return self.tile_system.profile_id
 
     @property
     def artwork_bounds_mm(self) -> tuple[float, float, float, float]:

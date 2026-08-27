@@ -24,8 +24,11 @@ from .mesh import (
 from .model import (
     FabricationProfile,
     LogicalMaterialChannel,
+    PhysicalTileDimension,
     ResolvedFabricationModel,
     ResolvedTile,
+    ResolvedTileSystem,
+    TileFabricationStrategy,
 )
 from .resolve import (
     AUTHORITATIVE_GROUT_GAP_MM,
@@ -34,11 +37,18 @@ from .resolve import (
     resolve_fabrication_model,
     resolve_mosaic_project,
 )
+from .strategy import (
+    HEXAGON_FABRICATION_STRATEGY, HEXAGON_TILE_PROFILE_ID,
+    HexagonFabricationStrategy, get_tile_fabrication_strategy,
+)
 
 __all__ = [
     "AUTHORITATIVE_GROUT_GAP_MM", "FabricationProfile",
-    "LogicalMaterialChannel", "MeshBody", "ResolvedFabricationModel",
-    "ResolvedTile", "SinglePanelGeometry", "TILE_PROFILE",
+    "LogicalMaterialChannel", "MeshBody", "PhysicalTileDimension",
+    "ResolvedFabricationModel", "ResolvedTile", "ResolvedTileSystem",
+    "SinglePanelGeometry", "TILE_PROFILE", "TileFabricationStrategy",
+    "HEXAGON_FABRICATION_STRATEGY", "HEXAGON_TILE_PROFILE_ID",
+    "HexagonFabricationStrategy", "get_tile_fabrication_strategy",
     "build_single_panel_geometry", "concave_grout_mesh",
     "concave_grout_spatial_validation", "debossed_cell_union_base_mesh",
     "debossed_x_monotone_base_mesh",
