@@ -4,9 +4,8 @@ from dataclasses import asdict, dataclass
 from math import atan2, pi
 
 from .geometry import GridGeometry
-from .model import MosaicConfig
-from .processing import tile_neighbors
 from .designer_colors import DEFAULT_DESIGNER_COLORS
+from .tiles import TileTopology, get_tile_family_for_geometry_shape
 
 
 Coordinate = tuple[int, int]
@@ -113,28 +112,26 @@ def _visible_coordinates(geometry: GridGeometry) -> set[Coordinate]:
 def _physical_neighbors(
     geometry: GridGeometry,
     coordinate: Coordinate,
+    topology: TileTopology,
 ) -> tuple[Coordinate, ...]:
-    config = MosaicConfig(
-        tile_shape=geometry.shape,
-        hex_orientation=(
-            "pointy" if geometry.orientation in {None, "point_top"}
-            else "flat"
-        ),
-    )
-    return tuple(tile_neighbors(
+    return topology.neighbors(
         coordinate[0], coordinate[1],
-        geometry.rows, geometry.columns, config,
-    ))
+        geometry.rows, geometry.columns,
+        geometry.orientation or "point_top",
+    )
 
 
 def physical_perimeter_rings(
     geometry: GridGeometry,
     depth: int,
+    topology: TileTopology | None = None,
 ) -> tuple[tuple[Coordinate, ...], ...]:
     """Peel coherent physical adjacency rings from visible placements."""
 
     if depth < 0:
         raise ValueError("Border depth cannot be negative.")
+    if topology is None:
+        topology = get_tile_family_for_geometry_shape(geometry.shape).topology
     clipped = {
         (value.row, value.column)
         for value in geometry.placements
@@ -151,10 +148,13 @@ def physical_perimeter_rings(
             coordinate
             for coordinate in remaining
             if (
-                len(_physical_neighbors(geometry, coordinate)) < 6
+                len(_physical_neighbors(geometry, coordinate, topology))
+                < topology.expected_neighbor_degree
                 or any(
                     neighbor not in remaining
-                    for neighbor in _physical_neighbors(geometry, coordinate)
+                    for neighbor in _physical_neighbors(
+                        geometry, coordinate, topology,
+                    )
                 )
             )
         }
@@ -190,13 +190,19 @@ def build_border_layer(
     preset_id: str = "none",
 ) -> BorderLayerState:
     preset = border_preset(preset_id)
+    family = get_tile_family_for_geometry_shape(geometry.shape)
+    if preset.id not in family.supported_border_presets():
+        raise ValueError(
+            f"Border preset {preset.id!r} is unsupported for {family.display_name}."
+        )
+    topology = family.topology
     visible = _visible_coordinates(geometry)
     clipped = {
         (value.row, value.column)
         for value in geometry.placements
         if value.piece_type not in {"full", "outside"}
     }
-    rings = physical_perimeter_rings(geometry, preset.depth)
+    rings = physical_perimeter_rings(geometry, preset.depth, topology)
     clipped_order = perimeter_order(geometry, clipped)
 
     if preset.id == "none":

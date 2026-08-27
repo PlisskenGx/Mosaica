@@ -16,12 +16,31 @@ HEXAGON_PRESETS = (
     TileSizePreset("m", 24.0, "Balanced", "Balanced detail · Balanced pieces", True, "M"),
     TileSizePreset("l", 28.0, "Bold", "Stronger mosaic · Fewer pieces", display_name="L"),
 )
+HEXAGON_BORDER_PRESET_IDS = ("none", "solid", "double", "alternating")
+
+
+@dataclass(frozen=True)
+class HexagonTopology:
+    expected_neighbor_degree: int = 6
+
+    def neighbors(self, row, column, rows, columns, orientation_id):
+        if orientation_id not in {value.id for value in HEXAGON_ORIENTATIONS}:
+            raise ValueError(f"Unsupported Hexagon orientation: {orientation_id}")
+        config = MosaicConfig(
+            tile_shape="hex",
+            hex_orientation="pointy" if orientation_id == "point_top" else "flat",
+        )
+        return tuple(tile_neighbors(row, column, rows, columns, config))
+
+
+HEXAGON_TOPOLOGY = HexagonTopology()
 
 
 @dataclass(frozen=True)
 class HexagonTileFamily:
     id: str = "hexagon"
     display_name: str = "Hexagon"
+    topology: HexagonTopology = HEXAGON_TOPOLOGY
 
     def orientations(self): return HEXAGON_ORIENTATIONS
     def presets(self): return HEXAGON_PRESETS
@@ -63,12 +82,13 @@ class HexagonTileFamily:
         )
 
     def neighbors(self, row, column, rows, columns, orientation_id):
-        orientation = self.normalize_orientation(orientation_id)
-        config = MosaicConfig(
-            tile_shape="hex",
-            hex_orientation="pointy" if orientation == "point_top" else "flat",
-        )
-        return tile_neighbors(row, column, rows, columns, config)
+        return list(self.topology.neighbors(
+            row, column, rows, columns,
+            self.normalize_orientation(orientation_id),
+        ))
+
+    def supported_border_presets(self):
+        return HEXAGON_BORDER_PRESET_IDS
 
 
 HEXAGON_TILE_FAMILY = HexagonTileFamily()
