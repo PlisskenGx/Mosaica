@@ -21,10 +21,7 @@ from wsgiref.simple_server import (
 
 from . import __version__
 
-from .geometry import (
-    GridGeometry, custom_counted_hex_geometry, vertex_constrained_panel_dimensions,
-    vertex_constrained_panel_hex_geometry,
-)
+from .geometry import GridGeometry, vertex_constrained_panel_dimensions
 from .model import MosaicConfig
 from .border import (
     BORDER_PRESETS,
@@ -59,6 +56,7 @@ from .project_file import (
     normalize_project_path,
     save_project_file,
 )
+from .tiles import HEXAGON_PRESETS, TileSizePreset, get_tile_family
 
 
 _KEYBOARD_DIRECTIONS = {
@@ -191,32 +189,7 @@ class CanvasPreset:
         }
 
 
-@dataclass(frozen=True)
-class TilePreset:
-    id: str
-    flat_to_flat_mm: float
-    title: str
-    summary: str
-    recommended: bool = False
-
-    @property
-    def flat_to_flat_in(self) -> float:
-        return self.flat_to_flat_mm / MM_PER_INCH
-
-    @property
-    def side_length_mm(self) -> float:
-        return self.flat_to_flat_mm / sqrt(3.0)
-
-    def to_dict(self) -> dict:
-        return {
-            "id": self.id,
-            "flat_to_flat_mm": self.flat_to_flat_mm,
-            "flat_to_flat_in": self.flat_to_flat_in,
-            "side_length_mm": self.side_length_mm,
-            "title": self.title,
-            "summary": self.summary,
-            "recommended": self.recommended,
-        }
+TilePreset = TileSizePreset
 
 
 CANVAS_PRESETS = (
@@ -225,11 +198,7 @@ CANVAS_PRESETS = (
     CanvasPreset("landscape", "Landscape", 36.0, 24.0),
 )
 
-TILE_PRESETS = (
-    TilePreset("s", 20.0, "Detailed", "More detail · More pieces"),
-    TilePreset("m", 24.0, "Balanced", "Balanced detail · Balanced pieces", True),
-    TilePreset("l", 28.0, "Bold", "Stronger mosaic · Fewer pieces"),
-)
+TILE_PRESETS = HEXAGON_PRESETS
 
 _CANVASES = {value.id: value for value in CANVAS_PRESETS}
 # Read-only construction compatibility for integrations that still reopen the
@@ -273,21 +242,12 @@ class DesignerProjectShell:
             canvas = {**_CANVASES, **_LEGACY_CANVASES}[canvas_id]
         except KeyError as exc:
             raise ValueError(f"Unknown canvas preset: {canvas_id}") from exc
-        try:
-            tile = _TILES[tile_id]
-        except KeyError as exc:
-            raise ValueError(f"Unknown tile preset: {tile_id}") from exc
-        config = MosaicConfig(
-            tile_shape="hex",
-            tile_width_in=tile.flat_to_flat_in,
-            tile_height_in=tile.flat_to_flat_in,
-            grout_width_in=DESIGNER_GROUT_MM / MM_PER_INCH,
-            hex_orientation=orientation,
-            target_width_in=canvas.width_in,
-            target_height_in=canvas.height_in,
-        )
-        geometry = vertex_constrained_panel_hex_geometry(
-            config, canvas.width_in, canvas.height_in,
+        family = get_tile_family()
+        selection = family.selection(orientation, tile_id)
+        tile = family.preset(selection.preset_id)
+        geometry = family.build_preset_panel(
+            selection.preset_id, selection.orientation_id, DESIGNER_GROUT_MM,
+            canvas.width_in, canvas.height_in,
         )
         return cls(canvas, tile, DESIGNER_GROUT_MM, geometry)
 
@@ -300,14 +260,13 @@ class DesignerProjectShell:
                 raise ValueError(f"{name} must be a whole number.")
             if not 1 <= value <= CUSTOM_GRID_MAX:
                 raise ValueError(f"{name} must be between 1 and {CUSTOM_GRID_MAX}.")
-        tile = _TILES[tile_id]
-        config = MosaicConfig(
-            tile_shape="hex", tile_width_in=tile.flat_to_flat_in,
-            tile_height_in=tile.flat_to_flat_in,
-            grout_width_in=DESIGNER_GROUT_MM / MM_PER_INCH,
-            hex_orientation=orientation,
+        family = get_tile_family()
+        selection = family.selection(orientation, tile_id)
+        tile = family.preset(selection.preset_id)
+        geometry = family.build_custom_grid(
+            selection.preset_id, selection.orientation_id, DESIGNER_GROUT_MM,
+            tiles_across, tiles_down,
         )
-        geometry = custom_counted_hex_geometry(config, tiles_across, tiles_down)
         canvas = CanvasPreset(
             "custom", "Custom", geometry.width_in, geometry.height_in,
         )
