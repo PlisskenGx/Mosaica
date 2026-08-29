@@ -356,7 +356,7 @@ def _draw_panel_map(page: _Page, content: PrintGuideContent, y: float) -> float:
         label_size = 10 if min(panel_width, panel_height) >= 42 else 8
         label_x = x + max(4.0, panel_width / 2 - len(panel.panel_id) * label_size * 0.25)
         page.text(label_x, panel_y + panel_height / 2 + 3, panel.panel_id, size=label_size, bold=True, color="#592A1D")
-    page.text(origin_x, origin_y - 7, "ARTWORK UP", size=7.5, bold=True, color="#71717A")
+    page.text(origin_x, origin_y - 7, "FRONT VIEW · ARTWORK FACE", size=7.5, bold=True, color="#71717A")
     return y + height + 12
 
 
@@ -388,7 +388,7 @@ def _page_one(content: PrintGuideContent) -> _Page:
     y += 58
     y = _section_title(
         page, y, "Panel map",
-        "Use this artwork-space map for plate order and final assembly. Panel IDs match the debossed marks on each backside.",
+        "Front view: A1 is top-left and columns increase left to right. Rear inspection reverses physical left/right; panel IDs remain attached to their front-view positions.",
     )
     y = _draw_panel_map(page, content, y)
     page.text(42, y, "EXPORTED PART / PROJECT COLOR", size=8.5, bold=True, color="#71717A")
@@ -405,7 +405,7 @@ def _page_one(content: PrintGuideContent) -> _Page:
     page.text(56, y + 18, "BACKSIDE PANEL ID", size=8.5, bold=True, color="#52525B")
     page.wrapped_text(
         56, y + 34,
-        "Each panel carries a debossed dot-matrix ID. Keep the mark facing the build plate and use it to match the panel map during assembly.",
+        "Each panel carries a rear-readable debossed ID. Match the ID to this front-view map before assembly; do not arrange panels left-to-right while viewing their backs.",
         width=495, size=8.5, color="#52525B",
     )
     return page

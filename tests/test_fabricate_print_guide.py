@@ -57,6 +57,9 @@ def test_print_guide_is_created_from_authoritative_project_and_panel_data(tmp_pa
         panel.panel_id for panel in fabrication.plan.panels
     )
     assert all(panel.panel_id.encode() in pdf for panel in content.panels)
+    assert b"FRONT VIEW" in pdf
+    assert b"A1 is top-left" in pdf
+    assert b"Rear inspection reverses physical left/right" in pdf
     assert model.to_dict() == before
 
 

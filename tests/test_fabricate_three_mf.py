@@ -304,6 +304,9 @@ def test_panel_identity_marking_zero_cuts_and_no_connectors_survive_package(tmp_
     assert panel["filename"] == "Mosaica_A1.3mf"
     assert panel["backside_marking"] == {
         "content": "A1", "cell_size_mm": 1.0, "deboss_depth_mm": 0.35,
+        "mirrored": True,
+        "reading_direction": "left_to_right_when_viewed_from_backside",
+        "coordinate_scope": "glyph_only",
     }
     assert panel["validation"]["geometry_round_trip"] is True
     assert manifest["panelization"]["tile_cuts_created"] == 0

@@ -45,11 +45,14 @@ separate physical-validation milestone.
 
 ## Coordinates and physical truth
 
-Units are millimetres. The origin is the top-left of the finished artwork at
-the flat backside/build-plate plane. X increases right across the artwork, Y
-increases down the artwork, and Z increases away from the build plate. Every
-body shares this origin. Z=0 is a continuous, flat backside. Printing is
-locked backside-down and artwork-face-up.
+Units are millimetres. Designer X is the authoritative finished-front axis and
+increases left to right. Physical validation established that backside-down
+export geometry is seen from the finished front with the opposite X sense.
+Fabrication therefore assigns Designer source X to export X as
+`export_x = artwork_width - designer_x`. Export meshes still use one shared,
+positive coordinate frame; no negative-scale affine transform is emitted.
+Y increases down the artwork in both frames, Z increases away from the build
+plate, and Z=0 is a continuous flat backside.
 
 Designer full-parent polygons used for hover/hit testing are retained only as
 debug metadata. Fabrication always uses the clipped visible polygon. Finished
@@ -259,9 +262,14 @@ names, filenames, manifest records, and physical marks share that identity.
 This model is sufficient for a future assembly map without assuming a single
 row. The current fixture uses `A1` and `A2`.
 
-The dependency-free dot-matrix panel ID was physically approved. Each Base
-contains only its normally ordered, backside-readable panel ID using 1.0 mm
-cells debossed 0.35 mm. There is no TOP arrow, mirrored text, wordmark, or
+The dependency-free dot-matrix panel ID uses 1.0 mm cells debossed 0.35 mm.
+Panel ownership follows finished-front artwork coordinates: A1 is top-left,
+and columns increase left to right. Consequently A1 occupies the highest-X
+export column before the validated physical-front conversion. The glyph alone
+is mirrored locally so it reads normally from the physical rear; that glyph
+transform never changes panel ownership, Base perimeter, Grout, Tile geometry,
+artwork assignment, STL geometry, or 3MF build transforms.
+There is no TOP arrow, wordmark, or
 decorative content. The cavities remain within the 1.5 mm Base, leave 1.15 mm
 above their deepest surface, remain clear of the perimeter and natural seam,
 and are nonstructural.

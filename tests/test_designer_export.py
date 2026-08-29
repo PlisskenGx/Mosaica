@@ -121,8 +121,17 @@ def test_current_border_and_paint_state_reaches_fabrication_resolution(tmp_path)
     app.project = app.project.with_border("solid")
     app.paint_overrides = {tile_id: target_color}
     model = app.export_service._model(app._export_snapshot())
-    resolved = next(tile for tile in model.tiles if tile.tile_id == tile_id)
+    resolved = next(
+        tile for tile in model.tiles if tile.source_color_id == target_color
+    )
+    source = next(
+        tile for tile in app.project.to_dict()["geometry"]["tiles"]
+        if tile["id"] == tile_id
+    )
     assert resolved.source_color_id == target_color
+    assert resolved.center_mm[0] == pytest.approx(
+        source["center_in"][0] * 25.4,
+    )
     assert model.border_preset_id == "solid"
 
 

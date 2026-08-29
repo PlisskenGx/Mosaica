@@ -119,6 +119,7 @@ def choose_flat_export_path(format_name: str, default_name: str) -> Path | None:
 
 
 def panelization_summary(plan: PanelizationPlan) -> dict:
+    from .fabricate.panelize import front_view_bounds
     model = plan.model
     mode = resolve_fabrication_mode(plan.fabrication_mode)
     tile_channels = tuple(
@@ -162,7 +163,8 @@ def panelization_summary(plan: PanelizationPlan) -> dict:
                 "panel_id": panel.panel_id,
                 "row": panel.row,
                 "column": panel.column,
-                "bounds_mm": list(panel.bounds_mm),
+                "bounds_mm": list(front_view_bounds(model, panel.bounds_mm)),
+                "export_geometry_bounds_mm": list(panel.bounds_mm),
                 "width_mm": panel.width_mm,
                 "height_mm": panel.height_mm,
             }

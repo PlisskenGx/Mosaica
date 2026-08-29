@@ -18,6 +18,7 @@ from .panelize import (
     PanelPlan,
     PanelizedFabrication,
     build_panelized_fabrication,
+    front_view_bounds,
     panelize_model,
 )
 from .modes import (
@@ -541,7 +542,10 @@ def export_panelized_three_mf_package(
             "plate_id": panel.panel_id,
             "filename": filename,
             "logical_grid": {"row": panel.row, "column": panel.column},
-            "logical_artwork_bounds_mm": list(panel.bounds_mm),
+            "logical_artwork_bounds_mm": list(
+                front_view_bounds(plan.model, panel.bounds_mm)
+            ),
+            "export_geometry_bounds_mm": list(panel.bounds_mm),
             "actual_dimensions_mm": {"width": panel.width_mm, "height": panel.height_mm},
             "neighbors": dict(panel.neighbors),
             "print_rotation_degrees": panel.print_rotation_degrees,
@@ -553,6 +557,9 @@ def export_panelized_three_mf_package(
                 "content": panel.panel_id,
                 "cell_size_mm": PANEL_ID_CELL_MM,
                 "deboss_depth_mm": PANEL_ID_DEBOSS_DEPTH_MM,
+                "mirrored": True,
+                "reading_direction": "left_to_right_when_viewed_from_backside",
+                "coordinate_scope": "glyph_only",
             },
             "validation": validation,
             "sha256": sha256(path.read_bytes()).hexdigest(),

@@ -91,6 +91,37 @@ class PanelizationPackage:
     geometry_signature: str
 
 
+def front_view_bounds(
+    model: ResolvedFabricationModel,
+    bounds: tuple[float, float, float, float],
+) -> tuple[float, float, float, float]:
+    """Convert export geometry bounds to finished-front artwork coordinates."""
+
+    left, top, right, bottom = bounds
+    return (
+        round(model.artwork_width_mm - right, 9), top,
+        round(model.artwork_width_mm - left, 9), bottom,
+    )
+
+
+def _export_body_x(
+    body: MeshBody, artwork_width_mm: float,
+) -> MeshBody:
+    """Convert a validated front-view body into backside-down export space."""
+
+    triangles = tuple(
+        tuple(
+            (round(artwork_width_mm - x, 9), y, z)
+            for x, y, z in (triangle[0], triangle[2], triangle[1])
+        )
+        for triangle in body.triangles
+    )
+    return MeshBody(
+        body.body_id, body.name, body.material_channel_id, triangles,
+        body.tile_ids, body.solid_triangle_counts,
+    )
+
+
 def theoretical_grid_counts(
     width_mm: float, height_mm: float,
     safe_envelope_mm: tuple[float, float] | None = None,
@@ -390,9 +421,11 @@ def _evaluate_candidate(
             ):
                 if 0 <= neighbor_row < rows and 0 <= neighbor_column < columns:
                     neighbors.append((direction, panel_identifier(neighbor_row, neighbor_column)))
-            tile_ids, bounds, area = measured[row, column]
+            tile_ids, front_bounds, area = measured[row, column]
+            export_bounds = front_view_bounds(model, front_bounds)
             panels.append(PanelPlan(
-                panel_id, row, column, tile_ids, bounds, area, tuple(neighbors),
+                panel_id, row, column, tile_ids, export_bounds, area,
+                tuple(neighbors),
             ))
     mean_area = sum(panel.area_mm2 for panel in panels) / len(panels)
     balance = max(abs(panel.area_mm2 - mean_area) / mean_area for panel in panels)
@@ -562,6 +595,9 @@ def build_panelized_fabrication(plan: PanelizationPlan) -> PanelizedFabrication:
     for panel in plan.panels:
         panel_tiles = tuple(tile_by_id[tile_id] for tile_id in panel.tile_ids)
         marking = _marking_for_panel(panel, cells, tile_by_id)
+        # Rear IDs are composed and reflected locally first. The independent
+        # whole-panel front-to-export conversion below reflects them once more,
+        # leaving the physical rear readable without touching artwork meaning.
         markings.append((panel.panel_id, marking))
         base = MeshBody(
             f"panel-{panel.panel_id.lower()}-base", f"Panel {panel.panel_id} Base", "base",
@@ -584,7 +620,12 @@ def build_panelized_fabrication(plan: PanelizationPlan) -> PanelizedFabrication:
             )
             if channel_tiles:
                 bodies.append(_panel_tile_body(model, panel.panel_id, channel, channel_tiles))
-        geometries.append(SinglePanelGeometry(panel.panel_id, model, tuple(bodies), panel.bounds_mm))
+        export_bodies = tuple(
+            _export_body_x(body, model.artwork_width_mm) for body in bodies
+        )
+        geometries.append(SinglePanelGeometry(
+            panel.panel_id, model, export_bodies, panel.bounds_mm,
+        ))
     assert set(ownership) == set(tile_by_id)
     return PanelizedFabrication(plan, tuple(geometries), tuple(markings))
 
@@ -649,13 +690,16 @@ def generate_panelization_package(
             "panel_id": panel.panel_id, "row": panel.row, "column": panel.column,
             "bounds_mm": list(panel.bounds_mm), "width_mm": panel.width_mm,
             "height_mm": panel.height_mm, "area_mm2": panel.area_mm2,
+            "front_view_bounds_mm": list(front_view_bounds(model, panel.bounds_mm)),
             "tile_count": len(panel.tile_ids), "tile_ids": list(panel.tile_ids),
             "neighbors": dict(panel.neighbors),
             "print_rotation_degrees": panel.print_rotation_degrees,
             "fits_safe_envelope": panel.fits_safe_envelope,
             "backside_marking": {
                 "content": panel.panel_id, "cell_size_mm": PANEL_ID_CELL_MM,
-                "depth_mm": PANEL_ID_DEBOSS_DEPTH_MM, "mirrored": False,
+                "depth_mm": PANEL_ID_DEBOSS_DEPTH_MM, "mirrored": True,
+                "reading_direction": "left_to_right_when_viewed_from_backside",
+                "coordinate_scope": "glyph_only",
                 "cell_count": len(marking_by_panel[panel.panel_id]),
             },
         })
@@ -689,7 +733,7 @@ def generate_panelization_package(
         "body_channel_ownership": body_records,
         "tile_assignment": {"all_tiles_assigned_exactly_once": len(ownership) == len(model.tiles), "tile_cuts_created": 0},
         "panel_connection": {"type": "natural_grout_line_seam", "dedicated_connector_geometry": False, "permanent_structure": "ACP/backer_and_adhesive"},
-        "coordinate_system": {"units": "mm", "internal": "global_artwork_coordinates", "stl": "shared_global_coordinates_per_panel_multipart_object"},
+        "coordinate_system": {"units": "mm", "internal": "export_geometry_coordinates", "finished_front": "x_reflected_from_export_geometry", "stl": "shared_global_coordinates_per_panel_multipart_object"},
         "geometry_signature_sha256": signature,
     }
     manifest_path = output / "manifest.json"

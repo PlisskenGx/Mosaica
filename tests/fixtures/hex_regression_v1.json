@@ -6,9 +6,10 @@
   "backside_id": {
     "cell_count": 28,
     "cell_mm": 1.0,
+    "coordinate_scope": "glyph-only-rear-readable-mirror",
     "deboss_depth_mm": 0.35,
-    "front_view_panel_order": "excluded-known-bug",
-    "glyph_sha256": "46b2ce4d17607d3e84949c24cc7777afa3676d164dd75493bc883d1d3490d30e"
+    "front_view_panel_order": "A1-top-left; columns-left-to-right",
+    "glyph_sha256": "f0c4a2c386341b9c1cfe8e404d22735c74a7a63d74dc484b477eac7d6e5d4ff3"
   },
   "borders": {
     "flat_top_alternating": {
@@ -615,7 +616,6 @@
     "float_digits": 9,
     "id": "mosaica-hex-regression-v1",
     "known_exclusions": [
-      "front-view-panel-order",
       "archimedean-chords"
     ]
   },
@@ -914,7 +914,7 @@
         4,
         3
       ],
-      "plan_sha256": "923ac3407acb0b378d4a02687706c32eb16ec0fd59b2b0bfaaab9aa22b283057",
+      "plan_sha256": "28b286fa625f874e8689d22ba491d26000aa4df5adcb912f687a4dd318f235f0",
       "safe": [
         210.0,
         210.0
@@ -946,7 +946,7 @@
         3,
         3
       ],
-      "plan_sha256": "29e043a32d9632dc5132302f1aa7c55176e78caf515db69f269ffad955663bdf",
+      "plan_sha256": "6d27b8acbc762d780f7e204c6561ec72bd8cc4964f8ed98d079a4b21b3dd0f86",
       "safe": [
         228.0,
         228.0
@@ -1288,10 +1288,10 @@
         101.729117431,
         1.5
       ],
-      "bytes_sha256": "c7ac46ed550d134c5b7a1481f25ce895f1fa81e35984794fb9e1bda8c3000d77",
-      "mesh_sha256": "a04d7582957f50e43fb1beb12fb3d551c02cdebafcf5a782bbfef257ea087c78",
+      "bytes_sha256": "65360e472a2f831a88af81171227a4130eb8a10163fceded9aef5c6f95695b46",
+      "mesh_sha256": "a50b88f428b878f89cb60a4b95eea7ea1fd2c65039fcda0cc0e6f5f848cfc925",
       "name": "Panel A1 Base",
-      "parsed_sha256": "a04d7582957f50e43fb1beb12fb3d551c02cdebafcf5a782bbfef257ea087c78",
+      "parsed_sha256": "a50b88f428b878f89cb60a4b95eea7ea1fd2c65039fcda0cc0e6f5f848cfc925",
       "parsed_validation": {
         "degenerate_faces": 0,
         "face_count": 2468,
@@ -1323,10 +1323,10 @@
         101.729117431,
         2.5
       ],
-      "bytes_sha256": "ed31f7643b7b7baf90fcc915185a3ba903bda35cb0bf9e623c06c2ebe8a31eba",
-      "mesh_sha256": "bd4b7b264b34c6c320a548311c47c95a606689deafc1959f32879d7247d8ab6f",
+      "bytes_sha256": "cf1fd051cf68128a4d7c18afab5a09178f5ccab3f27eefaeee180d96e3d79489",
+      "mesh_sha256": "e5db8b21da4be7c55fcde42da233bac8be00046caa35d1d7e132078cfdb3fa36",
       "name": "Panel A1 Grout/Thinset",
-      "parsed_sha256": "bd4b7b264b34c6c320a548311c47c95a606689deafc1959f32879d7247d8ab6f",
+      "parsed_sha256": "e5db8b21da4be7c55fcde42da233bac8be00046caa35d1d7e132078cfdb3fa36",
       "parsed_validation": {
         "degenerate_faces": 0,
         "face_count": 3720,
@@ -1358,10 +1358,10 @@
         101.729117431,
         4.6
       ],
-      "bytes_sha256": "cbb418e66b06a4170cfeed53e90bf39d3532ccb1fe7a5ca67c51d7ccc319b1fc",
-      "mesh_sha256": "ceadef499388c27d19cb867b045a9729cea27afd4d3791eca292d0f1eb0a5989",
+      "bytes_sha256": "e5a58bbcb22097e608568efb3f65c0cfbd1d07238528f37246c531da15c70180",
+      "mesh_sha256": "ff8bda304f0acd83824c0ee153c731223f3c348b4cf5fe299ecc4107afd1d3c7",
       "name": "Panel A1 Tile Color 1",
-      "parsed_sha256": "ceadef499388c27d19cb867b045a9729cea27afd4d3791eca292d0f1eb0a5989",
+      "parsed_sha256": "ff8bda304f0acd83824c0ee153c731223f3c348b4cf5fe299ecc4107afd1d3c7",
       "parsed_validation": {
         "degenerate_faces": 0,
         "face_count": 3004,
@@ -1386,17 +1386,17 @@
     },
     "tile-color-2": {
       "bounds": [
-        11.8,
+        0.9,
         1.558845727,
         2.5,
-        129.9,
+        119.0,
         100.170271704,
         4.6
       ],
-      "bytes_sha256": "55a875b773bb1634850387a64216c926561875b4afe96b6f7e308e53690d8e2d",
-      "mesh_sha256": "4d6b16d6f3e56d300ac665663b1d27d5dc4213608a78403f76137f4dd1ac002a",
+      "bytes_sha256": "0e81140fed233c324847ce5661ece60f16017d970890ce93e50871de5c807716",
+      "mesh_sha256": "866e41ab1b1edee38bf06d1ec15fe654ed05d874943c601e021e9b2e3231bbf5",
       "name": "Panel A1 Tile Color 2",
-      "parsed_sha256": "4d6b16d6f3e56d300ac665663b1d27d5dc4213608a78403f76137f4dd1ac002a",
+      "parsed_sha256": "866e41ab1b1edee38bf06d1ec15fe654ed05d874943c601e021e9b2e3231bbf5",
       "parsed_validation": {
         "degenerate_faces": 0,
         "face_count": 828,
@@ -1428,10 +1428,10 @@
         62.411564099,
         4.6
       ],
-      "bytes_sha256": "81ea42727805b4a6d995307e2ff994c0b22b8e495d0ba394cbe1867a816b84f2",
-      "mesh_sha256": "0faa7fe849ea1abeb1b44e7c5866d6b26188801e3760f5f6b4a0d64614ef0ca2",
+      "bytes_sha256": "c4da962063faf7b8625ebf633fad2a40c4c936d534591f7d728de904e0cb78a0",
+      "mesh_sha256": "65cbce1787cd29bd76afa62ce757d512473fdf393f5341b1a84f4dc63d75b401",
       "name": "Panel A1 Tile Color 3",
-      "parsed_sha256": "0faa7fe849ea1abeb1b44e7c5866d6b26188801e3760f5f6b4a0d64614ef0ca2",
+      "parsed_sha256": "65cbce1787cd29bd76afa62ce757d512473fdf393f5341b1a84f4dc63d75b401",
       "parsed_validation": {
         "degenerate_faces": 0,
         "face_count": 92,
@@ -1470,14 +1470,14 @@
     "width": "154.8mm"
   },
   "three_mf": {
-    "inspected_sha256": "bb956c05a8826d028684c19148684b4abffc1864bcd269a5159bd5389bbf41d3",
+    "inspected_sha256": "9fa2550dd3d56f9a33ff2e43a136eeb164687a4c7e38fce3c227d9d422e57043",
     "manifest_schema": {
       "name": "mosaica-fabricate-3mf",
       "version": 3
     },
-    "manifest_sha256": "30913c702db53a1f9c49251aa6035bc5b5f172719c7fdf638c2cde2e3f7b1098",
+    "manifest_sha256": "5d67529f0650f1866334d07cd946f891e3f2ff4b57db6081af24145b62b67735",
     "member_hashes": {
-      "3D/3dmodel.model": "86785a247992a091b5dc189b98f0c52511b5042a9a30b565590289bfd1d9b851",
+      "3D/3dmodel.model": "6d3c203483cf93fcf048018452ad06505d6567d0ea33d6b0190b95c4ecb26289",
       "Metadata/model_settings.config": "9fdd5c383901c616d1643adc869824b489b43b57d97cb462da062b90a6de1e4c",
       "[Content_Types].xml": "9cfbbf192341074cc42e7628b73c6a8134ec6c543fed1b38170aef0b1f38da4e",
       "_rels/.rels": "32cbd72fc8ad612cea9714f94f4305f982ce9625f905db5224f72bf4017b9bc2"
@@ -1489,7 +1489,7 @@
       "Metadata/model_settings.config"
     ],
     "no_ns0": false,
-    "package_sha256": "3b387cac2198c6a55bd4eea6f7bf94fcf31379000bdc887f9b74ad0c86331549",
+    "package_sha256": "50321850b5074ded09976d7d6b38c041d804de257eecf91bf458e4a5f18ae7a3",
     "part_mapping": [
       {
         "logical_channel_id": "base",

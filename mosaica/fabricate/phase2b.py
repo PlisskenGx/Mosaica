@@ -125,10 +125,12 @@ def _marking_dimensions(panel_id: str) -> tuple[float, float]:
 
 def _marking_cells_at(
     identity: PanelIdentity, origin_x: float, origin_y: float,
+    *, mirror_x: bool = True,
 ) -> tuple[tuple[Point2MM, ...], ...]:
     pixel, pitch, glyph_gap = PANEL_ID_CELL_MM, 1.45, 1.45 * 2
     glyphs = tuple(_GLYPHS[value] for value in identity.panel_id)
     widths = [len(glyph[0]) * pitch - (pitch - pixel) for glyph in glyphs]
+    mark_width = sum(widths) + glyph_gap * (len(glyphs) - 1)
     cells = []
     cursor_x = origin_x
     for glyph, width in zip(glyphs, widths):
@@ -136,7 +138,18 @@ def _marking_cells_at(
             for column, value in enumerate(values):
                 if value == "1":
                     x, y = cursor_x + column * pitch, origin_y + row * pitch
-                    cells.append(((x, y), (x + pixel, y), (x + pixel, y + pixel), (x, y + pixel)))
+                    # Direct prototype output mirrors the rear-facing glyph
+                    # locally. Panelized output authors it normally here; its
+                    # later, proven front-to-export conversion produces the
+                    # same rear-readable final glyph without changing artwork.
+                    rear_x = (
+                        origin_x + mark_width - (x - origin_x) - pixel
+                        if mirror_x else x
+                    )
+                    cells.append((
+                        (rear_x, y), (rear_x + pixel, y),
+                        (rear_x + pixel, y + pixel), (rear_x, y + pixel),
+                    ))
         cursor_x += width + glyph_gap
     return tuple(cells)
 
@@ -285,7 +298,7 @@ def generate_production_review_package(output_directory: str | Path) -> Phase2AR
             **identities[panel.panel_id].__dict__,
             "bounds_mm": list(panel.fabrication_bounds_mm),
             "tile_count": sum(1 for owner in ownership.values() if owner == panel.panel_id),
-            "backside_marking": {"content": panel.panel_id, "cell_size_mm": PANEL_ID_CELL_MM, "depth_mm": PANEL_ID_DEBOSS_DEPTH_MM, "mirrored": False, "reading_direction": "left_to_right_when_viewed_from_backside", "cell_count": len(marking_cells[panel.panel_id])},
+            "backside_marking": {"content": panel.panel_id, "cell_size_mm": PANEL_ID_CELL_MM, "depth_mm": PANEL_ID_DEBOSS_DEPTH_MM, "mirrored": True, "reading_direction": "left_to_right_when_viewed_from_backside", "coordinate_scope": "glyph_only", "cell_count": len(marking_cells[panel.panel_id])},
             "neighbors": [{"panel_id": "A2" if panel.panel_id == "A1" else "A1", "relationship": "natural_grout_line_seam"}],
         } for panel in prototype.panels],
         "seam": {"orientation": prototype.seam.orientation, "location_mm": [list(point) for point in prototype.seam.points_mm], "tile_cuts_created": 0},

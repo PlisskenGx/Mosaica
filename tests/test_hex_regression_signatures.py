@@ -4,9 +4,9 @@ Goldens never update during tests. An intentional physical change requires a
 developer to run ``build_records`` explicitly outside pytest, inspect the
 semantic summaries and hashes, then deliberately replace the v1 fixture.
 
-The known wrong-side front-view panel-numbering behavior is excluded. The A1
-dot-matrix glyph geometry is locked without asserting its physical side.
-Archimedean Chords is also excluded; it is a rejected surface recommendation.
+Front-view panel numbering and the locally mirrored, rear-readable A1 glyph
+are locked explicitly. Archimedean Chords remains excluded; it is a rejected
+surface recommendation.
 """
 from dataclasses import asdict, replace
 from hashlib import sha256
@@ -98,7 +98,7 @@ def clipped_record(shell):
 def build_records(root: Path):
     records = {"fixture": {
         "id": "mosaica-hex-regression-v1", "float_digits": 9,
-        "known_exclusions": ["front-view-panel-order", "archimedean-chords"],
+        "known_exclusions": ["archimedean-chords"],
     }}
     cases = {
         "preset_point": DesignerProjectShell.create("square", "m", "point_top"),
@@ -290,7 +290,8 @@ def build_records(root: Path):
     records["backside_id"] = {
         "cell_mm": PANEL_ID_CELL_MM, "deboss_depth_mm": PANEL_ID_DEBOSS_DEPTH_MM,
         "cell_count": len(cells), "glyph_sha256": signature(cells),
-        "front_view_panel_order": "excluded-known-bug",
+        "front_view_panel_order": "A1-top-left; columns-left-to-right",
+        "coordinate_scope": "glyph-only-rear-readable-mirror",
     }
     small_plan = panelize_model(production, mode="studio")
     fabrication = build_panelized_fabrication(small_plan)

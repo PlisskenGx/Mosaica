@@ -103,7 +103,7 @@ def test_backside_marking_cells_stay_inside_their_panel_and_away_from_seam():
             )
 
 
-def test_backside_id_geometry_is_left_to_right_and_contains_no_arrow():
+def test_backside_id_geometry_is_locally_mirrored_for_rear_reading_and_contains_no_arrow():
     prototype = build_production_prototype()
     cells = dict(prototype.marking_cells)
     assert {panel_id: len(values) for panel_id, values in cells.items()} == {
@@ -116,9 +116,10 @@ def test_backside_id_geometry_is_left_to_right_and_contains_no_arrow():
         round(min(x for x, _y in cell) - origin_x, 2)
         for cell in a1 if min(y for _x, y in cell) == origin_y
     }
-    # The leading A is authored normally at the left of the digit. Mirroring
-    # would move these three top-row cells to the opposite side of the mark.
-    assert {1.45, 2.9, 4.35}.issubset(first_row_offsets)
+    # In front artwork coordinates the leading A occupies the right side of
+    # the mark. Turning the panel over makes the physical rear read "A1".
+    assert {8.25, 9.7, 11.15}.issubset(first_row_offsets)
+    assert {2.9, 4.35}.isdisjoint(first_row_offsets)
 
 
 def test_production_all_exported_bodies_are_manifold_and_deterministic():
@@ -139,7 +140,11 @@ def test_production_package_names_identity_and_stl_round_trip_agree(tmp_path):
     assert [(panel["row"], panel["column"]) for panel in manifest["panels"]] == [(0, 0), (0, 1)]
     assert all(panel["top_orientation"] == "artwork_top" for panel in manifest["panels"])
     assert all(panel["backside_marking"]["content"] == panel["panel_id"] for panel in manifest["panels"])
-    assert all(panel["backside_marking"]["mirrored"] is False for panel in manifest["panels"])
+    assert all(panel["backside_marking"]["mirrored"] is True for panel in manifest["panels"])
+    assert all(
+        panel["backside_marking"]["coordinate_scope"] == "glyph_only"
+        for panel in manifest["panels"]
+    )
     assert all(
         panel["backside_marking"]["reading_direction"]
         == "left_to_right_when_viewed_from_backside"
