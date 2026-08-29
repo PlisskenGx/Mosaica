@@ -329,7 +329,7 @@ def test_paint_ui_uses_one_stroke_batch_with_rollback_and_no_geometry_math():
     assert 'id="paint-clear"' in html
     assert '>Clear</button>' in html
     assert '>Clear Edits</button>' not in html
-    assert script.count("window.confirm(") == 2
+    assert script.count("window.confirm(") == 3
     assert "Opening another project will discard them" in script
     assert "Returning to setup will discard them" in script
     assert 'new Set()' in script

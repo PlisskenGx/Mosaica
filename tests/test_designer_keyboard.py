@@ -127,12 +127,12 @@ def test_keyboard_workflow_is_centralized_and_uses_existing_paint_state():
     assert "event.metaKey || event.ctrlKey || event.altKey" in source
     assert "input, textarea, select" in source
     assert "dialog[open], [role=dialog]:not([hidden])" in source
-    assert '/^[1-4]$/.test(event.key)' in source
+    assert '/^[1-2]$/.test(event.key)' in source
     assert "paint.curated_palette[Number(event.key) - 1]" in source
-    assert 'event.key === "Enter" && !event.repeat' in source
+    assert 'event.key === " " && !event.repeat' in source
     assert "event.repeat" not in source.split(
         'if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"]', 1
-    )[1].split('if (/^[1-4]$/', 1)[0]
+    )[1].split('if (/^[1-2]$/', 1)[0]
     assert "if (!color) return" in source
     assert 'event.shiftKey ? "erase" : paintTool' in source
     assert '"/api/designer/paint/erase"' in source
@@ -141,7 +141,7 @@ def test_keyboard_workflow_is_centralized_and_uses_existing_paint_state():
     assert "activeGeometrySignature" in source
     assert 'state.stage !== "workspace"' in source
     assert "Artwork rotation remains deferred" in source
-    assert "Shift-click resets" in markup
+    assert "paint-shortcut-hint" not in markup
 
 
 def test_keyboard_originated_edit_uses_authoritative_save_open_state(tmp_path):

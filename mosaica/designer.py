@@ -994,8 +994,10 @@ class MosaicDesignerApp:
                 previous_project = project.to_dict(
                     self.generated_artwork, self.paint_overrides,
                 )
-                changed = bool(self.paint_overrides)
+                reset_project = project.with_grout_color("project-color-1")
+                changed = bool(self.paint_overrides) or reset_project != project
                 self.paint_overrides = {}
+                self.project = reset_project
                 self.document_dirty = self.document_dirty or changed
                 return self._json(
                     start_response, "200 OK",

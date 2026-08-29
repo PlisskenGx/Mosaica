@@ -351,7 +351,7 @@ def test_colors_tool_is_removed_and_tiles_owns_the_canonical_palette():
     assert script.count("function openDesignPalette") == 1
     assert script.count("state.project.paint.curated_palette") >= 1
     assert "window.alert" not in script
-    assert script.count("window.confirm(") == 2
+    assert script.count("window.confirm(") == 3
 
 
 def test_api_keeps_counts_while_normal_ui_hides_them():

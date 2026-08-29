@@ -739,7 +739,8 @@
       paintTool = null;
     }
     byId("mosaic-canvas").classList.toggle("paint-active", paintTool !== null);
-    byId("paint-clear").disabled = !state.project.paint?.override_count;
+    byId("paint-clear").disabled = !state.project.paint?.override_count
+      && state.project.grout?.color_id === "project-color-1";
     const palette = byId("paint-colors");
     palette.classList.toggle(
       "flat-top", state.project.tile_orientation === "flat_top",
@@ -754,10 +755,14 @@
       swatch.className = "paint-swatch tile-color-swatch";
       swatch.style.backgroundColor = color.display_color;
       swatch.dataset.colorId = color.color_id;
-      const shortcut = index < 4 ? ` · ${index + 1}` : "";
+      const shortcut = index < 2 ? ` · ${index + 1}` : "";
       swatch.setAttribute("aria-label", `${color.name}${shortcut}`);
       swatch.title = `${color.name}${shortcut}`;
-      if (index < 4) swatch.setAttribute("aria-keyshortcuts", String(index + 1));
+      if (index < 2) {
+        swatch.classList.add("shortcut-swatch");
+        swatch.textContent = String(index + 1);
+        swatch.setAttribute("aria-keyshortcuts", String(index + 1));
+      }
       swatch.setAttribute("aria-pressed", String(color.color_id === activeTileColorId));
       swatch.addEventListener("click", () => {
         activeTileColorId = color.color_id;
@@ -1746,6 +1751,19 @@
     );
   }
 
+  async function newMosaic() {
+    closeDocumentMenu(false);
+    const discard = !state?.document?.dirty || window.confirm(
+      "You have unsaved changes. Starting a new mosaic will discard them.",
+    );
+    if (!discard) return;
+    await performDesignerMutation(
+      "/api/designer/new",
+      { discard_unsaved: Boolean(state?.document?.dirty) },
+      { name: "New Mosaic" },
+    );
+  }
+
   byId("back").addEventListener("click", async () => {
     if (state.stage === "workspace") {
       const discard = !state.document.dirty || window.confirm(
@@ -1759,11 +1777,7 @@
       );
     }
   });
-  byId("welcome-new").addEventListener("click", async () => {
-    await performDesignerMutation(
-      "/api/designer/new", {}, { name: "New Mosaic" },
-    );
-  });
+  byId("welcome-new").addEventListener("click", newMosaic);
   byId("welcome-open").addEventListener("click", openMosaic);
   byId("document-menu-button").addEventListener("click", () => {
     if (byId("document-menu").hidden) openDocumentMenu();
@@ -1795,6 +1809,7 @@
     );
   });
   byId("open-action").addEventListener("click", openMosaic);
+  byId("new-action").addEventListener("click", newMosaic);
   byId("export-close").addEventListener("click", closeExportDialog);
   byId("export-done").addEventListener("click", closeExportDialog);
   byId("export-file-done").addEventListener("click", closeExportDialog);
@@ -1908,7 +1923,8 @@
   byId("artwork-generate").addEventListener("click", generateArtwork);
   byId("artwork-edit").addEventListener("click", () => artworkAction("/api/designer/artwork/edit", {}, "Edit artwork"));
   byId("paint-clear").addEventListener("click", async () => {
-    if (!state.project.paint?.override_count) return;
+    if (!state.project.paint?.override_count
+        && state.project.grout?.color_id === "project-color-1") return;
     await performDesignerMutation(
       "/api/designer/paint/clear", {}, { name: "Clear Edits" },
     );
@@ -1981,7 +1997,7 @@
       event.preventDefault();
       return;
     }
-    if (/^[1-4]$/.test(event.key)) {
+    if (/^[1-2]$/.test(event.key)) {
       const color = state.project.paint.curated_palette[Number(event.key) - 1];
       if (!color) return;
       activeTileColorId = color.color_id;
@@ -1990,7 +2006,7 @@
       event.preventDefault();
       return;
     }
-    if (event.key === "Enter" && !event.repeat) {
+    if (event.key === " " && !event.repeat) {
       const consumed = event.shiftKey
         ? Boolean(hoveredTileId)
         : Boolean(hoveredTileId && activeTileColorId);

@@ -107,6 +107,21 @@ def test_grout_recolor_is_compact_and_does_not_change_tiles_or_counts():
     assert after["geometry"]["visible_piece_count"] == before["geometry"]["visible_piece_count"]
 
 
+def test_clear_resets_all_tiles_toolbox_work_including_grout():
+    app = _app()
+    tile_id = app.payload()["project"]["geometry"]["tiles"][0]["id"]
+    _request(app, "POST", "/api/designer/paint", {
+        "mode": "paint", "color_id": "project-color-2",
+        "placement_ids": [tile_id],
+    })
+    _request(app, "POST", "/api/designer/grout", {"color_id": "project-color-2"})
+    status, cleared = _request(app, "POST", "/api/designer/paint/clear", {})
+    assert status == "200 OK"
+    assert cleared["paint"]["override_count"] == 0
+    assert cleared["grout"]["color_id"] == "project-color-1"
+    assert app.project.grout_color_id == "project-color-1"
+
+
 def test_grout_is_independent_from_border_and_artwork(monkeypatch):
     monkeypatch.setattr(generation_module, "SVG_RASTER_WIDTH", 256)
     app = _app()
