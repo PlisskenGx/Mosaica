@@ -30,12 +30,12 @@
       "sha256": "1bc93c802a4549800698b075e251ba5aafa875114734a9e35b0767f9d1052483"
     },
     "flat_top_none": {
-      "available": 27,
-      "owned": 18,
+      "available": 45,
+      "owned": 0,
       "rings": [
-        18
+        0
       ],
-      "sha256": "8bee4a21e4bda185f0d728ac4b44fa5a297efefb45b4f9f4e95a81cce893ab6e"
+      "sha256": "75566d3fbbb1955d04452da1f9fd2163a5be1df3638b17c54a47d3ecde85be5f"
     },
     "flat_top_solid": {
       "available": 11,
@@ -63,12 +63,12 @@
       "sha256": "e1899aa8be4caae38c12cce8a85c99e0c95fac1ca4d87b30a3646032af72feae"
     },
     "point_top_none": {
-      "available": 27,
-      "owned": 18,
+      "available": 45,
+      "owned": 0,
       "rings": [
-        18
+        0
       ],
-      "sha256": "55ce632a5681c81858f65c4810ec4f649e8549b1764b90a51dbfd7d97714cae8"
+      "sha256": "aa23f4be1b8c7b652f26ee48a5a5c9b13788df22c170d324cfb3254edfa0a50a"
     },
     "point_top_solid": {
       "available": 11,
@@ -1269,12 +1269,12 @@
   "resolved_models": {
     "flat_top": {
       "channels": 4,
-      "sha256": "a8ffd1a05f82f9ca0c16ebb788fd0a37344f8d22e2f724469b267fb6b5dc3d8c",
+      "sha256": "5a994e42e7ea18a7644bae0c103b24b354bacdc72bdfc93877fa4e3a6cad7d9c",
       "tiles": 45
     },
     "point_top": {
       "channels": 3,
-      "sha256": "0af056641e27d584d594c486f9c86f785aed20b0f74c5fa2eabe8f50ad9df931",
+      "sha256": "4c89f3ea74ee4c7ae0fde1f69a9dfc88ebaea24172b28c033fcecd9e0b54fba3",
       "tiles": 45
     }
   },

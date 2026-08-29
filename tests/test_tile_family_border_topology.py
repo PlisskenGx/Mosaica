@@ -61,7 +61,9 @@ def test_family_boundary_and_clipped_classification_match_frozen_hex_path(orient
         f"placement-{index:06d}" for index, value in enumerate(geometry.placements)
         if value.piece_type not in {"full", "outside"}
     }
-    assert set(build_border_layer(geometry, "none").protected_placement_ids) == clipped_ids
+    none = build_border_layer(geometry, "none")
+    assert not none.protected_placement_ids
+    assert clipped_ids.issubset(none.available_artwork_placement_ids)
 
 
 def test_generic_boundary_detection_uses_supplied_topology_degree():

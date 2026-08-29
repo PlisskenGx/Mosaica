@@ -361,7 +361,10 @@ def test_api_keeps_counts_while_normal_ui_hides_them():
     assert payload["project"]["color_counts"]
     assert payload["project"]["geometry"]["full_tile_count"] > 0
     assert payload["project"]["geometry"]["clipped_piece_count"] > 0
-    assert payload["project"]["border"]["counts"]["protected"] > 0
+    assert payload["project"]["border"]["counts"]["protected"] == 0
+    assert payload["project"]["border"]["counts"]["available_artwork"] == (
+        payload["project"]["geometry"]["visible_piece_count"]
+    )
     _, script = _request(app, "GET", "/designer.js")
     assert "color_counts" in script
     assert "renderColorCounts" not in script

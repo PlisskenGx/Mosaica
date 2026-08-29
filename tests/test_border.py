@@ -119,7 +119,7 @@ def test_border_channel_recolor_is_compact_independent_and_preserves_topology():
     assert all(item["color_id"] == "project-color-5" for item in changed["tile_updates"])
 
 
-def test_none_protects_only_clipped_perimeter_with_edge_role():
+def test_none_leaves_every_visible_hex_available_to_artwork():
     shell = _shell()
     state = build_border_layer(shell.geometry, "none")
     clipped = {
@@ -132,10 +132,9 @@ def test_none_protects_only_clipped_perimeter_with_edge_role():
         for index, value in enumerate(shell.geometry.placements)
         if value.piece_type == "full"
     }
-    assert set(state.protected_placement_ids) == clipped
-    assert set(state.available_artwork_placement_ids) == full
-    assert {value.color_role for value in state.assignments} == {"edge"}
-    assert not clipped & set(state.available_artwork_placement_ids)
+    assert not state.protected_placement_ids
+    assert set(state.available_artwork_placement_ids) == full | clipped
+    assert not state.assignments
 
 
 def test_solid_owns_one_full_physical_ring_plus_clipped_perimeter():

@@ -39,3 +39,9 @@ This is a recurring regression risk when changing canvas fitting, overflow,
 layer ordering, or hit testing. Keep the physical canvas boundary authoritative
 for exported geometry while preserving the larger interaction bounds for the
 Designer helper.
+
+Clipped tiles remain ordinary artwork targets when Border is None. Artwork
+generation samples their visible physical fragment, while manual pointer hit
+testing additionally accepts the off-canvas portion of the full parent tile.
+The visible clipped fragment uses a normal solid tile stroke; the complete
+parent outline is dashed only while its hover helper is active.

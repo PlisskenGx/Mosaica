@@ -105,7 +105,11 @@ def test_upload_is_placement_only_and_explicit_generation_keeps_source():
 def test_generation_honors_physical_transform_and_is_deterministic():
     app = _app()
     _upload(app, _svg(f'<rect width="100" height="100" fill="{BLUE}"/>'))
-    transform = {"x_in": 0, "y_in": 0, "width_in": 24, "height_in": 24}
+    transform = {
+        "x_in": 0, "y_in": 0,
+        "width_in": app.project.geometry.width_in,
+        "height_in": app.project.geometry.height_in,
+    }
     _request(app, "POST", "/api/designer/artwork/transform", transform)
     _, first = _generate(app)
     first_ids = [
@@ -690,7 +694,7 @@ def test_stale_generated_layer_survives_every_border_switch_and_regenerates():
     assert regenerated["revision"] == 2
 
 
-def test_none_has_only_clipped_edge_ownership_with_edge_near_artwork():
+def test_none_allows_artwork_on_clipped_edge_tiles():
     app = _app()
     _upload(app, _svg(f'<rect width="100" height="100" fill="{BLUE}"/>'))
     _request(app, "POST", "/api/designer/artwork/transform", {
@@ -705,17 +709,17 @@ def test_none_has_only_clipped_edge_ownership_with_edge_near_artwork():
 
     assert clipped and full
     assert all(
-        value["protected"]
-        and not value["artwork_available"]
-        and value["color_role"] == "edge"
-        and not value["generated_artwork"]
+        not value["protected"]
+        and value["artwork_available"]
+        and not value["border_owned"]
+        and value["generated_artwork"]
         for value in clipped
     )
     assert all(
         not value["border_owned"] and value["artwork_available"]
         for value in full
     )
-    assert generated_ids == {value["id"] for value in full}
+    assert generated_ids == {value["id"] for value in (*full, *clipped)}
 
 
 def test_semantic_color_identities_are_immutable_when_generating_under_solid():
@@ -744,9 +748,13 @@ def test_semantic_color_identities_are_immutable_when_generating_under_solid():
         if value["piece_type"] != "full"
     ]
     assert all(
-        value["color_role"] == "edge"
-        and value["color_id"] == "project-color-1"
-        and value["display_color"] == "#FAF9F6"
+        not value["protected"]
+        and value["artwork_available"]
+        and value["color_id"] == (
+            blue_id if value["id"] in {
+                assignment.tile_id for assignment in app.generated_artwork.assignments
+            } else "project-color-1"
+        )
         for value in clipped
     )
 
@@ -756,7 +764,7 @@ def test_semantic_color_identities_are_immutable_when_generating_under_solid():
     {"x_in": 0, "y_in": 0, "width_in": 12, "height_in": 12},
     {"x_in": -6, "y_in": -6, "width_in": 36, "height_in": 36},
 ])
-def test_none_edge_invariants_survive_repeated_border_switches(transform):
+def test_none_clipped_artwork_availability_survives_repeated_border_switches(transform):
     app = _app()
     _upload(app, _svg(f'<rect width="100" height="100" fill="{BLUE}"/>'))
     _request(app, "POST", "/api/designer/artwork/transform", transform)
@@ -770,9 +778,10 @@ def test_none_edge_invariants_survive_repeated_border_switches(transform):
         project = _assert_effective_generated_precedence(app, stored_ids)
         tiles = project["geometry"]["tiles"]
         assert all(
-            value["protected"]
-            and value["color_role"] == "edge"
-            and not value["generated_artwork"]
+            not value["protected"]
+            and not value["border_owned"]
+            and value["artwork_available"]
+            and value["generated_artwork"] == (value["id"] in stored_ids)
             for value in tiles if value["piece_type"] != "full"
         )
         assert all(

@@ -500,11 +500,48 @@ def test_parent_hit_aid_stays_below_tiles_and_hover_outline_stays_above_boundary
     ) < script.index("renderArtwork(svg, project.artwork)")
     assert "overflow: visible" in stylesheet
     assert ".partial-parent-ghost { fill: none" in stylesheet
+    cut_rules = [
+        rule for rule in stylesheet.split("}")
+        if ".designer-tile.cut" in rule
+    ]
+    assert cut_rules
+    assert all("stroke:" not in rule and "stroke-width:" not in rule for rule in cut_rules)
     assert "#mosaic-canvas.paint-active .partial-parent-ghost.visible" in stylesheet
     assert "if (paintTool === null || !tileId) return" in script
     assert "updatePartialPreview" not in script
     assert ".panel-boundary { fill: none" in stylesheet
     assert "pointer-events: none" in stylesheet[stylesheet.index(".panel-boundary"):stylesheet.index(".tile-hit-layer")]
+
+
+def test_hex_clipped_tiles_are_artwork_targets_without_a_border(monkeypatch):
+    monkeypatch.setattr(generation_module, "SVG_RASTER_WIDTH", 256)
+    app = _app()
+    _, initial = _request(app, "GET", "/api/designer")
+    clipped = [
+        tile for tile in initial["project"]["geometry"]["tiles"]
+        if tile["piece_type"] != "full"
+    ]
+    assert clipped
+    assert all(tile["artwork_available"] for tile in clipped)
+    assert all(not tile["protected"] for tile in clipped)
+
+    svg = (
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">'
+        '<rect width="10" height="10" fill="#000"/></svg>'
+    )
+    _request(app, "POST", "/api/designer/artwork/upload", {
+        "filename": "edge-cover.svg", "svg_content": svg,
+    })
+    geometry = app.project.geometry
+    _request(app, "POST", "/api/designer/artwork/transform", {
+        "x_in": 0,
+        "y_in": 0,
+        "width_in": geometry.width_in,
+        "height_in": geometry.height_in,
+    })
+    _request(app, "POST", "/api/designer/artwork/generate", {})
+    assigned = {value.tile_id for value in app.generated_artwork.assignments}
+    assert {tile["id"] for tile in clipped}.issubset(assigned)
 
 
 @pytest.mark.parametrize("orientation", ("point_top", "flat_top"))
