@@ -701,12 +701,12 @@ def test_viewport_receives_off_canvas_hover_and_paint_and_resolves_full_geometry
     assert 'byId("canvas-viewport").setPointerCapture(event.pointerId)' in script
     assert "function fullTileInteractionBounds(geometry)" in script
     assert "interaction.maxX - interaction.minX" in script
-    assert ".canvas-viewport { display: grid; min-width: 0; min-height: 0" in _request(
+    assert ".canvas-viewport { min-width: 0; min-height: 0" in _request(
         app, "GET", "/designer.css",
     )[1]
-    assert "overflow: hidden; place-items: center" in _request(
-        app, "GET", "/designer.css",
-    )[1]
+    stylesheet = _request(app, "GET", "/designer.css")[1]
+    assert "overflow: auto; overscroll-behavior: contain" in stylesheet
+    assert ".canvas-stage { display: grid; place-items: center" in stylesheet
 
 
 def test_workspace_never_becomes_a_scrolling_document_at_narrow_widths():
@@ -793,3 +793,20 @@ def test_fit_sizes_the_svg_to_full_parent_bounds_without_overflow_translation():
     assert "(interaction.maxY - interaction.minY) * fitted.scale" in fit
     assert 'svg.style.transform = "none"' in fit
     assert "offsetX" not in fit and "offsetY" not in fit
+
+
+def test_zoom_scales_only_the_fitted_svg_and_keeps_clipped_geometry_authoritative():
+    app = MosaicDesignerApp()
+    _, html = _request(app, "GET", "/")
+    _, script = _request(app, "GET", "/designer.js")
+    _, stylesheet = _request(app, "GET", "/designer.css")
+    assert 'id="zoom-out"' in html
+    assert 'id="zoom-reset"' in html
+    assert 'id="zoom-in"' in html
+    assert "fitted.scale * canvasZoom" in script
+    assert "function setCanvasZoom(nextZoom)" in script
+    assert "Math.min(3, Math.max(.5, nextZoom))" in script
+    assert 'svg.setAttribute("viewBox"' in script
+    assert ".canvas-viewport { min-width: 0; min-height: 0" in stylesheet
+    assert "overflow: auto" in stylesheet
+    assert ".canvas-stage { display: grid; place-items: center" in stylesheet

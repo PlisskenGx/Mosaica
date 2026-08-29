@@ -249,9 +249,16 @@ h1, h2, h3, p { margin-top: 0; }
   min-height: 0;
   overflow: hidden;
 }
-.canvas-region { display: grid; grid-template-rows: minmax(0, 1fr); min-width: 0; min-height: 0; padding: clamp(1rem, 2vw, 1.75rem); overflow: hidden; }
-.canvas-viewport { display: grid; min-width: 0; min-height: 0; padding: clamp(1rem, 3vw, 2.5rem); overflow: hidden; place-items: center; border: 1px solid #dddde1; border-radius: 1.1rem; background: #e8e8eb; }
+.canvas-region { position: relative; display: grid; grid-template-rows: minmax(0, 1fr); min-width: 0; min-height: 0; padding: clamp(1rem, 2vw, 1.75rem); overflow: hidden; }
+.canvas-viewport { min-width: 0; min-height: 0; padding: clamp(1rem, 3vw, 2.5rem); overflow: auto; overscroll-behavior: contain; border: 1px solid #dddde1; border-radius: 1.1rem; background: #e8e8eb; }
+.canvas-stage { display: grid; place-items: center; width: max-content; min-width: 100%; height: max-content; min-height: 100%; }
 #mosaic-canvas { display: block; flex: none; max-width: none; max-height: none; overflow: visible; background: transparent; filter: drop-shadow(0 12px 24px rgba(0, 0, 0, .12)); }
+.zoom-controls { position: absolute; right: clamp(1.7rem, 3vw, 2.5rem); bottom: clamp(1.7rem, 3vw, 2.5rem); z-index: 4; display: grid; grid-template-columns: 2.35rem 3.7rem 2.35rem; overflow: hidden; border: 1px solid #c9c9ce; border-radius: .65rem; background: rgba(255,255,255,.96); box-shadow: 0 4px 14px rgba(0,0,0,.12); }
+.zoom-controls button { min-height: 2.25rem; padding: .25rem; border: 0; border-right: 1px solid #dddde1; color: #45454a; background: transparent; cursor: pointer; font-size: .9rem; }
+.zoom-controls button:last-child { border-right: 0; }
+.zoom-controls button:hover { background: #eeeef1; }
+.zoom-controls button:focus-visible { position: relative; z-index: 1; outline: 3px solid #8bb7ff; outline-offset: -3px; }
+.zoom-controls button:disabled { color: #aaaab0; cursor: default; }
 .grout-field { pointer-events: none; }
 .designer-tile { fill: #faf9f6; stroke: #a8a8ad; stroke-width: .65px; vector-effect: non-scaling-stroke; }
 .designer-tile.border-owned { stroke: #53545a; stroke-width: .8px; }

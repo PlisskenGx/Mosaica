@@ -123,7 +123,14 @@
     <section id="workspace" class="workspace" hidden>
       <div class="canvas-region">
         <div id="canvas-viewport" class="canvas-viewport">
-          <svg id="mosaic-canvas" xmlns="http://www.w3.org/2000/svg" aria-label="Blank physical mosaic lattice"></svg>
+          <div class="canvas-stage">
+            <svg id="mosaic-canvas" xmlns="http://www.w3.org/2000/svg" aria-label="Blank physical mosaic lattice"></svg>
+          </div>
+        </div>
+        <div class="zoom-controls" role="group" aria-label="Canvas zoom">
+          <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
+          <button id="zoom-reset" type="button" aria-label="Reset zoom">100%</button>
+          <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
         </div>
       </div>
 

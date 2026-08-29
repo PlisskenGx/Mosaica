@@ -2,6 +2,7 @@
   const SVG_NS = "http://www.w3.org/2000/svg";
   let state = null;
   let viewportObserver = null;
+  let canvasZoom = 1;
   let artworkInteraction = null;
   let artworkUploadPath = "/api/designer/artwork/upload";
   let generationInFlight = false;
@@ -323,6 +324,7 @@
     ].join(":");
     if (activeGeometrySignature !== null && activeGeometrySignature !== geometrySignature) {
       setTileHighlight(null, false);
+      canvasZoom = 1;
     }
     activeGeometrySignature = geometrySignature;
     const svg = byId("mosaic-canvas");
@@ -1427,10 +1429,27 @@
       verticalPadding,
     );
     if (fitted.scale > 0 && Number.isFinite(fitted.scale)) {
-      svg.style.width = `${(interaction.maxX - interaction.minX) * fitted.scale}px`;
-      svg.style.height = `${(interaction.maxY - interaction.minY) * fitted.scale}px`;
+      svg.style.width = `${(interaction.maxX - interaction.minX) * fitted.scale * canvasZoom}px`;
+      svg.style.height = `${(interaction.maxY - interaction.minY) * fitted.scale * canvasZoom}px`;
       svg.style.transform = "none";
+      byId("zoom-reset").textContent = `${Math.round(canvasZoom * 100)}%`;
+      byId("zoom-out").disabled = canvasZoom <= .5;
+      byId("zoom-in").disabled = canvasZoom >= 3;
     }
+  }
+
+  function setCanvasZoom(nextZoom) {
+    const viewport = byId("canvas-viewport");
+    const centerX = (viewport.scrollLeft + viewport.clientWidth / 2)
+      / Math.max(viewport.scrollWidth, 1);
+    const centerY = (viewport.scrollTop + viewport.clientHeight / 2)
+      / Math.max(viewport.scrollHeight, 1);
+    canvasZoom = Math.min(3, Math.max(.5, nextZoom));
+    fitToWorkspace();
+    requestAnimationFrame(() => {
+      viewport.scrollLeft = centerX * viewport.scrollWidth - viewport.clientWidth / 2;
+      viewport.scrollTop = centerY * viewport.scrollHeight - viewport.clientHeight / 2;
+    });
   }
 
   function render() {
@@ -2016,6 +2035,9 @@
     }
   });
   const canvasViewport = byId("canvas-viewport");
+  byId("zoom-out").addEventListener("click", () => setCanvasZoom(canvasZoom - .25));
+  byId("zoom-reset").addEventListener("click", () => setCanvasZoom(1));
+  byId("zoom-in").addEventListener("click", () => setCanvasZoom(canvasZoom + .25));
   byId("mosaic-canvas").addEventListener("pointerdown", beginArtworkInteraction);
   byId("mosaic-canvas").addEventListener("pointermove", moveArtworkInteraction);
   byId("mosaic-canvas").addEventListener("pointerup", finishArtworkInteraction);
