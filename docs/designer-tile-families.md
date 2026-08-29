@@ -24,3 +24,18 @@ consume the shared Designer placement model.
 Square is intentionally 2D-only. The Fabricate strategy registry still
 contains Hexagon alone, so Square Print Package, STL, Studio, and Museum paths
 are unavailable before any physical geometry is generated.
+
+## Clipped-tile interaction invariant
+
+Every clipped placement retains its complete parent-tile polygon as an
+interaction aid. When the pointer is outside the physical canvas but still
+inside that parent polygon, Designer must show the complete dashed parent
+outline in the surrounding workspace—not only the fragment inside the canvas.
+The root SVG view box therefore includes the full parent bounds. Do not rely on
+SVG overflow for this behavior: browsers differ in whether geometry outside a
+root view box is painted or receives pointer events.
+
+This is a recurring regression risk when changing canvas fitting, overflow,
+layer ordering, or hit testing. Keep the physical canvas boundary authoritative
+for exported geometry while preserving the larger interaction bounds for the
+Designer helper.

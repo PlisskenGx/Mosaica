@@ -12,6 +12,7 @@ from mosaica.artwork import (
     update_artwork_transform,
 )
 from mosaica.border import build_border_layer
+from mosaica.builtin_artwork import BUILTIN_ARTWORK, builtin_artwork
 from mosaica.designer import DesignerProjectShell, MosaicDesignerApp
 
 
@@ -52,6 +53,65 @@ def _upload(app, filename="logo.svg", content=LANDSCAPE_SVG):
         "filename": filename,
         "svg_content": content,
     })
+
+
+def _builtin(app, shape_id="circle"):
+    return _request(app, "POST", "/api/designer/artwork/builtin", {
+        "shape_id": shape_id,
+    })
+
+
+def test_builtin_shape_catalog_is_safe_complete_and_deterministic():
+    expected = {
+        "circle", "square", "triangle", "star",
+        "heart", "hexagon", "diamond", "arrow",
+    }
+    assert {shape.shape_id for shape in BUILTIN_ARTWORK} == expected
+    assert len({shape.filename for shape in BUILTIN_ARTWORK}) == len(expected)
+    for shape in BUILTIN_ARTWORK:
+        safe, view_box = sanitize_svg(shape.filename, shape.svg)
+        assert view_box == (0.0, 0.0, 100.0, 100.0)
+        assert safe == sanitize_svg(shape.filename, shape.svg)[0]
+        assert shape.label in {value.title() for value in expected}
+        assert builtin_artwork(shape.shape_id) is shape
+
+
+def test_builtin_shape_uses_same_artwork_creation_and_editing_path_as_upload():
+    app = _workspace("solid")
+    geometry = app.project.geometry
+    status, payload = _builtin(app, "heart")
+    assert status == "200 OK"
+    assert payload["payload_kind"] == "artwork_state"
+    assert payload["artwork"]["source_filename"] == "basic-heart.svg"
+    assert payload["artwork"]["source_view_box"] == [0.0, 0.0, 100.0, 100.0]
+    assert payload["artwork"]["source_aspect_ratio"] == 1.0
+    assert payload["artwork"]["selected"] is True
+    assert payload["generated_artwork"] is None
+    assert app.project.geometry is geometry
+
+    transform = payload["artwork"]["transform"]
+    moved = {**transform, "x_in": transform["x_in"] + 1.0}
+    status, moved_payload = _request(
+        app, "POST", "/api/designer/artwork/transform", moved,
+    )
+    assert status == "200 OK"
+    assert moved_payload["artwork"]["transform"] == moved
+
+
+def test_builtin_shape_can_replace_loaded_artwork_and_rejects_unknown_ids():
+    app = _workspace()
+    _upload(app)
+    status, replaced = _builtin(app, "arrow")
+    assert status == "200 OK"
+    assert replaced["artwork"]["source_filename"] == "basic-arrow.svg"
+    assert "<path" in replaced["artwork"]["sanitized_svg"]
+    assert app.document_dirty is True
+
+    before = app.artwork
+    status, error = _builtin(app, "not-a-shape")
+    assert status == "400 Bad Request"
+    assert "valid built-in artwork shape" in error["error"]
+    assert app.artwork is before
 
 
 def test_valid_svg_is_sanitized_as_vector_and_aspect_ratio_is_derived():
@@ -278,6 +338,12 @@ def test_frontend_uses_vector_pointer_interaction_and_four_corner_handles():
     assert 'id="artwork-replace"' not in html
     assert ">Replace<" not in html
     assert 'id="artwork-preview-image"' in html
+    assert 'class="artwork-shape-grid"' in html
+    for shape_id in (
+        "circle", "square", "triangle", "star",
+        "heart", "hexagon", "diamond", "arrow",
+    ):
+        assert f'data-shape-id="{shape_id}"' in html
     assert 'class="artwork-info-preview"' in html
     loaded = html[html.index('id="artwork-loaded"'):html.index('id="artwork-colors"')]
     assert loaded.index('id="artwork-filename"') < loaded.index('id="artwork-preview-image"')
@@ -324,6 +390,11 @@ def test_frontend_uses_vector_pointer_interaction_and_four_corner_handles():
     assert ".artwork-actions { display: grid; grid-template-columns: repeat(3" in css
     assert 'byId("artwork-filename").title = artwork.source_filename' in script
     assert 'byId("artwork-edit").disabled = artwork.edit_mode' in script
+    assert '"/api/designer/artwork/builtin"' in script
+    assert 'document.querySelectorAll(".artwork-shape")' in script
+    assert ".artwork-shape-grid" in css
+    assert "grid-template-columns: repeat(4" in css
+    assert ".artwork-shape-grid { grid-template-columns: repeat(2" in css
 
 
 def test_side_resize_math_has_independent_axes_anchors_and_minimums():

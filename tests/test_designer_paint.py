@@ -653,6 +653,8 @@ def test_viewport_receives_off_canvas_hover_and_paint_and_resolves_full_geometry
     ]
     assert "svg.getScreenCTM()" in resolver
     assert "pointer.matrixTransform(matrix.inverse())" in resolver
+    assert "outsidePhysicalCanvas" in resolver
+    assert "if (direct && !outsidePhysicalCanvas) return direct;" in resolver
     assert "tile.full_vertices_in || tile.vertices_in" in resolver
     assert "pointInPolygon(" in resolver
     assert 'const canvasViewport = byId("canvas-viewport")' in script
@@ -660,8 +662,27 @@ def test_viewport_receives_off_canvas_hover_and_paint_and_resolves_full_geometry
     assert 'canvasViewport.addEventListener("pointermove", updateTileHover)' in script
     assert 'canvasViewport.addEventListener("pointermove", movePaintStroke)' in script
     assert 'byId("canvas-viewport").setPointerCapture(event.pointerId)' in script
-    assert "function fullHexInteractionBounds(geometry)" in script
+    assert "function fullTileInteractionBounds(geometry)" in script
     assert "interaction.maxX - interaction.minX" in script
+    assert ".canvas-viewport { display: grid; min-width: 0; min-height: 0" in _request(
+        app, "GET", "/designer.css",
+    )[1]
+    assert "overflow: hidden; place-items: center" in _request(
+        app, "GET", "/designer.css",
+    )[1]
+
+
+def test_workspace_never_becomes_a_scrolling_document_at_narrow_widths():
+    app = MosaicDesignerApp()
+    _, stylesheet = _request(app, "GET", "/designer.css")
+    narrow = stylesheet[stylesheet.index("@media (max-width: 680px)"):]
+    assert "body.workspace-active { height: 100dvh; overflow: hidden; }" in narrow
+    assert ".workspace { display: grid;" in narrow
+    assert "grid-template-columns: minmax(0, 1fr) minmax(11rem, 13rem)" in narrow
+    assert ".inspector { min-height: 0;" in narrow
+    assert "overflow-x: hidden; overflow-y: auto" in narrow
+    assert "body.workspace-active { height: auto; overflow: auto; }" not in narrow
+    assert ".workspace { display: block" not in narrow
 
 
 def test_custom_corner_pieces_keep_full_hex_hit_regions_past_applicable_edges():
@@ -720,3 +741,18 @@ def test_hover_outline_uses_full_parent_geometry_for_hex_and_square():
     assert ghost.index("tileHoverLayer.appendChild(ghost)") < ghost.index(
         'if (\n        tile.piece_type !== "full"'
     )
+    assert "const interactionBounds = fullTileInteractionBounds(geometry);" in render
+    assert "interactionBounds.minX" in render
+    assert "interactionBounds.minY" in render
+    assert 'svg.setAttribute("viewBox"' in render
+
+
+def test_fit_sizes_the_svg_to_full_parent_bounds_without_overflow_translation():
+    app = MosaicDesignerApp()
+    _, script = _request(app, "GET", "/designer.js")
+    fit = script[script.index("function fitToWorkspace"):script.index("function render()")]
+    assert "fullTileInteractionBounds(geometry)" in fit
+    assert "(interaction.maxX - interaction.minX) * fitted.scale" in fit
+    assert "(interaction.maxY - interaction.minY) * fitted.scale" in fit
+    assert 'svg.style.transform = "none"' in fit
+    assert "offsetX" not in fit and "offsetY" not in fit

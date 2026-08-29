@@ -28,6 +28,7 @@ from .border import (
     build_border_layer,
     border_preset,
 )
+from .builtin_artwork import builtin_artwork
 from .designer_colors import (
     CURATED_MOSAICA_PALETTE, DEFAULT_DESIGNER_COLORS, LEGACY_PAINT_SLOTS,
     DesignerColorResolution,
@@ -1060,6 +1061,31 @@ class MosaicDesignerApp:
                 self.artwork_edit_mode = True
                 self.document_dirty = True
                 if not path.endswith("/replace") and not had_generated:
+                    return self._json(
+                        start_response, "200 OK", self._artwork_state_payload(),
+                    )
+                return self._json(
+                    start_response, "200 OK",
+                    self._design_state_payload(previous_project),
+                )
+            if method == "POST" and path == "/api/designer/artwork/builtin":
+                project = self._require_project()
+                previous_project = project.to_dict(
+                    self.generated_artwork, self.paint_overrides,
+                )
+                had_generated = self.generated_artwork is not None
+                body = self._request_json(environ)
+                shape = builtin_artwork(body.get("shape_id"))
+                border = build_border_layer(
+                    project.geometry, project.border_preset_id,
+                )
+                self.artwork = create_artwork(
+                    shape.filename, shape.svg, project.geometry, border,
+                )
+                self.generated_artwork = None
+                self.artwork_edit_mode = True
+                self.document_dirty = True
+                if not had_generated:
                     return self._json(
                         start_response, "200 OK", self._artwork_state_payload(),
                     )

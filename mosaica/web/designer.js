@@ -327,7 +327,13 @@
     activeGeometrySignature = geometrySignature;
     const svg = byId("mosaic-canvas");
     svg.replaceChildren();
-    svg.setAttribute("viewBox", `0 0 ${geometry.width_in} ${geometry.height_in}`);
+    const interactionBounds = fullTileInteractionBounds(geometry);
+    svg.setAttribute("viewBox", [
+      interactionBounds.minX,
+      interactionBounds.minY,
+      interactionBounds.maxX - interactionBounds.minX,
+      interactionBounds.maxY - interactionBounds.minY,
+    ].join(" "));
     svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
     const groutField = document.createElementNS(SVG_NS, "rect");
     groutField.classList.add("grout-field");
@@ -1051,6 +1057,13 @@
     }
   }
 
+  async function chooseBuiltinArtwork(shapeId) {
+    await performDesignerMutation(
+      "/api/designer/artwork/builtin", { shape_id: shapeId },
+      { name: "Add basic shape" },
+    );
+  }
+
   async function artworkAction(path, body = {}, name = "Artwork change") {
     await performDesignerMutation(path, body, { name });
   }
@@ -1184,16 +1197,25 @@
     const direct = initialTarget || event.target.closest?.(
       ".tile-paint-hit.editable, .designer-tile.editable, .partial-parent-hit.editable",
     );
-    if (direct) return direct;
-    if (event.clientX === undefined || event.clientY === undefined) return null;
+    if (event.clientX === undefined || event.clientY === undefined) return direct;
     const svg = byId("mosaic-canvas");
     const matrix = svg.getScreenCTM();
-    if (!matrix) return null;
+    if (!matrix) return direct;
     const pointer = svg.createSVGPoint();
     pointer.x = event.clientX;
     pointer.y = event.clientY;
     const physical = pointer.matrixTransform(matrix.inverse());
-    const matched = state.project.geometry.tiles.find((tile) => (
+    const geometry = state.project.geometry;
+    const outsidePhysicalCanvas = (
+      physical.x < 0 || physical.x > geometry.width_in
+      || physical.y < 0 || physical.y > geometry.height_in
+    );
+    // Clipped visible-piece polygons can collapse to a shared boundary line.
+    // Browsers may report one of those degenerate paint hits even when the
+    // pointer is outside the finished panel. Full-parent geometry is the
+    // authority there so the outline follows the actual tile under the cursor.
+    if (direct && !outsidePhysicalCanvas) return direct;
+    const matched = geometry.tiles.find((tile) => (
       tile.editable && pointInPolygon(
         physical.x, physical.y, tileInteractionVertices(tile),
       )
@@ -1367,7 +1389,7 @@
     };
   }
 
-  function fullHexInteractionBounds(geometry) {
+  function fullTileInteractionBounds(geometry) {
     const bounds = {
       minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity,
     };
@@ -1390,7 +1412,7 @@
     const horizontalPadding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
     const verticalPadding = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
     const geometry = state.project.geometry;
-    const interaction = fullHexInteractionBounds(geometry);
+    const interaction = fullTileInteractionBounds(geometry);
     const fitted = calculateFitSize(
       viewport.clientWidth,
       viewport.clientHeight,
@@ -1400,15 +1422,9 @@
       verticalPadding,
     );
     if (fitted.scale > 0 && Number.isFinite(fitted.scale)) {
-      svg.style.width = `${geometry.width_in * fitted.scale}px`;
-      svg.style.height = `${geometry.height_in * fitted.scale}px`;
-      const offsetX = (
-        (interaction.minX + interaction.maxX - geometry.width_in) / 2
-      ) * fitted.scale;
-      const offsetY = (
-        (interaction.minY + interaction.maxY - geometry.height_in) / 2
-      ) * fitted.scale;
-      svg.style.transform = `translate(${-offsetX}px, ${-offsetY}px)`;
+      svg.style.width = `${(interaction.maxX - interaction.minX) * fitted.scale}px`;
+      svg.style.height = `${(interaction.maxY - interaction.minY) * fitted.scale}px`;
+      svg.style.transform = "none";
     }
   }
 
@@ -1884,6 +1900,9 @@
     byId("artwork-file").click();
   });
   byId("artwork-file").addEventListener("change", (event) => uploadArtwork(event.target.files[0]));
+  document.querySelectorAll(".artwork-shape").forEach((button) => {
+    button.addEventListener("click", () => chooseBuiltinArtwork(button.dataset.shapeId));
+  });
   byId("artwork-remove").addEventListener("click", () => artworkAction("/api/designer/artwork/remove", {}, "Remove artwork"));
   byId("artwork-reset").addEventListener("click", () => artworkAction("/api/designer/artwork/reset", {}, "Reset artwork"));
   byId("artwork-generate").addEventListener("click", generateArtwork);
